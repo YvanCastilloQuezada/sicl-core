@@ -1,0 +1,6 @@
+SICL DASHBOARD
+[##########] 100%
+Project: EDIFICIO-YVAN-TRUJILLO-01 | Stage: DRAFT
+Objectives=1 Constraints=2 Alternatives=2
+Evaluations=2 Comparisons=1 Recommendations=0
+Events=15 | Last events: ALTERNATIVE_CREATED, ALTERNATIVE_CREATED, EVALUATION_RECORDED, EVALUATION_RECORDED, COMPARISON_CREATED

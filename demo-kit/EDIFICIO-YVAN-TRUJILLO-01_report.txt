@@ -1,0 +1,26 @@
+================================================================
+SICL PROJECT REPORT — EDIFICIO-YVAN-TRUJILLO-01
+================================================================
+Name: Edificio Yvan Trujillo
+Stage: DRAFT
+Objectives: 1
+Constraints: 2
+Roles: 1
+Facts: 4 | Assumptions: 1
+Alternatives: 2
+Evaluations: 2
+Comparisons: 1
+Recommendations: 0
+Decisions: 0
+Events: 15
+
+OBJECTIVES
+- CLIMATE: MAXIMIZE 80
+
+CONSTRAINTS
+- ZONIFICACION = C-2 (Comercial) Municipalidad
+- HEIGHT <= 6 FLOORS
+
+RECOMMENDATIONS
+
+DECISIONS

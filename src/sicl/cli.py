@@ -35,7 +35,7 @@ class CLI:
         try:
             parts = shlex.split(command)
             if not parts or parts[0] == "/HELP":
-                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
+                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/SITE INTELLIGENCE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
             head = tuple(p.upper() for p in parts[:2])
             if head == ("/EXIT",):
                 self.closed = True
@@ -60,6 +60,8 @@ class CLI:
                 return self.fact_set(parts[2:])
             if head == ("/ASSUMPTION", "SET"):
                 return self.assumption_set(parts[2:])
+            if head == ("/SITE", "INTELLIGENCE"):
+                return self.site_intelligence(" ".join(parts[2:]))
             if head == ("/DECISION", "RECORD"):
                 return self.decision_record(parts[2:])
             if head == ("/ALTERNATIVE", "CREATE"):
@@ -138,10 +140,10 @@ class CLI:
         self.repo.insert_entity_and_event("INSERT INTO objectives VALUES (?, ?, ?, ?, ?, ?)", (oid, p.project_id, key, direction, value, 1), p, self._event(p.project_id, "OBJECTIVE_SET", asdict(o)))
         return self._ok(asdict(o))
 
-    def constraint_set(self, args: list[str]) -> dict:
+    def constraint_set(self, args: list[str], *, source: str = "USER_COMMAND") -> dict:
         if len(args) not in (3, 4): raise SICLError("INVALID_ARGUMENT", "key operator value [unit] required")
         p = self._require_open(); key, operator, value = args[:3]; unit = args[3] if len(args) == 4 else ""; cid = f"CON-{uuid.uuid4().hex[:10]}"; c = Constraint(cid, p.project_id, key, operator, value, unit, True); p.constraints[cid] = c; p.version += 1
-        self.repo.insert_entity_and_event("INSERT INTO constraints_ VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (cid, p.project_id, key, operator, value, unit, 1, 1), p, self._event(p.project_id, "CONSTRAINT_SET", asdict(c)))
+        self.repo.insert_entity_and_event("INSERT INTO constraints_ VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (cid, p.project_id, key, operator, value, unit, 1, 1), p, self._event(p.project_id, "CONSTRAINT_SET", asdict(c), source))
         return self._ok(asdict(c))
 
     def role_add(self, args: list[str]) -> dict:
@@ -150,11 +152,32 @@ class CLI:
         self.repo.insert_entity_and_event("INSERT INTO roles VALUES (?, ?, ?, ?, ?)", (rid, p.project_id, name, actor, 1), p, self._event(p.project_id, "ROLE_ADDED", asdict(r)))
         return self._ok(asdict(r))
 
-    def fact_set(self, args: list[str]) -> dict:
+    def fact_set(self, args: list[str], *, event_source: str = "USER_COMMAND") -> dict:
         if not args: raise SICLError("INVALID_ARGUMENT", "statement required")
         p = self._require_open(); statement, source = args[0], " ".join(args[1:]); fid = f"FACT-{uuid.uuid4().hex[:10]}"; f = Fact(fid, p.project_id, statement, source); p.facts[fid] = f; p.version += 1
-        self.repo.insert_entity_and_event("INSERT INTO facts VALUES (?, ?, ?, ?, ?)", (fid, p.project_id, statement, source, 1), p, self._event(p.project_id, "FACT_SET", asdict(f)))
+        self.repo.insert_entity_and_event("INSERT INTO facts VALUES (?, ?, ?, ?, ?)", (fid, p.project_id, statement, source, 1), p, self._event(p.project_id, "FACT_SET", asdict(f), event_source))
         return self._ok(asdict(f))
+
+    def site_intelligence(self, location: str) -> dict:
+        if not location:
+            raise SICLError("INVALID_ARGUMENT", "location required")
+        if "TRUJILLO" not in location.upper():
+            return {"status": "REQUIRES_HUMAN_DECISION", "code": "LOCATION_NOT_RECOGNIZED", "message": "Ubicación no reconocida. Ingrese datos manualmente.", "data": {"location": location}}
+        source = "SITE_INTELLIGENCE_API"
+        facts = [
+            ("Clima: Semiárido cálido (BSk Köppen), T° promedio 21°C", "SENAMHI"),
+            ("Radiación solar: 5.5 kWh/m²/día anual", "NASA_POWER"),
+            ("Vientos predominantes: Sur-Suroeste", "SENAMHI"),
+        ]
+        recorded = []
+        existing = self._project()
+        for statement, evidence_source in facts:
+            if not any(f.statement == statement for f in existing.facts.values()):
+                recorded.append(self.fact_set([statement, evidence_source], event_source=source)["data"])
+                existing = self._project()
+        if not any(c.key == "ZONIFICACION" and c.value == "C-2 (Comercial)" for c in existing.constraints.values()):
+            recorded.append(self.constraint_set(["ZONIFICACION", "=", "C-2 (Comercial)", "Municipalidad"], source=source)["data"])
+        return self._ok({"location": location, "source": source, "records": recorded, "simulated": True})
 
     def assumption_set(self, args: list[str]) -> dict:
         if not args: raise SICLError("INVALID_ARGUMENT", "statement required")
