@@ -1,52 +1,91 @@
-# SICL Core API v1.0
+# SICL Core
 
-Capa REST FastAPI sobre el Core CLI existente. La API no duplica reglas de dominio: traduce requests a comandos SICL y devuelve respuestas estructuradas.
+SICL (Spatial Intelligence Command Language) es una arquitectura de decisión espacial que conserva la separación entre evidencia, análisis y autoridad humana. El Core es la fuente de verdad del dominio: registra proyectos, hechos, supuestos, objetivos, restricciones, alternativas, evaluaciones, recomendaciones y decisiones mediante eventos trazables.
 
-## Ejecutar
+## Estado actual
 
-Desde `/home/ubuntu/sicl-core-v1.0`:
+**Línea:** SICL Core v1.2 feature set, con API REST FastAPI y persistencia SQLite.
 
-```bash
-uvicorn api.main:app --reload --port 8000
+**Estado de verificación:** suite Core/API aprobada localmente; el despliegue remoto y el E2E navegador–API dependen de una URL real del servicio y de `VITE_API_URL` en el frontend.
+
+La recomendación analítica nunca se convierte automáticamente en decisión. La decisión requiere actor y autoridad humana explícitos.
+
+## Estructura
+
+```text
+src/sicl/       Dominio, CLI, persistencia y exportaciones
+api/             Adaptador REST FastAPI
+ tests/          Pruebas del dominio y de la API
+docs/            Contratos, alcance y configuración
+exports/         Salidas generadas localmente; ignoradas por Git
 ```
 
-Health check:
+## Requisitos
+
+- Python 3.11 o superior.
+- `pip` y un entorno virtual.
+- SQLite, incluido en Python.
+
+## Instalación local
 
 ```bash
-curl http://localhost:8000/health
+cd sicl-core-v1.0
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -e ".[test,api]"
 ```
 
-## Endpoints
+## Ejecutar la CLI
 
-| Método | Ruta | Propósito |
+```bash
+sicl
+```
+
+La CLI admite comandos como `/PROJECT CREATE`, `/FACT SET`, `/ASSUMPTION SET`, `/OBJECTIVE SET`, `/CONSTRAINT SET`, `/ALTERNATIVE CREATE`, `/EVALUATE`, `/COMPARE`, `/RECOMMEND`, `/DECISION RECORD` y exportaciones.
+
+## Ejecutar la API
+
+```bash
+PYTHONPATH=src uvicorn api.main:app --host 127.0.0.1 --port 8000
+```
+
+Verificación:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+Rutas principales:
+
+| Método | Ruta | Función |
 |---|---|---|
-| GET | `/projects` | Lista proyectos |
-| POST | `/projects` | Crea un proyecto |
-| GET | `/projects/{project_id}` | Recupera un proyecto |
-| PUT | `/projects/{project_id}` | Actualiza la etapa |
-| DELETE | `/projects/{project_id}` | Cierre lógico; no elimina historial |
-| POST | `/commands` | Ejecuta un comando SICL |
-
-Ejemplo:
-
-```bash
-curl -X POST http://localhost:8000/projects \
-  -H 'content-type: application/json' \
-  -d '{"project_id":"UPAO-001","name":"Plaza Center","actor":"architect"}'
-```
-
-## CORS
-
-Por defecto se permite `*` para desarrollo. En despliegue se recomienda configurar:
-
-```bash
-export SICL_CORS_ORIGINS=https://siclcc-cxipx7sy.manus.space
-```
+| GET | `/health` | Salud del servicio |
+| GET | `/projects` | Listar proyectos |
+| POST | `/projects` | Crear proyecto |
+| GET | `/projects/{project_id}` | Recuperar snapshot |
+| PUT | `/projects/{project_id}` | Cambiar etapa |
+| POST | `/commands` | Ejecutar comando SICL |
 
 ## Pruebas
 
 ```bash
-python3 -m pytest -ra
+python -m pytest -ra
+python -m compileall -q src api tests
 ```
 
-La API mantiene la persistencia SQLite y los eventos append-only del Core. `DELETE /projects/{id}` es un cierre lógico (`STAGE=CLOSED`) para no destruir estado ni historial.
+La integración CI instala `.[test,api]` y ejecuta la suite completa. Los datos locales, secretos, bases SQLite y exportaciones no deben subirse al repositorio.
+
+## CORS y frontend
+
+En despliegue, configure únicamente los orígenes conocidos:
+
+```bash
+export SICL_CORS_ORIGINS=https://<frontend-host>
+```
+
+El frontend utiliza `VITE_API_URL` para apuntar a este servicio. Nunca coloque tokens de servicio en código cliente.
+
+## Licencia
+
+Este repositorio se distribuye actualmente como **Proprietary — All rights reserved**. Cualquier cambio a una licencia abierta requiere una decisión explícita del Product Owner.
