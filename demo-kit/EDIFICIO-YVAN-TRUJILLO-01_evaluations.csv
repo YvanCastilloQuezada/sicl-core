@@ -1,0 +1,3 @@
+alternative_id,confidence,evaluation_id,objective_id,source,unit,value,version
+ALT-49f32160d2,0.9,EVAL-e745280e4d,OBJ-28fc951aba,USER_INPUT,score,80.0,1
+ALT-e5b77a64ca,0.8,EVAL-c45d0f86d2,OBJ-28fc951aba,USER_INPUT,score,70.0,1
