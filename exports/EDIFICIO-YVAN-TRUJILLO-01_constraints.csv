@@ -1,0 +1,4 @@
+constraint_id,hard,key,operator,project_id,unit,value,version
+CON-360aae6392,True,HEIGHT,<=,EDIFICIO-YVAN-TRUJILLO-01,FLOORS,8,1
+CON-e210e67040,True,BUDGET,<=,EDIFICIO-YVAN-TRUJILLO-01,PEN,3000000,1
+CON-dc3a22a19f,True,FAR,<=,EDIFICIO-YVAN-TRUJILLO-01,,5.0,1
