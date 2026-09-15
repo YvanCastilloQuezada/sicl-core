@@ -57,7 +57,8 @@ class SQLiteRepository:
         CREATE TABLE IF NOT EXISTS alternatives (
           id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
           name TEXT NOT NULL, description TEXT NOT NULL, parameters_json TEXT NOT NULL,
-          status TEXT NOT NULL, version INTEGER NOT NULL
+          status TEXT NOT NULL, version INTEGER NOT NULL,
+          source TEXT NOT NULL DEFAULT 'USER_COMMAND'
         );
         CREATE TABLE IF NOT EXISTS evaluations (
           id TEXT PRIMARY KEY, alternative_id TEXT NOT NULL REFERENCES alternatives(id),
@@ -89,6 +90,9 @@ class SQLiteRepository:
         columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(events)")}
         if "source" not in columns:
             self.conn.execute("ALTER TABLE events ADD COLUMN source TEXT NOT NULL DEFAULT 'USER_COMMAND'")
+        alternative_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(alternatives)")}
+        if "source" not in alternative_columns:
+            self.conn.execute("ALTER TABLE alternatives ADD COLUMN source TEXT NOT NULL DEFAULT 'USER_COMMAND'")
         self.conn.commit()
 
     @contextmanager
@@ -126,7 +130,7 @@ class SQLiteRepository:
         p.facts = {r["fact_id"]: Fact(**dict(r)) for r in self.conn.execute("SELECT * FROM facts WHERE project_id=?", (project_id,))}
         p.assumptions = {r["assumption_id"]: Assumption(**dict(r)) for r in self.conn.execute("SELECT * FROM assumptions WHERE project_id=?", (project_id,))}
         p.decisions = {r["decision_id"]: Decision(**dict(r)) for r in self.conn.execute("SELECT * FROM decisions WHERE project_id=?", (project_id,))}
-        p.alternatives = {r["id"]: Alternative(r["id"], r["project_id"], r["name"], r["description"], json.loads(r["parameters_json"]), r["status"], r["version"]) for r in self.conn.execute("SELECT * FROM alternatives WHERE project_id=?", (project_id,))}
+        p.alternatives = {r["id"]: Alternative(r["id"], r["project_id"], r["name"], r["description"], json.loads(r["parameters_json"]), r["status"], r["version"], r["source"]) for r in self.conn.execute("SELECT * FROM alternatives WHERE project_id=?", (project_id,))}
         p.evaluations = {r["id"]: Evaluation(r["id"], r["alternative_id"], r["objective_id"], r["value"], r["unit"], r["confidence"], r["source"], r["version"]) for r in self.conn.execute("SELECT e.* FROM evaluations e JOIN alternatives a ON a.id=e.alternative_id WHERE a.project_id=?", (project_id,))}
         p.comparisons = {r["id"]: Comparison(r["id"], r["project_id"], json.loads(r["alternative_ids_json"]), [p.evaluations[eid] for eid in json.loads(r["evaluations_json"])], json.loads(r["tradeoffs_json"]), r["version"]) for r in self.conn.execute("SELECT * FROM comparisons WHERE project_id=?", (project_id,))}
         p.recommendations = {r["id"]: Recommendation(r["id"], r["comparison_id"], r["recommended_alternative_id"], r["reason"], r["confidence"], r["status"], r["version"]) for r in self.conn.execute("SELECT r.* FROM recommendations r JOIN comparisons c ON c.id=r.comparison_id WHERE c.project_id=?", (project_id,))}
