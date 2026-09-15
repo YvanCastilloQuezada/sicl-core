@@ -126,3 +126,69 @@ El Product Owner debe cerrar diciendo:
 | Pareto | Devuelve no dominadas, dominadas e incompletas |
 | Mutabilidad | Site Intelligence, agente y Pareto conservan historial append-only |
 | Decisión | Solo un actor humano puede registrar `Decision` |
+
+## 4. Generación paramétrica de alternativas
+
+### Comando
+
+```text
+/GENERATE CONVENCIONAL_A ENERGY_SAVINGS,CONSTRUCTION_COST
+```
+
+### Qué debe decir el Product Owner
+
+> “A partir de la evidencia registrada y de las evaluaciones de los agentes, SICL puede proponer variaciones paramétricas para explorar soluciones. Estas propuestas no son decisiones ni recomendaciones: son alternativas nuevas, deterministas y trazables que el arquitecto puede aceptar, descartar o evaluar posteriormente.”
+
+### Qué debe observar el arquitecto
+
+- Se crean una o más alternativas nuevas con estado `PROPOSED`.
+- La fuente aparece como `GENERATIVE_OPTIMIZER`.
+- Ante sobrepresupuesto, la regla puede reducir el número de pisos o el área.
+- Ante bajo desempeño energético, la regla puede proponer una fachada de doble piel.
+- Se registra `ALTERNATIVE_GENERATED` en el historial append-only.
+- La respuesta indica explícitamente `decision_created=false` y `recommendation_created=false`.
+- No se utiliza LLM: la propuesta procede de reglas deterministas auditables.
+
+### Pregunta clave de validación
+
+> “¿La propuesta generada es suficientemente transparente para que el arquitecto pueda identificar qué evidencia y qué regla produjeron cada cambio antes de incorporarla a su proceso profesional?”
+
+## 5. Matriz automatizada de trade-offs
+
+### Comando
+
+```text
+/TRADEOFF_MATRIX ENERGY_SAVINGS CONSTRUCTION_COST
+```
+
+### Qué debe decir el Product Owner
+
+> “Ahora comparamos todas las alternativas, incluidas las propuestas generadas. SICL muestra los valores de cada objetivo, calcula los deltas respecto de la alternativa base y señala cuáles pertenecen al frente de Pareto. La herramienta organiza el conflicto; no decide cuál solución debe construirse.”
+
+### Qué debe observar el arquitecto
+
+- La matriz incluye alternativas originales y generadas.
+- Cada fila muestra los valores de `ENERGY_SAVINGS` y `CONSTRUCTION_COST`.
+- Los deltas se expresan de forma explícita y porcentual respecto de la alternativa base.
+- El frente de Pareto aparece identificado sin convertirlo en un ganador automático.
+- Las alternativas con datos insuficientes permanecen visibles como incompletas o sin evaluación.
+- El comando es read-only y no crea `Recommendation` ni `Decision`.
+
+### Pregunta clave de validación
+
+> “¿La matriz y sus deltas permiten comprender el costo de cada mejora energética, y son suficientes para que el arquitecto decida qué trade-off desea priorizar?”
+
+## 6. Validación constitucional específica de la Fase 5
+
+| Criterio | PASS esperado |
+|---|---|
+| Determinismo | La misma alternativa y las mismas evaluaciones producen la misma transformación paramétrica, salvo identificadores técnicos nuevos. |
+| Estado inicial | Toda alternativa generada inicia como `PROPOSED`. |
+| Procedencia | Toda alternativa generada conserva `source=GENERATIVE_OPTIMIZER`. |
+| Trazabilidad | Cada generación registra `ALTERNATIVE_GENERATED`. |
+| Autoridad humana | La generación no crea `Recommendation` ni `Decision`. |
+| Inmutabilidad | Los eventos de generación son append-only. |
+| Comparación | `TRADEOFF_MATRIX` incluye originales, propuestas, deltas y Pareto. |
+| Alcance | No se utilizan LLMs ni agentes autónomos para generar alternativas. |
+
+La demostración debe terminar con una revisión humana explícita de las alternativas propuestas. Ninguna alternativa generada debe presentarse como aprobada, seleccionada o decidida automáticamente.
