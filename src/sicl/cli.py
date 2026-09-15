@@ -11,7 +11,7 @@ from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
 from .site_intelligence import get_site_observation
-from .agents import BioclimaticAgent
+from .agents import BioclimaticAgent, EconomicAgent, StructuralAgent
 from .optimization import pareto_front
 
 
@@ -83,6 +83,8 @@ class CLI:
                 return self.recommend()
             if parts[0].upper() == "/PARETO":
                 return self.pareto(parts[1:])
+            if parts[0].upper() == "/DEBATE":
+                return self.debate(parts[1:])
             if parts[0].upper() == "/REPORT":
                 return self._text_response(report_text(self.repo, self._project()))
             if parts[0].upper() == "/TRADEOFFS":
@@ -268,6 +270,32 @@ class CLI:
             raise SICLError("INVALID_STATE", "both objectives with evaluations are required")
         result = pareto_front(p.alternatives.values(), p.evaluations.values(), objectives)
         return self._ok({"non_dominated": result.non_dominated, "dominated": result.dominated, "incomplete": result.incomplete, "decision_created": False})
+
+    def debate(self, args: list[str]) -> dict:
+        if len(args) != 1:
+            raise SICLError("INVALID_ARGUMENT", "alternative id or name required")
+        p = self._project()
+        alternative = next((item for item in p.alternatives.values() if item.alternative_id == args[0] or item.name == args[0].upper()), None)
+        if alternative is None:
+            raise SICLError("INVALID_ARGUMENT", f"alternative not found: {args[0]}")
+        agents = [BioclimaticAgent(), StructuralAgent(), EconomicAgent()]
+        lines = ["SICL MULTI-AGENT DEBATE", f"Alternative: {alternative.name}", ""]
+        evaluations = []
+        for agent in agents:
+            try:
+                evaluation = agent.evaluate(alternative, p)
+                evaluations.append(evaluation)
+                stance = "aprueba" if evaluation.value >= 0 else "rechaza"
+                lines.append(f"El Agente {agent.name.title()} {stance}: {evaluation.value} {evaluation.unit} (EXPERT_SYSTEM).")
+            except ValueError as error:
+                lines.append(f"El Agente {agent.name.title()} requiere datos: {error}.")
+        if evaluations:
+            positive = sum(item.value >= 0 for item in evaluations)
+            verdict = f"{positive}/{len(evaluations)} agentes producen evaluaciones no negativas; revisar trade-offs antes de decidir."
+        else:
+            verdict = "No hay evaluaciones suficientes para un veredicto analítico."
+        lines.extend(["", f"VEREDICTO DEL DEBATE: {verdict}", "DECISION CREADA: NO"])
+        return self._text_response("\n".join(lines) + "\n")
 
     def evaluate(self, args: list[str]) -> dict:
         if len(args) < 3 or len(args) > 6:
