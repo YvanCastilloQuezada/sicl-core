@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: sicl-core
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SICL_DB_PATH
+        value: /data/sicl/sicl.sqlite
+      - key: SICL_CORS_ORIGINS
+        value: "*"
+    disk:
+      name: sicl-data
+      mountPath: /data/sicl
+      sizeGB: 1
