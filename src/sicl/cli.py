@@ -10,6 +10,9 @@ from .domain import Assumption, Constraint, Decision, Event, Fact, Objective, Pr
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
+from .site_intelligence import get_site_observation
+from .agents import BioclimaticAgent
+from .optimization import pareto_front
 
 
 class CLI:
@@ -62,6 +65,8 @@ class CLI:
                 return self.assumption_set(parts[2:])
             if head == ("/SITE", "INTELLIGENCE"):
                 return self.site_intelligence(" ".join(parts[2:]))
+            if head == ("/AGENT", "RUN"):
+                return self.agent_run(parts[2:])
             if head == ("/DECISION", "RECORD"):
                 return self.decision_record(parts[2:])
             if head == ("/ALTERNATIVE", "CREATE"):
@@ -76,6 +81,8 @@ class CLI:
                 return self.compare(parts[1:])
             if parts[0].upper() == "/RECOMMEND":
                 return self.recommend()
+            if parts[0].upper() == "/PARETO":
+                return self.pareto(parts[1:])
             if parts[0].upper() == "/REPORT":
                 return self._text_response(report_text(self.repo, self._project()))
             if parts[0].upper() == "/TRADEOFFS":
@@ -161,13 +168,15 @@ class CLI:
     def site_intelligence(self, location: str) -> dict:
         if not location:
             raise SICLError("INVALID_ARGUMENT", "location required")
-        if "TRUJILLO" not in location.upper():
+        try:
+            observation = get_site_observation(location)
+        except ValueError:
             return {"status": "REQUIRES_HUMAN_DECISION", "code": "LOCATION_NOT_RECOGNIZED", "message": "Ubicación no reconocida. Ingrese datos manualmente.", "data": {"location": location}}
-        source = "SITE_INTELLIGENCE_API"
+        source = observation.source
         facts = [
-            ("Clima: Semiárido cálido (BSk Köppen), T° promedio 21°C", "SENAMHI"),
-            ("Radiación solar: 5.5 kWh/m²/día anual", "NASA_POWER"),
-            ("Vientos predominantes: Sur-Suroeste", "SENAMHI"),
+            (f"Coordenadas: {observation.latitude}, {observation.longitude}", source),
+            (f"Temperatura media observada: {observation.temperature_mean_c} °C", source),
+            (f"Viento máximo medio: {observation.wind_speed_kmh} km/h; radiación: {observation.radiation_kwh_m2_day} kWh/m²/día", source),
         ]
         recorded = []
         existing = self._project()
@@ -177,7 +186,7 @@ class CLI:
                 existing = self._project()
         if not any(c.key == "ZONIFICACION" and c.value == "C-2 (Comercial)" for c in existing.constraints.values()):
             recorded.append(self.constraint_set(["ZONIFICACION", "=", "C-2 (Comercial)", "Municipalidad"], source=source)["data"])
-        return self._ok({"location": location, "source": source, "records": recorded, "simulated": True})
+        return self._ok({"location": location, "source": source, "records": recorded, "simulated": observation.simulated, "latitude": observation.latitude, "longitude": observation.longitude})
 
     def assumption_set(self, args: list[str]) -> dict:
         if not args: raise SICLError("INVALID_ARGUMENT", "statement required")
@@ -231,6 +240,34 @@ class CLI:
     def alternative_list(self) -> dict:
         p = self._project()
         return self._ok({"alternatives": [asdict(a) for a in p.alternatives.values()]})
+
+    def agent_run(self, args: list[str]) -> dict:
+        if len(args) != 2 or args[0].upper() != "BIOCLIMATIC":
+            raise SICLError("INVALID_ARGUMENT", "usage: /AGENT RUN BIOCLIMATIC alternative")
+        p = self._require_open()
+        alternative = next((item for item in p.alternatives.values() if item.alternative_id == args[1] or item.name == args[1].upper()), None)
+        if alternative is None:
+            raise SICLError("INVALID_ARGUMENT", f"alternative not found: {args[1]}")
+        evaluation = BioclimaticAgent().evaluate(alternative, p)
+        p.evaluations[evaluation.evaluation_id] = evaluation
+        p.version += 1
+        self.repo.insert_entity_and_event(
+            "INSERT INTO evaluations VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (evaluation.evaluation_id, evaluation.alternative_id, evaluation.objective_id, evaluation.value, evaluation.unit, evaluation.confidence, evaluation.source, evaluation.version),
+            p,
+            self._event(p.project_id, "AGENT_EVALUATION_RECORDED", asdict(evaluation), "EXPERT_SYSTEM"),
+        )
+        return self._ok({"agent": "BIOCLIMATIC", "evaluation": asdict(evaluation), "decision_created": False})
+
+    def pareto(self, args: list[str]) -> dict:
+        if len(args) != 2:
+            raise SICLError("INVALID_ARGUMENT", "two objective keys required")
+        p = self._project()
+        objectives = [item for key in args for item in p.objectives.values() if item.key == key]
+        if len(objectives) != 2:
+            raise SICLError("INVALID_STATE", "both objectives with evaluations are required")
+        result = pareto_front(p.alternatives.values(), p.evaluations.values(), objectives)
+        return self._ok({"non_dominated": result.non_dominated, "dominated": result.dominated, "incomplete": result.incomplete, "decision_created": False})
 
     def evaluate(self, args: list[str]) -> dict:
         if len(args) < 3 or len(args) > 6:
