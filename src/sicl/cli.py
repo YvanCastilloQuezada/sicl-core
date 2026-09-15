@@ -12,7 +12,7 @@ from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
 from .site_intelligence import get_site_observation
 from .agents import BioclimaticAgent, EconomicAgent, StructuralAgent
-from .optimization import pareto_front
+from .optimization import GenerativeOptimizer, pareto_front, tradeoff_matrix
 
 
 class CLI:
@@ -38,7 +38,7 @@ class CLI:
         try:
             parts = shlex.split(command)
             if not parts or parts[0] == "/HELP":
-                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/SITE INTELLIGENCE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
+                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
             head = tuple(p.upper() for p in parts[:2])
             if head == ("/EXIT",):
                 self.closed = True
@@ -85,6 +85,10 @@ class CLI:
                 return self.pareto(parts[1:])
             if parts[0].upper() == "/DEBATE":
                 return self.debate(parts[1:])
+            if parts[0].upper() == "/GENERATE":
+                return self.generate(parts[1:])
+            if parts[0].upper() == "/TRADEOFF_MATRIX":
+                return self.tradeoff_matrix_command(parts[1:])
             if parts[0].upper() == "/REPORT":
                 return self._text_response(report_text(self.repo, self._project()))
             if parts[0].upper() == "/TRADEOFFS":
@@ -211,8 +215,8 @@ class CLI:
         p.alternatives[aid] = alternative
         p.version += 1
         self.repo.insert_entity_and_event(
-            "INSERT INTO alternatives VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (aid, p.project_id, alternative.name, alternative.description, "{}", alternative.status, alternative.version),
+            "INSERT INTO alternatives VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (aid, p.project_id, alternative.name, alternative.description, "{}", alternative.status, alternative.version, alternative.source),
             p,
             self._event(p.project_id, "ALTERNATIVE_CREATED", asdict(alternative)),
         )
@@ -270,6 +274,37 @@ class CLI:
             raise SICLError("INVALID_STATE", "both objectives with evaluations are required")
         result = pareto_front(p.alternatives.values(), p.evaluations.values(), objectives)
         return self._ok({"non_dominated": result.non_dominated, "dominated": result.dominated, "incomplete": result.incomplete, "decision_created": False})
+
+    def generate(self, args: list[str]) -> dict:
+        if len(args) != 2:
+            raise SICLError("INVALID_ARGUMENT", "alternative and target objectives required")
+        p = self._require_open()
+        alternative = next((item for item in p.alternatives.values() if item.alternative_id == args[0] or item.name == args[0].upper()), None)
+        if alternative is None:
+            raise SICLError("INVALID_ARGUMENT", f"alternative not found: {args[0]}")
+        target_objectives = {item.upper() for item in args[1].split(",")}
+        evaluations = [item for item in p.evaluations.values() if item.alternative_id == alternative.alternative_id]
+        proposals = GenerativeOptimizer().generate(alternative, evaluations)
+        proposals = [item for item in proposals if not target_objectives or any(item_key in target_objectives for item_key in ("ENERGY_SAVINGS", "CONSTRUCTION_COST", "ESTIMATED_COST"))]
+        for proposal in proposals:
+            p.alternatives[proposal.alternative_id] = proposal
+            p.version += 1
+            self.repo.insert_entity_and_event(
+                "INSERT INTO alternatives VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (proposal.alternative_id, proposal.project_id, proposal.name, proposal.description, json.dumps(proposal.parameters, sort_keys=True), proposal.status, proposal.version, proposal.source),
+                p,
+                self._event(p.project_id, "ALTERNATIVE_GENERATED", asdict(proposal), proposal.source),
+            )
+        return self._ok({"generated": [asdict(item) for item in proposals], "decision_created": False, "recommendation_created": False})
+
+    def tradeoff_matrix_command(self, args: list[str]) -> dict:
+        if len(args) != 2:
+            raise SICLError("INVALID_ARGUMENT", "two objective keys required")
+        p = self._project()
+        objectives = [item for key in args for item in p.objectives.values() if item.key == key]
+        if len(objectives) != 2:
+            raise SICLError("INVALID_STATE", "both objectives with evaluations are required")
+        return self._text_response(tradeoff_matrix(p.alternatives.values(), p.evaluations.values(), objectives))
 
     def debate(self, args: list[str]) -> dict:
         if len(args) != 1:

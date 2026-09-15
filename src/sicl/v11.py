@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-ALTERNATIVE_STATUSES = {"GENERATED", "FEASIBLE", "REJECTED", "SELECTED", "ARCHIVED"}
+ALTERNATIVE_STATUSES = {"GENERATED", "PROPOSED", "FEASIBLE", "REJECTED", "SELECTED", "ARCHIVED"}
 EVALUATION_SOURCES = {"USER_INPUT", "AI_INFERENCE", "SIMULATION", "FACT", "ASSUMPTION", "EXPERT_SYSTEM"}
 RECOMMENDATION_STATUSES = {"PENDING_APPROVAL", "APPROVED", "REJECTED"}
 
@@ -17,6 +17,7 @@ class Alternative:
     parameters: dict[str, Any] = field(default_factory=dict)
     status: str = "GENERATED"
     version: int = 1
+    source: str = "USER_COMMAND"
 
     def __post_init__(self) -> None:
         self.name = self.name.upper()
