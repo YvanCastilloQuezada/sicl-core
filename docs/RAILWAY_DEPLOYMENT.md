@@ -21,10 +21,11 @@ Configure estas variables en **Variables** del servicio:
 | Variable | Valor | Observación |
 |---|---|---|
 | `SICL_DB_PATH` | `/data/sicl/sicl.sqlite` | Ruta recomendada dentro del volumen persistente |
+| `DATABASE_URL` | `./sicl.db` | Alternativa compatible para una primera ejecución sin `SICL_DB_PATH` |
 | `SICL_CORS_ORIGINS` | `https://<dominio-real-del-frontend>` | Sustituir por el origen real; sin barra final |
 | `PORT` | Gestionada por Railway | No fijar manualmente salvo que Railway lo requiera |
 
-`DATABASE_URL` es aceptada como compatibilidad por el adaptador, pero `SICL_DB_PATH` es la variable canónica del servicio actual.
+Si se configuran ambas, `SICL_DB_PATH` tiene prioridad. Para una prueba inicial puede configurarse `DATABASE_URL=./sicl.db`; para producción con volumen, use `SICL_DB_PATH=/data/sicl/sicl.sqlite`.
 
 ### Persistencia
 
