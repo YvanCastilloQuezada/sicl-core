@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from urllib.parse import urlencode
+from typing import Any
 from urllib.request import Request, urlopen
+
+from .domain import KNOWLEDGE_STATES
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 @dataclass(frozen=True)
@@ -16,6 +25,21 @@ class SiteObservation:
     radiation_kwh_m2_day: float
     source: str
     simulated: bool = False
+    state: str = "OBSERVED"
+    captured_at: str = ""
+    raw_response: dict[str, Any] = field(default_factory=dict)
+    method_version: str = "OPEN_METEO_DAILY_INDICATORS/1"
+    evidence_url: str = ""
+    evidence_hash: str = ""
+
+    def __post_init__(self) -> None:
+        if self.state not in KNOWLEDGE_STATES:
+            raise ValueError(f"invalid knowledge state: {self.state}")
+        if not self.captured_at:
+            object.__setattr__(self, "captured_at", _now_iso())
+        if not self.evidence_hash and self.raw_response:
+            canonical = json.dumps(self.raw_response, sort_keys=True, separators=(",", ":")).encode()
+            object.__setattr__(self, "evidence_hash", hashlib.sha256(canonical).hexdigest())
 
 
 FALLBACK_TRUJILLO = SiteObservation(
@@ -27,6 +51,9 @@ FALLBACK_TRUJILLO = SiteObservation(
     radiation_kwh_m2_day=5.5,
     source="SITE_INTELLIGENCE_FIXTURE",
     simulated=True,
+    method_version="DETERMINISTIC_FIXTURE/1",
+    raw_response={"fixture": "FALLBACK_TRUJILLO"},
+    evidence_url="fixture://FALLBACK_TRUJILLO",
 )
 
 
@@ -72,6 +99,9 @@ def fetch_open_meteo(location: str, timeout: float = 5.0) -> SiteObservation:
         wind_speed_kmh=round(sum(wind) / len(wind), 2),
         radiation_kwh_m2_day=round(sum(radiation) / len(radiation), 2),
         source="OPEN_METEO_API",
+        raw_response={"geocoding": geo, "weather": weather},
+        method_version="OPEN_METEO_GEOCODING_FORECAST/1",
+        evidence_url=f"{geo_url} | {weather_url}",
     )
 
 

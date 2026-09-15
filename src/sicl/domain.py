@@ -8,6 +8,7 @@ from .v11 import Alternative, Comparison, Evaluation, Recommendation
 
 STAGES = {"DRAFT", "ACTIVE", "PRELIMINARY_DESIGN", "CLOSED"}
 DIRECTIONS = {"MAXIMIZE", "MINIMIZE"}
+KNOWLEDGE_STATES = {"UNKNOWN", "CONFLICTING", "INSUFFICIENT", "OBSERVED"}
 
 
 def now_iso() -> str:
@@ -26,6 +27,7 @@ class Project:
     facts: dict[str, "Fact"] = field(default_factory=dict)
     assumptions: dict[str, "Assumption"] = field(default_factory=dict)
     decisions: dict[str, "Decision"] = field(default_factory=dict)
+    human_reviews: dict[str, "HumanReview"] = field(default_factory=dict)
     alternatives: dict[str, Alternative] = field(default_factory=dict)
     evaluations: dict[str, Evaluation] = field(default_factory=dict)
     comparisons: dict[str, Comparison] = field(default_factory=dict)
@@ -88,6 +90,19 @@ class Decision:
     statement: str
     actor: str
     authority: str
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class HumanReview:
+    review_id: str
+    project_id: str
+    actor: str
+    timestamp: str
+    review: str
+    reason: str
+    authority: str
+    status: str = "APPROVED"
     version: int = 1
 
 

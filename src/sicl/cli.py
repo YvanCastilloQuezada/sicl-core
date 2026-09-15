@@ -6,7 +6,7 @@ import json
 import csv
 from dataclasses import asdict
 
-from .domain import Assumption, Constraint, Decision, Event, Fact, Objective, Project, Role, DIRECTIONS, STAGES, now_iso
+from .domain import Assumption, Constraint, Decision, Event, Fact, HumanReview, Objective, Project, Role, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
@@ -38,7 +38,7 @@ class CLI:
         try:
             parts = shlex.split(command)
             if not parts or parts[0] == "/HELP":
-                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
+                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
             head = tuple(p.upper() for p in parts[:2])
             if head == ("/EXIT",):
                 self.closed = True
@@ -63,6 +63,8 @@ class CLI:
                 return self.fact_set(parts[2:])
             if head == ("/ASSUMPTION", "SET"):
                 return self.assumption_set(parts[2:])
+            if head == ("/HUMAN", "REVIEW"):
+                return self.human_review(parts[2:])
             if head == ("/SITE", "INTELLIGENCE"):
                 return self.site_intelligence(" ".join(parts[2:]))
             if head == ("/AGENT", "RUN"):
@@ -190,8 +192,6 @@ class CLI:
             if not any(f.statement == statement for f in existing.facts.values()):
                 recorded.append(self.fact_set([statement, evidence_source], event_source=source)["data"])
                 existing = self._project()
-        if not any(c.key == "ZONIFICACION" and c.value == "C-2 (Comercial)" for c in existing.constraints.values()):
-            recorded.append(self.constraint_set(["ZONIFICACION", "=", "C-2 (Comercial)", "Municipalidad"], source=source)["data"])
         return self._ok({"location": location, "source": source, "records": recorded, "simulated": observation.simulated, "latitude": observation.latitude, "longitude": observation.longitude})
 
     def assumption_set(self, args: list[str]) -> dict:
@@ -202,9 +202,26 @@ class CLI:
 
     def decision_record(self, args: list[str]) -> dict:
         if len(args) < 3: raise SICLError("INVALID_ARGUMENT", "statement actor authority required")
-        p = self._require_open(); statement, actor, authority = args[0], args[1], " ".join(args[2:]); did = f"DEC-{uuid.uuid4().hex[:10]}"; d = Decision(did, p.project_id, statement, actor, authority); p.decisions[did] = d; p.version += 1
+        p = self._require_open(); statement, actor, authority = args[0], args[1], " ".join(args[2:])
+        if not any(review.status == "APPROVED" and review.actor == actor and review.authority == authority for review in p.human_reviews.values()):
+            raise SICLError("HUMAN_REVIEW_REQUIRED", "an approved HumanReview by the same actor and authority is required")
+        did = f"DEC-{uuid.uuid4().hex[:10]}"; d = Decision(did, p.project_id, statement, actor, authority); p.decisions[did] = d; p.version += 1
         self.repo.insert_entity_and_event("INSERT INTO decisions VALUES (?, ?, ?, ?, ?, ?)", (did, p.project_id, statement, actor, authority, 1), p, self._event(p.project_id, "DECISION_RECORDED", asdict(d)))
         return self._ok(asdict(d))
+
+    def human_review(self, args: list[str]) -> dict:
+        if len(args) < 4:
+            raise SICLError("INVALID_ARGUMENT", "actor timestamp review reason [authority] required")
+        p = self._require_open(); actor, timestamp, review_text, reason = args[:4]; authority = args[4] if len(args) > 4 else ""
+        if not timestamp.endswith("Z") and "+00:00" not in timestamp:
+            raise SICLError("INVALID_ARGUMENT", "timestamp must be UTC")
+        status = "APPROVED"
+        if status not in {"APPROVED", "REJECTED", "PENDING"}:
+            raise SICLError("INVALID_ARGUMENT", "status must be APPROVED, REJECTED or PENDING")
+        review = HumanReview(f"REV-{uuid.uuid4().hex[:10]}", p.project_id, actor, timestamp, review_text, reason, authority, status)
+        p.human_reviews[review.review_id] = review; p.version += 1
+        self.repo.insert_entity_and_event("INSERT INTO human_reviews VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (review.review_id, p.project_id, actor, timestamp, review_text, reason, authority, status, review.version), p, self._event(p.project_id, "HUMAN_REVIEW_RECORDED", asdict(review)))
+        return self._ok(asdict(review))
 
     def alternative_create(self, args: list[str]) -> dict:
         if len(args) != 1:

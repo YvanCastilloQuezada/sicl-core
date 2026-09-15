@@ -1,12 +1,12 @@
 # SICL Core Contract v1.0
 
-**Estado:** APPROVED FOR IMPLEMENTATION
+**Estado:** APPROVED — SiMS-DeI CANONICAL BASELINE (v2 repaired)
 
 **Línea:** `sicl-core-v1.0` — independiente de SICL 0.6.
 
-## 1. Alcance MVP aprobado
+## 1. Alcance constitucional vigente
 
-El MVP implementa exclusivamente:
+La base canónica implementa el MVP fundacional y las capacidades analíticas v2 siguientes:
 
 - `Project`
 - `Stage`
@@ -18,7 +18,16 @@ El MVP implementa exclusivamente:
 - `Decision` como registro básico humano
 - `Event` append-only estricto
 
-`Alternative`, `Evaluation`, `Comparison` y `Recommendation` pertenecen a SICL v1.1. `Project DNA`, `Agents`, `Requirements` formales, optimización, UI, GIS, BIM, clima y APIs externas quedan fuera del MVP.
+Capacidades analíticas v2 reconocidas:
+
+- `Alternative`, `Evaluation`, `Comparison` y `Recommendation`.
+- `SiteObservation` con fuente y estado de conocimiento explícitos.
+- Agentes expertos que producen únicamente `Evaluation`.
+- Pareto, generación y debate como operaciones analíticas que no crean `Decision`.
+
+Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el contrato.
+
+`Project DNA`, `Requirements` formales, UI, GIS, BIM, Digital Twin e IoT permanecen fuera de alcance. Las integraciones externas de datos solo pueden producir observaciones/facts con fuente, estado y trazabilidad explícitos.
 
 ## 2. Ontología mínima
 
@@ -38,6 +47,8 @@ El MVP implementa exclusivamente:
 | Fact | `fact_id`, `project_id`, `statement`, `source`, `version` |
 | Assumption | `assumption_id`, `project_id`, `statement`, `basis`, `version` |
 | Decision | `decision_id`, `project_id`, `statement`, `actor`, `authority`, `version` |
+| HumanReview | `review_id`, `project_id`, `statement`, `actor`, `authority`, `status`, `version` |
+| SiteObservation | `location`, valores con unidad, `source`, `state`, `captured_at`, `method`, `evidence` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
 
 ## 4. Comandos aprobados
@@ -68,12 +79,14 @@ El MVP implementa exclusivamente:
 4. `Objective.direction` es obligatorio y solo admite `MAXIMIZE` o `MINIMIZE`.
 5. Todo `Constraint` del MVP es `hard=true`; no se admite un nivel soft.
 6. Fact y Assumption se almacenan separadamente.
-7. Decision conserva actor y authority y no es generada por análisis automático.
+7. Decision conserva actor y authority, requiere un `HumanReview` aprobado del mismo actor y authority, y nunca es generada por análisis automático.
 8. Toda mutación exitosa produce exactamente un Event.
 9. La tabla de eventos es append-only: no se actualiza ni elimina.
 10. State y Event se persisten en una única transacción.
 11. El cierre del proyecto impide nuevas mutaciones.
 12. El historial devuelve eventos ordenados por inserción temporal.
+13. Los estados de conocimiento admitidos son `UNKNOWN`, `CONFLICTING`, `INSUFFICIENT` y `OBSERVED`; ningún estado se sustituye silenciosamente por otro.
+14. `SiteObservation` no crea restricciones normativas; la normativa requiere una fuente específica y autoridad humana.
 
 ## 6. Persistencia
 
@@ -83,8 +96,8 @@ SQLite es el adaptador aprobado del MVP. Se usan tablas de estado para Project y
 
 La CLI devuelve objetos `Response` con `status`, `code`, `message` y `data`. Códigos mínimos: `OK`, `INVALID_COMMAND`, `INVALID_ARGUMENT`, `PROJECT_NOT_FOUND`, `PROJECT_ALREADY_EXISTS`, `INVALID_STATE`, `PERSISTENCE_ERROR`, `UNKNOWN_COMMAND`.
 
-## 8. Exclusiones
+## 8. Límites y exclusiones
 
-No se implementan Alternative, Evaluation, Comparison, Recommendation, Project DNA, Agents, Requirements formales, Optimization, Site Intelligence, Generative, Feasibility avanzada, UI ni integraciones externas.
+Los agentes, Pareto, generación, debate y Site Intelligence son analíticos y no autoritativos. No se implementan Project DNA, Requirements formales, UI, BIM, GIS, Digital Twin, IoT ni decisiones automáticas.
 
 **Este contrato no modifica SICL 0.6.**
