@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Generator
+from pathlib import Path
 
 from sicl.cli import CLI
 from sicl.repository import SQLiteRepository
@@ -16,6 +17,9 @@ if not _database_path:
         _database_path = database_url
     else:
         _database_path = "sicl.sqlite"
+
+if _database_path != ":memory:":
+    Path(_database_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
 
 _repository = SQLiteRepository(_database_path, check_same_thread=False)
 
