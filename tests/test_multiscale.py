@@ -22,10 +22,10 @@ def test_project_defaults_to_undeclared_spatial_and_project_temporal():
 
 def test_project_create_with_valid_scopes_persists():
     repo = SQLiteRepository()
-    result = CLI(repo).execute('/PROJECT CREATE P-002 "Building" edificio escenario_2030')
+    result = CLI(repo).execute('/PROJECT CREATE P-002 "Building" edificacion escenario_2030')
     assert result["code"] == "OK"
     project = repo.get_project("P-002")
-    assert project.spatial_scope is SpatialScope.EDIFICIO
+    assert project.spatial_scope is SpatialScope.EDIFICACION
     assert project.temporal_scope is TemporalScope.ESCENARIO_2030
 
 
@@ -66,11 +66,11 @@ def test_project_scope_survives_reload(tmp_path):
     db = tmp_path / "scope.sqlite"
     first = SQLiteRepository(db)
     cli = CLI(first)
-    cli.execute('/PROJECT CREATE P-005 "Persistent" ciudad_distrito largo_plazo')
+    cli.execute('/PROJECT CREATE P-005 "Persistent" distrito_ciudad largo_plazo')
     first.close()
     second = SQLiteRepository(db)
     project = second.get_project("P-005")
-    assert project.spatial_scope is SpatialScope.CIUDAD_DISTRITO
+    assert project.spatial_scope is SpatialScope.DISTRITO_CIUDAD
     assert project.temporal_scope is TemporalScope.LARGO_PLAZO
 
 
@@ -115,3 +115,34 @@ def test_api_invalid_scope_returns_bad_request(tmp_path):
     finally:
         app.dependency_overrides.clear()
         repo.close()
+
+
+
+def test_rfc019_exposes_eleven_canonical_scopes_and_labels():
+    expected = [
+        "pais", "macro_region", "region", "provincia_metropoli",
+        "distrito_ciudad", "zona_barrio_sector", "parcela_sitio",
+        "edificacion", "sistema", "espacio", "objeto",
+    ]
+    assert [scope.value for scope in SpatialScope] == expected
+    assert SpatialScope.MACRO_REGION.label == "Macro-región"
+    assert SpatialScope.SISTEMA.label == "Sistema"
+
+
+def test_rfc019_parent_child_chain_has_eleven_scopes():
+    from sicl.multiscale import SCALE_ORDER, children_scopes, parent_scope
+
+    assert len(SCALE_ORDER) == 11
+    assert parent_scope("macro_region") is SpatialScope.PAIS
+    assert children_scopes("pais") == [SpatialScope.MACRO_REGION]
+    assert parent_scope("sistema") is SpatialScope.EDIFICACION
+    assert children_scopes("sistema") == [SpatialScope.ESPACIO]
+    assert parent_scope("objeto") is SpatialScope.ESPACIO
+
+
+def test_rfc019_new_scopes_support_ancestor_relations():
+    from sicl.multiscale import is_ancestor
+
+    assert is_ancestor("pais", "sistema")
+    assert is_ancestor("edificacion", "objeto")
+    assert not is_ancestor("sistema", "edificacion")
