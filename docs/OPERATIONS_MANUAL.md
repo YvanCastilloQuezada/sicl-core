@@ -887,7 +887,7 @@ Un error conserva `contract_version`, `code`, `message`, `project_id` y `data` d
 
 ## Escalas espaciales
 
-El catálogo espacial tiene nueve valores: `pais`, `region`, `provincia_metropoli`, `distrito_ciudad`, `zona_barrio_sector`, `parcela_sitio`, `edificacion`, `espacio` y `objeto`. El Core no infiere una escala desde un nombre de lugar. La escala se declara mediante el comando o el payload.
+El catálogo espacial tiene once valores: `pais`, `macro_region`, `region`, `provincia_metropoli`, `distrito_ciudad`, `zona_barrio_sector`, `parcela_sitio`, `edificacion`, `sistema`, `espacio` y `objeto`. El Core no infiere una escala desde un nombre de lugar. La escala se declara mediante el comando o el payload.
 
 Los horizontes temporales son `proyecto`, `corto_plazo`, `mediano_plazo`, `largo_plazo`, `escenario_2030`, `escenario_2040` y `escenario_2050`. El horizonte por defecto es `proyecto` cuando no se declara otro.
 

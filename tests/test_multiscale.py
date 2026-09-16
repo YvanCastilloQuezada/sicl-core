@@ -146,3 +146,31 @@ def test_rfc019_new_scopes_support_ancestor_relations():
     assert is_ancestor("pais", "sistema")
     assert is_ancestor("edificacion", "objeto")
     assert not is_ancestor("sistema", "edificacion")
+
+
+def test_rfc019_http_scales_and_project_scope_validation(tmp_path, monkeypatch):
+    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    repo = SQLiteRepository(tmp_path / "rfc019-api.sqlite", check_same_thread=False)
+    app.dependency_overrides[get_repository] = lambda: repo
+    try:
+        with TestClient(app) as client:
+            scales = client.get("/v1/scales")
+            assert scales.status_code == 200
+            values = scales.json()["data"]["scales"]
+            assert len(values) == 11
+            assert values[0] == {"scope": "pais", "label": "País", "parent": None, "children": ["macro_region"]}
+            assert values[7]["scope"] == "edificacion"
+            assert values[7]["children"] == ["sistema"]
+
+            for index, scope in enumerate(("macro_region", "sistema", "edificacion", "distrito_ciudad", "zona_barrio_sector")):
+                response = client.post("/v1/projects", json={"project_id": f"RFC019-{index}", "name": scope, "spatial_scope": scope})
+                assert response.status_code == 200
+                assert response.json()["data"]["snapshot"]["spatial_scope"] == scope
+
+            for index, scope in enumerate(("edificio", "ciudad_distrito", "barrio_sector", "multiscale")):
+                response = client.post("/v1/projects", json={"project_id": f"RFC019-OLD-{index}", "name": scope, "spatial_scope": scope})
+                assert response.status_code == 400
+                assert response.json()["detail"]["code"] == "INVALID_SCOPE"
+    finally:
+        app.dependency_overrides.clear()
+        repo.close()

@@ -1519,7 +1519,7 @@ Usar /STATUS o /PROJECT SHOW
 
 ### Scopes espaciales
 
-`pais`, `region`, `provincia_metropoli`, `distrito_ciudad`, `zona_barrio_sector`, `parcela_sitio`, `edificacion`, `espacio`, `objeto`.
+`pais`, `macro_region`, `region`, `provincia_metropoli`, `distrito_ciudad`, `zona_barrio_sector`, `parcela_sitio`, `edificacion`, `sistema`, `espacio`, `objeto`.
 
 ### Scopes temporales
 

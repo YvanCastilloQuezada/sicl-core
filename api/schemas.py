@@ -43,8 +43,8 @@ class V1Envelope(BaseModel):
 class CanonicalProjectCreateRequest(BaseModel):
     project_id: str = Field(min_length=1)
     name: str = Field(min_length=1)
-    spatial_scope: dict[str, Any] | None = None
-    temporal_scope: dict[str, Any] | None = None
+    spatial_scope: str | dict[str, Any] | None = None
+    temporal_scope: str | dict[str, Any] | None = None
     actor: str = Field(default="api", min_length=1)
 
 

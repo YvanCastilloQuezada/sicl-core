@@ -745,7 +745,18 @@ def list_projects(repo: SQLiteRepository = Depends(get_repository)) -> V1Envelop
 @router.post("/projects", dependencies=[Depends(_auth)])
 def create_project(request: CanonicalProjectCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
     cli = CLI(repo, actor=request.actor)
-    result = cli.execute(f'/PROJECT CREATE "{request.project_id}" "{request.name}"')
+    spatial_scope = request.spatial_scope
+    temporal_scope = request.temporal_scope
+    if isinstance(spatial_scope, dict):
+        spatial_scope = spatial_scope.get("scope") or spatial_scope.get("value")
+    if isinstance(temporal_scope, dict):
+        temporal_scope = temporal_scope.get("scope") or temporal_scope.get("value")
+    command = f'/PROJECT CREATE "{request.project_id}" "{request.name}"'
+    if spatial_scope is not None:
+        command += f' "{spatial_scope}"'
+        if temporal_scope is not None:
+            command += f' "{temporal_scope}"'
+    result = cli.execute(command)
     _error(result, request.project_id)
     snapshot, version = _snapshot(repo, request.project_id)
     return _ok({"snapshot": snapshot}, request.project_id, version)
