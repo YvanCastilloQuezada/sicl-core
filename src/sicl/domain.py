@@ -287,6 +287,8 @@ class Project:
     spatial_scope: SpatialScope | None = None
     temporal_scope: TemporalScope = TemporalScope.PROYECTO
     scale_relations: dict[str, "ScaleRelation"] = field(default_factory=dict)
+    project_variables: dict[str, Any] = field(default_factory=dict)
+    feasibility_results: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
