@@ -156,7 +156,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 17. `Evaluation` requiere una Alternative y un Objective existentes; no crea Recommendation ni Decision.
 18. `Comparison` requiere al menos dos Alternatives existentes y no crea Recommendation ni Decision.
 19. `Simulation` es append-only, no crea Recommendation ni Decision y no convierte Assumption en Fact.
-20. Los tipos admitidos son `DETERMINISTIC`, `MONTE_CARLO`, `SCENARIO` y `SENSITIVITY`; esta fase ejecuta únicamente métodos deterministas y de sensibilidad.
+20. Los tipos admitidos son `DETERMINISTIC`, `MONTE_CARLO`, `SCENARIO` y `SENSITIVITY`. RFC-006.1 implementa `monte_carlo_v1` para distribuciones `NORMAL`, `UNIFORM` y `TRIANGULAR`, con semilla reproducible y un máximo de 10 000 iteraciones. Los tipos `SCENARIO` y cualquier método no implementado permanecen catalogados sin ejecución.
 21. `DesignPrinciple` es un catálogo read-only con fuente declarada; no crea Decision, Recommendation ni Evaluation automática.
 22. `MultiobjectiveResult` es descriptivo: no crea Recommendation, Decision, Alternative ni Evaluation.
 23. Cada objetivo multiobjetivo requiere dirección explícita `MAXIMIZE` o `MINIMIZE`; la ausencia produce `OBJECTIVE_DIRECTION_REQUIRED`.
