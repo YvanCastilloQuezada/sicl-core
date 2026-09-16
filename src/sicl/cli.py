@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 from dataclasses import asdict
 from typing import Any
 
-from .domain import Actor, ActorPosition, ActorRole, ActorState, Assumption, AuthorityLevel, Constraint, Decision, Evidence, EvidenceType, Event, GeneratedAlternative, GenerationMethod, GenerationState, HumanReview, Fact, InterpretationConfidence, InterpretationState, MemoryState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, SpatialScope, SourceType, Stance, SubjectType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
+from .domain import Actor, ActorPosition, ActorRole, ActorState, Assumption, AuthorityLevel, Constraint, CycleHorizon, CycleState, Decision, Evidence, EvidenceType, Event, GeneratedAlternative, GenerationMethod, GenerationState, HumanReview, Fact, InterpretationConfidence, InterpretationState, MemoryState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, ScenarioBranch, ScenarioState, SpatialScope, SourceType, Stance, SubjectType, TemporalCycle, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
@@ -23,6 +23,7 @@ from .multiscale import SCALE_ORDER, children_scopes, is_ancestor, parent_scope
 from .generation import generate_candidates, generation_to_dict, list_generation_methods
 from .memory import extract_memory, memory_to_dict, memory_types
 from .actors import actor_to_dict, position_to_dict
+from .temporal import cycle_to_dict, scenario_to_dict
 
 
 class CLI:
@@ -48,7 +49,7 @@ class CLI:
         try:
             parts = shlex.split(command)
             if not parts or parts[0] == "/HELP":
-                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT IMPORT OBJECTIVE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/ACTOR ADD", "/ACTOR LIST", "/ACTOR SHOW", "/POSITION ADD", "/POSITION LIST", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE DESIGN", "/GENERATE LIST", "/GENERATE SHOW", "/GENERATE METHODS", "/ALTERNATIVE PROMOTE", "/MEMORY LIST", "/MEMORY SHOW", "/MEMORY EXTRACT", "/MEMORY REVOKE", "/MEMORY APPLY", "/MEMORY TYPES", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/SCALE PARENT", "/SCALE CHILDREN", "/SCALE RELATE", "/SCALE RELATIONS", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/REGULATION ADD", "/REGULATION LIST", "/REGULATION SHOW", "/REGULATION STATUS", "/INTERPRET ADD", "/INTERPRET LIST", "/INTERPRET REVIEW", "/SNAPSHOT CREATE", "/SNAPSHOT LIST", "/SNAPSHOT FREEZE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
+                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT IMPORT OBJECTIVE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/ACTOR ADD", "/ACTOR LIST", "/ACTOR SHOW", "/POSITION ADD", "/POSITION LIST", "/CYCLE CREATE", "/CYCLE LIST", "/CYCLE SHOW", "/SCENARIO CREATE", "/SCENARIO LIST", "/SCENARIO SELECT", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE DESIGN", "/GENERATE LIST", "/GENERATE SHOW", "/GENERATE METHODS", "/ALTERNATIVE PROMOTE", "/MEMORY LIST", "/MEMORY SHOW", "/MEMORY EXTRACT", "/MEMORY REVOKE", "/MEMORY APPLY", "/MEMORY TYPES", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/SCALE PARENT", "/SCALE CHILDREN", "/SCALE RELATE", "/SCALE RELATIONS", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/REGULATION ADD", "/REGULATION LIST", "/REGULATION SHOW", "/REGULATION STATUS", "/INTERPRET ADD", "/INTERPRET LIST", "/INTERPRET REVIEW", "/SNAPSHOT CREATE", "/SNAPSHOT LIST", "/SNAPSHOT FREEZE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
             head = tuple(p.upper() for p in parts[:2])
             if head == ("/EXIT",):
                 self.closed = True
@@ -101,6 +102,18 @@ class CLI:
                 return self.position_add(parts[2:])
             if head == ("/POSITION", "LIST"):
                 return self.position_list(parts[2:])
+            if head == ("/CYCLE", "CREATE"):
+                return self.cycle_create(parts[2:])
+            if head == ("/CYCLE", "LIST"):
+                return self.cycle_list()
+            if head == ("/CYCLE", "SHOW"):
+                return self.cycle_show(parts[2:])
+            if head == ("/SCENARIO", "CREATE"):
+                return self.scenario_create(parts[2:])
+            if head == ("/SCENARIO", "LIST"):
+                return self.scenario_list()
+            if head == ("/SCENARIO", "SELECT"):
+                return self.scenario_select(parts[2:])
             if head == ("/FACT", "SET"):
                 return self.fact_set(parts[2:])
             if head == ("/ASSUMPTION", "SET"):
@@ -596,6 +609,73 @@ class CLI:
         if len(args) > 1:
             raise SICLError("INVALID_ARGUMENT", "optional subject_id only")
         return self._ok({"positions": [position_to_dict(item) for item in self.repo.list_positions(self._project().project_id, args[0] if args else None)]})
+
+    def cycle_create(self, args: list[str]) -> dict:
+        if len(args) not in {3, 7}:
+            raise SICLError("INVALID_ARGUMENT", "cycle_id horizon start_date [end_date assumptions_json objectives_json actors_json] required")
+        p = self._require_open(); cycle_id, horizon_text, start_text = args[:3]
+        if cycle_id in p.temporal_cycles:
+            raise SICLError("CONFLICT", f"cycle already exists: {cycle_id}")
+        try:
+            horizon = CycleHorizon(horizon_text.upper())
+            start_date = date.fromisoformat(start_text)
+        except ValueError as exc:
+            raise SICLError("INVALID_ARGUMENT", "invalid horizon or ISO start_date") from exc
+        try:
+            end_date = date.fromisoformat(args[3]) if len(args) == 7 and args[3] not in {"", "NONE", "NULL"} else None
+            assumptions = json.loads(args[4]) if len(args) == 7 else []
+            objectives = json.loads(args[5]) if len(args) == 7 else []
+            actors = json.loads(args[6]) if len(args) == 7 else []
+            if not all(isinstance(item, list) for item in (assumptions, objectives, actors)):
+                raise ValueError
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise SICLError("INVALID_ARGUMENT", "invalid cycle JSON fields") from exc
+        cycle = TemporalCycle(cycle_id, p.project_id, horizon, start_date, end_date, assumptions, objectives, actors)
+        p.temporal_cycles[cycle_id] = cycle; p.version += 1
+        self.repo.insert_entity_and_event("INSERT INTO temporal_cycles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (cycle.cycle_id, cycle.project_id, cycle.horizon.value, cycle.start_date.isoformat(), None, json.dumps(cycle.assumptions), json.dumps(cycle.objectives_at_horizon), json.dumps(cycle.actors_involved), cycle.state.value, cycle.created_at.isoformat(), cycle.version), p, self._event(p.project_id, "TEMPORAL_CYCLE_CREATED", cycle_to_dict(cycle)))
+        return self._ok({"cycle": cycle_to_dict(cycle)})
+
+    def cycle_list(self) -> dict:
+        return self._ok({"cycles": [cycle_to_dict(item) for item in self.repo.list_cycles(self._project().project_id)]})
+
+    def cycle_show(self, args: list[str]) -> dict:
+        if len(args) != 1: raise SICLError("INVALID_ARGUMENT", "cycle_id required")
+        cycle = self.repo.get_cycle(self._project().project_id, args[0])
+        if cycle is None: raise SICLError("CYCLE_NOT_FOUND", args[0])
+        return self._ok({"cycle": cycle_to_dict(cycle)})
+
+    def scenario_create(self, args: list[str]) -> dict:
+        if len(args) not in {3, 5}: raise SICLError("INVALID_ARGUMENT", "branch_id parent_cycle_id name [conditions_json objectives_json] required")
+        p = self._require_open(); branch_id, parent_text, name = args[:3]
+        if branch_id in p.scenario_branches: raise SICLError("CONFLICT", f"scenario already exists: {branch_id}")
+        parent_id = None if parent_text.upper() in {"NONE", "NULL", "-"} else parent_text
+        if parent_id and parent_id not in p.temporal_cycles: raise SICLError("CYCLE_NOT_FOUND", parent_id)
+        try:
+            conditions = json.loads(args[3]) if len(args) == 5 else {}
+            objectives = json.loads(args[4]) if len(args) == 5 else []
+            if not isinstance(conditions, dict) or not isinstance(objectives, list): raise ValueError
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise SICLError("INVALID_ARGUMENT", "invalid scenario JSON fields") from exc
+        branch = ScenarioBranch(branch_id, p.project_id, parent_id, name, conditions, objectives)
+        p.scenario_branches[branch_id] = branch; p.version += 1
+        self.repo.insert_entity_and_event("INSERT INTO scenario_branches VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (branch.branch_id, branch.project_id, branch.parent_cycle_id, branch.scenario_name, json.dumps(branch.conditions), json.dumps(branch.objectives), branch.state.value, branch.selected_by, None, branch.created_at.isoformat(), branch.version), p, self._event(p.project_id, "SCENARIO_BRANCH_CREATED", scenario_to_dict(branch)))
+        return self._ok({"scenario": scenario_to_dict(branch)})
+
+    def scenario_list(self) -> dict:
+        return self._ok({"scenarios": [scenario_to_dict(item) for item in self.repo.list_scenarios(self._project().project_id)]})
+
+    def scenario_select(self, args: list[str]) -> dict:
+        if len(args) != 3: raise SICLError("INVALID_ARGUMENT", "branch_id actor authority required")
+        p = self._require_open(); branch_id, actor, authority = args
+        branch = p.scenario_branches.get(branch_id)
+        if branch is None: raise SICLError("SCENARIO_NOT_FOUND", branch_id)
+        if branch.state is ScenarioState.SELECTED: raise SICLError("CONFLICT", "scenario already selected")
+        if actor not in p.actors or p.actors[actor].state is not ActorState.ACTIVE: raise SICLError("ACTOR_REQUIRED", actor)
+        if not any(review.actor == actor and review.authority == authority and review.status == "APPROVED" for review in p.human_reviews.values()): raise SICLError("HUMAN_REVIEW_REQUIRED", "approved HumanReview is required")
+        selected = ScenarioBranch(branch.branch_id, branch.project_id, branch.parent_cycle_id, branch.scenario_name, branch.conditions, branch.objectives, ScenarioState.SELECTED, actor, datetime.now(timezone.utc), branch.created_at, branch.version + 1)
+        p.scenario_branches[branch_id] = selected; p.version += 1
+        self.repo.insert_entity_and_event("INSERT INTO scenario_branches VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (selected.branch_id, selected.project_id, selected.parent_cycle_id, selected.scenario_name, json.dumps(selected.conditions), json.dumps(selected.objectives), selected.state.value, selected.selected_by, selected.selected_at.isoformat(), selected.created_at.isoformat(), selected.version), p, self._event(p.project_id, "SCENARIO_SELECTED", scenario_to_dict(selected)))
+        return self._ok({"scenario": scenario_to_dict(selected)})
 
     def fact_set(self, args: list[str], *, event_source: str = "USER_COMMAND") -> dict:
         if not args: raise SICLError("INVALID_ARGUMENT", "statement required")

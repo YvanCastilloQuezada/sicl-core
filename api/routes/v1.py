@@ -18,6 +18,9 @@ from api.schemas import (
     CanonicalWriteRequest,
     ActorCreateRequest,
     PositionCreateRequest,
+    CycleCreateRequest,
+    ScenarioCreateRequest,
+    ScenarioSelectRequest,
     ComparisonCreateRequest,
     EvidenceCreateRequest,
     EvaluationCreateRequest,
@@ -42,6 +45,7 @@ from api.schemas import (
 from sicl.cli import CLI
 from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, SourceType
 from sicl.actors import actor_to_dict, position_to_dict
+from sicl.temporal import cycle_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
 from sicl.memory import memory_to_dict, memory_types
 from sicl.repository import SQLiteRepository
@@ -285,6 +289,57 @@ def get_position(project_id: str, position_id: str, repo: SQLiteRepository = Dep
     if position is None:
         _error({"code": "POSITION_NOT_FOUND", "message": position_id}, project_id)
     return _ok({"position": position_to_dict(position)}, project_id, repo.get_project(project_id).version)
+
+
+@router.post("/projects/{project_id}/cycles", dependencies=[Depends(_auth)])
+def create_cycle(project_id: str, request: CycleCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None: _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    cli = CLI(repo, actor="api")
+    _error(cli.execute(f"/PROJECT OPEN {shlex.quote(project_id)}"), project_id)
+    command = f"/CYCLE CREATE {shlex.quote(request.cycle_id)} {shlex.quote(request.horizon)} {shlex.quote(request.start_date.isoformat())} {shlex.quote(request.end_date.isoformat() if request.end_date else 'NONE')} {shlex.quote(json.dumps(request.assumptions))} {shlex.quote(json.dumps(request.objectives_at_horizon))} {shlex.quote(json.dumps(request.actors_involved))}"
+    result = cli.execute(command); _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok(result["data"], project_id, project.version if project else None)
+
+
+@router.get("/projects/{project_id}/cycles", dependencies=[Depends(_auth)])
+def list_cycles(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None: _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"cycles": [cycle_to_dict(item) for item in repo.list_cycles(project_id)]}, project_id, repo.get_project(project_id).version)
+
+
+@router.get("/projects/{project_id}/cycles/{cycle_id}", dependencies=[Depends(_auth)])
+def get_cycle(project_id: str, cycle_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    cycle = repo.get_cycle(project_id, cycle_id)
+    if cycle is None: _error({"code": "CYCLE_NOT_FOUND", "message": cycle_id}, project_id)
+    return _ok({"cycle": cycle_to_dict(cycle)}, project_id, repo.get_project(project_id).version)
+
+
+@router.post("/projects/{project_id}/scenarios", dependencies=[Depends(_auth)])
+def create_scenario(project_id: str, request: ScenarioCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None: _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    cli = CLI(repo, actor="api")
+    _error(cli.execute(f"/PROJECT OPEN {shlex.quote(project_id)}"), project_id)
+    command = f"/SCENARIO CREATE {shlex.quote(request.branch_id)} {shlex.quote(request.parent_cycle_id or 'NONE')} {shlex.quote(request.scenario_name)} {shlex.quote(json.dumps(request.conditions))} {shlex.quote(json.dumps(request.objectives))}"
+    result = cli.execute(command); _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok(result["data"], project_id, project.version if project else None)
+
+
+@router.get("/projects/{project_id}/scenarios", dependencies=[Depends(_auth)])
+def list_scenarios(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None: _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"scenarios": [scenario_to_dict(item) for item in repo.list_scenarios(project_id)]}, project_id, repo.get_project(project_id).version)
+
+
+@router.post("/projects/{project_id}/scenarios/{branch_id}/select", dependencies=[Depends(_auth)])
+def select_scenario(project_id: str, branch_id: str, request: ScenarioSelectRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None: _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    cli = CLI(repo, actor=request.actor)
+    _error(cli.execute(f"/PROJECT OPEN {shlex.quote(project_id)}"), project_id)
+    result = cli.execute(f"/SCENARIO SELECT {shlex.quote(branch_id)} {shlex.quote(request.actor)} {shlex.quote(request.authority)}"); _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok(result["data"], project_id, project.version if project else None)
 
 
 @router.get("/design/principles", dependencies=[Depends(_auth)])
