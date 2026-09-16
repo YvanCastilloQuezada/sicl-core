@@ -47,6 +47,8 @@ from api.schemas import (
     FeasibilityCheckRequest,
     FeasibleParetoRequest,
     DesignKnowledgeQueryRequest,
+    BIMSnapshotCreateRequest,
+    BIMChangeSetCreateRequest,
     V1Envelope,
 )
 from sicl.cli import CLI
@@ -63,6 +65,7 @@ from sicl.regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation
 from sicl.multiscale import SCALE_ORDER, children_scopes, parent_scope
 from sicl.feasibility import ProjectVariable, VariableType, evaluate_feasibility, feasible_pareto_front, normalized_key, serialize_result
 from sicl.design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery, list_items as list_knowledge_items, list_patterns as list_knowledge_patterns, list_sources as list_knowledge_sources
+from sicl.bim import BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelSnapshot, BIMReviewState, build_preview_change_set, change_set_to_dict, snapshot_to_dict as bim_snapshot_to_dict
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -77,7 +80,7 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "SCALE_RELATION_REQUIRED"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "BIM_SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED"}:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
@@ -85,9 +88,9 @@ def _status_for(code: str) -> int:
         return 422
     if code == "PROJECT_NOT_FOUND":
         return 404
-    if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT", "SOURCE_ALREADY_EXISTS", "PLANNING_INSTRUMENT_ALREADY_LINKED", "INVALID_SCOPE_RELATION"}:
+    if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT", "SOURCE_ALREADY_EXISTS", "BIM_SNAPSHOT_ALREADY_EXISTS", "PLANNING_INSTRUMENT_ALREADY_LINKED", "INVALID_SCOPE_RELATION"}:
         return 409
-    if code in {"HUMAN_REVIEW_REQUIRED", "HUMAN_AUTHORITY_REQUIRED", "MEMORY_REVOKED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED", "INVALID_SOURCE_TYPE"}:
+    if code in {"HUMAN_REVIEW_REQUIRED", "HUMAN_AUTHORITY_REQUIRED", "MEMORY_REVOKED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED", "INVALID_SOURCE_TYPE", "BIM_PREVIEW_ONLY"}:
         return 422
     return 400
 
@@ -180,6 +183,70 @@ def query_design_knowledge(request: DesignKnowledgeQueryRequest, repo: SQLiteRep
         preferences=request.preferences,
     ))
     return _ok(asdict(result))
+
+
+@router.post("/projects/{project_id}/bim/snapshots", dependencies=[Depends(_auth)])
+def create_bim_snapshot(project_id: str, request: BIMSnapshotCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    if repo.get_bim_snapshot(project_id, request.exchange_id) is not None:
+        _error({"code": "BIM_SNAPSHOT_ALREADY_EXISTS", "message": request.exchange_id}, project_id)
+    try:
+        item = BIMModelSnapshot(
+            request.exchange_id, BIMFormat(request.format.upper()), request.source_application,
+            request.source_version, project_id, SpatialScope(request.spatial_scope),
+            request.coordinate_reference_system, request.units, request.model_hash,
+            [BIMElementReference(element.global_id, element.entity, element.parameters, element.provenance) for element in request.elements],
+            BIMReviewState(request.review_state.upper()),
+        )
+    except ValueError as exc:
+        _error({"code": "INVALID_BIM_SNAPSHOT", "message": str(exc)}, project_id)
+    except KeyError as exc:
+        _error({"code": "INVALID_BIM_SNAPSHOT", "message": str(exc)}, project_id)
+    repo.insert_bim_snapshot(item, datetime.now(timezone.utc).isoformat())
+    return _ok({"snapshot": bim_snapshot_to_dict(item), "write_mode": "APPEND_ONLY"}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/bim/snapshots", dependencies=[Depends(_auth)])
+def list_bim_snapshots(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"snapshots": [bim_snapshot_to_dict(item) for item in repo.list_bim_snapshots(project_id)]}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/bim/snapshots/{exchange_id}", dependencies=[Depends(_auth)])
+def get_bim_snapshot(project_id: str, exchange_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    item = repo.get_bim_snapshot(project_id, exchange_id)
+    if item is None:
+        _error({"code": "BIM_SNAPSHOT_NOT_FOUND", "message": exchange_id}, project_id)
+    return _ok({"snapshot": bim_snapshot_to_dict(item)}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/bim/change-sets", dependencies=[Depends(_auth)])
+def create_bim_change_set(project_id: str, request: BIMChangeSetCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    if request.mode.upper() != BIMChangeSetMode.PREVIEW.value:
+        _error({"code": "BIM_PREVIEW_ONLY", "message": "RFC-027 only permits PREVIEW change sets"}, project_id)
+    if repo.get_bim_snapshot(project_id, request.snapshot_id) is None:
+        _error({"code": "BIM_SNAPSHOT_NOT_FOUND", "message": request.snapshot_id}, project_id)
+    item = build_preview_change_set(request.change_set_id, project_id, request.snapshot_id, request.changes, request.requested_by)
+    repo.insert_bim_change_set(item, datetime.now(timezone.utc).isoformat())
+    return _ok({"change_set": change_set_to_dict(item), "applied": False, "write_mode": "PREVIEW_ONLY"}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/bim/change-sets", dependencies=[Depends(_auth)])
+def list_bim_change_sets(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"change_sets": [change_set_to_dict(item) for item in repo.list_bim_change_sets(project_id)]}, project_id, project.version)
 
 
 @router.post("/projects/{project_id}/generations", dependencies=[Depends(_auth)])
