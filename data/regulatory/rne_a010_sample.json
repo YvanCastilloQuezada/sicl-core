@@ -1,0 +1,68 @@
+{
+  "schema_version": "rne-corpus-fixture/1",
+  "corpus_status": "SAMPLE_UNVERIFIED",
+  "retrieved_at": "2026-09-16T23:00:00Z",
+  "jurisdiction": "PE",
+  "authority": "Ministerio de Vivienda, Construcción y Saneamiento",
+  "sources": [
+    {
+      "source_id": "SRC-RNE-A010-OFFICIAL",
+      "source_type": "OFFICIAL",
+      "title": "Reglamento Nacional de Edificaciones - RNE",
+      "url": "https://www.gob.pe/institucion/vivienda/informes-publicaciones/2309793-reglamento-nacional-de-edificaciones-rne",
+      "version": "portal-2021-11-04"
+    },
+    {
+      "source_id": "SRC-RNE-A010-PDF",
+      "source_type": "OFFICIAL",
+      "title": "A.010 Condiciones Generales de Diseño - RM N° 191-2021-VIVIENDA",
+      "url": "https://cdn.www.gob.pe/uploads/document/file/2366528/35%20A.010%20CONDICIONES%20GENERALES%20DE%20DISE%C3%91O%20-%20RM%20N%C2%B0%20191-2021-VIVIENDA.pdf?v=1636058378",
+      "version": "RM-191-2021-VIVIENDA"
+    }
+  ],
+  "regulations": [
+    {
+      "regulation_id": "RNE-A010-SAMPLE",
+      "code": "A.010",
+      "title": "Condiciones Generales de Diseño",
+      "authority": "Ministerio de Vivienda, Construcción y Saneamiento",
+      "jurisdiction": "PE",
+      "version": "RM-191-2021-VIVIENDA",
+      "publication_date": "2021-07-08",
+      "effective_date": null,
+      "status": "NO_VERIFICADA",
+      "source_id": "SRC-RNE-A010-PDF",
+      "scope_applicable": ["EDIFICACION", "ESPACIO"],
+      "summary": "Fixture de prueba para validar ingesta, trazabilidad y revisión humana; no es una certificación de vigencia ni de cumplimiento."
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "EVD-RNE-A010-001",
+      "source_id": "SRC-RNE-A010-PDF",
+      "evidence_type": "NORMATIVE",
+      "article_reference": "A.010-INTRO",
+      "statement": "La Norma A.010 se registra como referencia normativa para condiciones generales de diseño arquitectónico.",
+      "method_version": "MANUAL_REVIEW_REQUIRED/1",
+      "state": "UNVERIFIED"
+    },
+    {
+      "evidence_id": "EVD-RNE-A010-002",
+      "source_id": "SRC-RNE-A010-PDF",
+      "evidence_type": "NORMATIVE",
+      "article_reference": "A.010-SCOPE",
+      "statement": "El subconjunto se limita a metadatos y referencias de prueba; no convierte el documento en regla computable automática.",
+      "method_version": "CORPUS_FIXTURE/1",
+      "state": "UNVERIFIED"
+    },
+    {
+      "evidence_id": "EVD-RNE-A010-003",
+      "source_id": "SRC-RNE-A010-OFFICIAL",
+      "evidence_type": "REFERENCE",
+      "article_reference": "PORTAL-RNE",
+      "statement": "El portal oficial del MVCS identifica al RNE como marco técnico nacional y publica el documento A.010 asociado a la RM N° 191-2021-VIVIENDA.",
+      "method_version": "OFFICIAL_PORTAL_CAPTURE/1",
+      "state": "OBSERVED"
+    }
+  ]
+}
