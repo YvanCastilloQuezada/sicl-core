@@ -8,7 +8,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Iterator
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, Fact, HumanReview, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Regulation, RegulationStatus, Role, Source, SourceType, SpatialScope, TemporalScope
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, Fact, HumanReview, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, Source, SourceType, SpatialScope, TemporalScope
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 from .simulation import Simulation, SimulationState, SimulationType
@@ -35,7 +35,8 @@ class SQLiteRepository:
         );
         CREATE TABLE IF NOT EXISTS objectives (
           objective_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
-          key TEXT NOT NULL, direction TEXT NOT NULL, value TEXT NOT NULL, version INTEGER NOT NULL
+          key TEXT NOT NULL, direction TEXT NOT NULL, value TEXT NOT NULL, version INTEGER NOT NULL,
+          source_parent_objective_id TEXT NULL
         );
         CREATE TABLE IF NOT EXISTS constraints_ (
           constraint_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
@@ -182,6 +183,20 @@ class SQLiteRepository:
           interpretations_included_json TEXT NOT NULL, state TEXT NOT NULL, reviewer TEXT NULL,
           created_at TEXT NOT NULL, PRIMARY KEY(snapshot_id, version)
         );
+        CREATE TABLE IF NOT EXISTS scale_relations (
+          relation_id TEXT NOT NULL, version INTEGER NOT NULL,
+          parent_project_id TEXT NOT NULL REFERENCES projects(project_id),
+          child_project_id TEXT NOT NULL REFERENCES projects(project_id),
+          relation_type TEXT NOT NULL, description TEXT NULL,
+          created_by TEXT NOT NULL, created_at TEXT NOT NULL,
+          PRIMARY KEY(relation_id, version)
+        );
+        CREATE TRIGGER IF NOT EXISTS scale_relations_no_update
+        BEFORE UPDATE ON scale_relations
+        BEGIN SELECT RAISE(ABORT, 'scale relations are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS scale_relations_no_delete
+        BEFORE DELETE ON scale_relations
+        BEGIN SELECT RAISE(ABORT, 'scale relations are append-only'); END;
         CREATE TRIGGER IF NOT EXISTS regulations_no_update
         BEFORE UPDATE ON regulations
         BEGIN SELECT RAISE(ABORT, 'regulations are append-only'); END;
@@ -229,6 +244,9 @@ class SQLiteRepository:
             self.conn.execute("ALTER TABLE projects ADD COLUMN spatial_scope TEXT NULL")
         if "temporal_scope" not in project_columns:
             self.conn.execute("ALTER TABLE projects ADD COLUMN temporal_scope TEXT NOT NULL DEFAULT 'proyecto'")
+        objective_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(objectives)")}
+        if "source_parent_objective_id" not in objective_columns:
+            self.conn.execute("ALTER TABLE objectives ADD COLUMN source_parent_objective_id TEXT NULL")
         self.conn.commit()
 
     @contextmanager
@@ -306,6 +324,7 @@ class SQLiteRepository:
         p.multiobjective_results = {r["multiobjective_id"]: MultiobjectiveResult(r["multiobjective_id"], r["project_id"], r["method"], r["method_version"], json.loads(r["objectives_json"]), json.loads(r["alternatives_json"]), json.loads(r["pareto_front_json"]), json.loads(r["dominated_json"]), json.loads(r["incomplete_json"]), json.loads(r["tradeoffs_json"]), MultiobjectiveState(r["state"]), r["inputs_hash"], datetime.fromisoformat(r["created_at"]), r["version"]) for r in self.conn.execute("SELECT * FROM multiobjective_results WHERE project_id=?", (project_id,))}
         p.planning_instruments = {item.instrument_id: item for item in self.list_project_planning_instruments(project_id)}
         p.normative_snapshots = {item.snapshot_id: item for item in self.list_normative_snapshots(project_id)}
+        p.scale_relations = {item.relation_id: item for item in self.list_scale_relations(project_id)}
         return p
 
     def list_projects(self) -> list[Project]:
@@ -491,6 +510,37 @@ class SQLiteRepository:
     def get_normative_snapshot(self, snapshot_id: str) -> NormativeSnapshot | None:
         row = self.conn.execute("SELECT s.* FROM normative_snapshots s WHERE s.snapshot_id=? AND NOT EXISTS (SELECT 1 FROM normative_snapshots newer WHERE newer.snapshot_id=s.snapshot_id AND newer.version>s.version)", (snapshot_id,)).fetchone()
         return self._snapshot_from_row(row) if row else None
+
+    @staticmethod
+    def _scale_relation_from_row(row: sqlite3.Row) -> ScaleRelation:
+        return ScaleRelation(row["relation_id"], row["parent_project_id"], row["child_project_id"], ScaleRelationType(row["relation_type"]), row["description"], row["created_by"], datetime.fromisoformat(row["created_at"]), row["version"])
+
+    def insert_scale_relation_and_event(self, relation: ScaleRelation, event: Event) -> None:
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO scale_relations VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (relation.relation_id, relation.version, relation.parent_project_id, relation.child_project_id,
+                 relation.relation_type.value, relation.description, relation.created_by, relation.created_at.isoformat()),
+            )
+            self.conn.execute("UPDATE projects SET version=version+1 WHERE project_id IN (?, ?)", (relation.parent_project_id, relation.child_project_id))
+            self.add_event(event)
+
+    def list_scale_relations(self, project_id: str) -> list[ScaleRelation]:
+        rows = self.conn.execute(
+            "SELECT r.* FROM scale_relations r WHERE (r.parent_project_id=? OR r.child_project_id=?) AND NOT EXISTS (SELECT 1 FROM scale_relations newer WHERE newer.relation_id=r.relation_id AND newer.version>r.version) ORDER BY r.created_at, r.relation_id",
+            (project_id, project_id),
+        ).fetchall()
+        return [self._scale_relation_from_row(row) for row in rows]
+
+    def get_scale_relation(self, relation_id: str) -> ScaleRelation | None:
+        row = self.conn.execute("SELECT r.* FROM scale_relations r WHERE r.relation_id=? AND NOT EXISTS (SELECT 1 FROM scale_relations newer WHERE newer.relation_id=r.relation_id AND newer.version>r.version)", (relation_id,)).fetchone()
+        return self._scale_relation_from_row(row) if row else None
+
+    def has_scale_relation(self, parent_project_id: str, child_project_id: str, relation_type: str) -> bool:
+        return self.conn.execute(
+            "SELECT 1 FROM scale_relations WHERE parent_project_id=? AND child_project_id=? AND relation_type=? LIMIT 1",
+            (parent_project_id, child_project_id, relation_type),
+        ).fetchone() is not None
 
     def list_simulations(self, project_id: str) -> list[Simulation]:
         project = self.get_project(project_id)

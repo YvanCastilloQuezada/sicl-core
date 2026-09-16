@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 from dataclasses import asdict
 from typing import Any
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, HumanReview, Fact, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, HumanReview, Fact, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
@@ -19,6 +19,7 @@ from .optimization import GenerativeOptimizer, pareto_front, tradeoff_matrix
 from .simulation import METHODS, Simulation, SimulationState, SimulationType, canonical_hash, execute_method, list_methods, now_utc, simulation_to_dict
 from .design_principles import get_principle, list_principles
 from .regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_dict, snapshot_to_dict
+from .multiscale import SCALE_ORDER, children_scopes, is_ancestor, parent_scope
 
 
 class CLI:
@@ -44,13 +45,15 @@ class CLI:
         try:
             parts = shlex.split(command)
             if not parts or parts[0] == "/HELP":
-                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/REGULATION ADD", "/REGULATION LIST", "/REGULATION SHOW", "/REGULATION STATUS", "/INTERPRET ADD", "/INTERPRET LIST", "/INTERPRET REVIEW", "/SNAPSHOT CREATE", "/SNAPSHOT LIST", "/SNAPSHOT FREEZE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
+                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT IMPORT OBJECTIVE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/SCALE PARENT", "/SCALE CHILDREN", "/SCALE RELATE", "/SCALE RELATIONS", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/REGULATION ADD", "/REGULATION LIST", "/REGULATION SHOW", "/REGULATION STATUS", "/INTERPRET ADD", "/INTERPRET LIST", "/INTERPRET REVIEW", "/SNAPSHOT CREATE", "/SNAPSHOT LIST", "/SNAPSHOT FREEZE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
             head = tuple(p.upper() for p in parts[:2])
             if head == ("/EXIT",):
                 self.closed = True
                 return self._ok({"closed": True})
             if head == ("/PROJECT", "CREATE"):
                 return self.project_create(parts[2:])
+            if head == ("/PROJECT", "IMPORT") and len(parts) > 2 and parts[2].upper() == "OBJECTIVE":
+                return self.project_import_objective(parts[3:])
             if head == ("/PROJECT", "SET") and len(parts) > 2 and parts[2].upper() == "SCOPE":
                 return self.project_set_scope(parts[3:])
             if head == ("/PROJECT", "OPEN"):
@@ -61,6 +64,24 @@ class CLI:
                 return self._ok({"projects": [asdict(p) for p in self.repo.list_projects()]})
             if head == ("/STAGE", "SET"):
                 return self.stage_set(parts[2:])
+            if head == ("/SCALE", "PARENT"):
+                if len(parts) != 3: raise SICLError("INVALID_ARGUMENT", "scope required")
+                try:
+                    parent = parent_scope(parts[2])
+                except ValueError as exc:
+                    raise SICLError("INVALID_SCOPE", f"invalid scope: {parts[2]}") from exc
+                return self._ok({"scope": parts[2].lower(), "parent": parent.value if parent else None})
+            if head == ("/SCALE", "CHILDREN"):
+                if len(parts) != 3: raise SICLError("INVALID_ARGUMENT", "scope required")
+                try:
+                    children = children_scopes(parts[2])
+                except ValueError as exc:
+                    raise SICLError("INVALID_SCOPE", f"invalid scope: {parts[2]}") from exc
+                return self._ok({"scope": parts[2].lower(), "children": [item.value for item in children]})
+            if head == ("/SCALE", "RELATE"):
+                return self.scale_relate(parts[2:])
+            if head == ("/SCALE", "RELATIONS"):
+                return self.scale_relations(parts[2:])
             if head == ("/OBJECTIVE", "SET"):
                 return self.objective_set(parts[2:])
             if head == ("/CONSTRAINT", "SET"):
@@ -334,6 +355,57 @@ class CLI:
         self.repo.insert_snapshot_and_event(frozen, self._event(current.project_id, "NORMATIVE_SNAPSHOT_FROZEN", snapshot_to_dict(frozen)))
         return self._ok({"snapshot": snapshot_to_dict(frozen)})
 
+    def scale_relate(self, args: list[str]) -> dict:
+        if len(args) not in (3, 4):
+            raise SICLError("INVALID_ARGUMENT", "parent_project_id child_project_id relation_type [description] required")
+        parent_id, child_id = args[:2]
+        if parent_id == child_id:
+            raise SICLError("INVALID_ARGUMENT", "a project cannot relate to itself")
+        parent = self.repo.get_project(parent_id)
+        child = self.repo.get_project(child_id)
+        if parent is None or child is None:
+            raise SICLError("PROJECT_NOT_FOUND", parent_id if parent is None else child_id)
+        try:
+            relation_type = ScaleRelationType(args[2].upper())
+        except ValueError as exc:
+            raise SICLError("INVALID_ARGUMENT", "invalid relation_type") from exc
+        if self.repo.has_scale_relation(parent_id, child_id, relation_type.value):
+            raise SICLError("CONFLICT", "scale relation already exists")
+        if relation_type == ScaleRelationType.CONTAINS and (parent.spatial_scope is None or child.spatial_scope is None or not is_ancestor(parent.spatial_scope, child.spatial_scope)):
+            raise SICLError("INVALID_SCOPE_RELATION", "CONTAINS requires an explicit ancestor spatial scope")
+        relation = ScaleRelation(f"REL-{uuid.uuid4().hex[:10]}", parent_id, child_id, relation_type, args[3] if len(args) == 4 else None, self.actor, datetime.now(timezone.utc), 1)
+        event_payload = {**asdict(relation), "relation_type": relation.relation_type.value, "created_at": relation.created_at.isoformat()}
+        event = self._event(parent_id, "SCALE_RELATION_CREATED", event_payload)
+        self.repo.insert_scale_relation_and_event(relation, event)
+        return self._ok(asdict(relation))
+
+    def scale_relations(self, args: list[str]) -> dict:
+        if len(args) != 1:
+            raise SICLError("INVALID_ARGUMENT", "project_id required")
+        if self.repo.get_project(args[0]) is None:
+            raise SICLError("PROJECT_NOT_FOUND", args[0])
+        return self._ok({"relations": [asdict(item) for item in self.repo.list_scale_relations(args[0])]})
+
+    def project_import_objective(self, args: list[str]) -> dict:
+        if len(args) != 2:
+            raise SICLError("INVALID_ARGUMENT", "source_project_id objective_id required")
+        child = self._require_open()
+        source_project = self.repo.get_project(args[0])
+        if source_project is None:
+            raise SICLError("PROJECT_NOT_FOUND", args[0])
+        objective = source_project.objectives.get(args[1])
+        if objective is None:
+            raise SICLError("OBJECTIVE_NOT_FOUND", args[1])
+        relation = next((item for item in self.repo.list_scale_relations(child.project_id) if item.parent_project_id == source_project.project_id and item.child_project_id == child.project_id and item.relation_type == ScaleRelationType.CONTAINS), None)
+        if relation is None:
+            raise SICLError("SCALE_RELATION_REQUIRED", "source project must contain the current project")
+        imported_id = f"OBJ-{uuid.uuid4().hex[:10]}"
+        imported = Objective(imported_id, child.project_id, objective.key, objective.direction, objective.value, 1, objective.objective_id)
+        child.objectives[imported_id] = imported
+        child.version += 1
+        self.repo.insert_entity_and_event("INSERT INTO objectives(objective_id, project_id, key, direction, value, version, source_parent_objective_id) VALUES (?, ?, ?, ?, ?, ?, ?)", (imported.objective_id, imported.project_id, imported.key, imported.direction, imported.value, imported.version, imported.source_parent_objective_id), child, self._event(child.project_id, "OBJECTIVE_IMPORTED", asdict(imported)))
+        return self._ok(asdict(imported))
+
     def project_create(self, args: list[str]) -> dict:
         if len(args) < 2: raise SICLError("INVALID_ARGUMENT", "project_id and name required")
         if len(args) > 4: raise SICLError("INVALID_ARGUMENT", "project_id name [spatial_scope] [temporal_scope]")
@@ -396,7 +468,7 @@ class CLI:
     def objective_set(self, args: list[str]) -> dict:
         if len(args) != 3 or args[1].upper() not in DIRECTIONS: raise SICLError("INVALID_ARGUMENT", "key direction value required")
         p = self._require_open(); key, direction, value = args[0], args[1].upper(), args[2]; oid = f"OBJ-{uuid.uuid4().hex[:10]}"; o = Objective(oid, p.project_id, key, direction, value); p.objectives[oid] = o; p.version += 1
-        self.repo.insert_entity_and_event("INSERT INTO objectives VALUES (?, ?, ?, ?, ?, ?)", (oid, p.project_id, key, direction, value, 1), p, self._event(p.project_id, "OBJECTIVE_SET", asdict(o)))
+        self.repo.insert_entity_and_event("INSERT INTO objectives(objective_id, project_id, key, direction, value, version, source_parent_objective_id) VALUES (?, ?, ?, ?, ?, ?, ?)", (oid, p.project_id, key, direction, value, 1, None), p, self._event(p.project_id, "OBJECTIVE_SET", asdict(o)))
         return self._ok(asdict(o))
 
     def constraint_set(self, args: list[str], *, source: str = "USER_COMMAND") -> dict:

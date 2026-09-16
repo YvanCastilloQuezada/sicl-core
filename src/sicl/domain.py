@@ -131,6 +131,13 @@ class NormativeSnapshotState(str, Enum):
     SUPERSEDED = "SUPERSEDED"
 
 
+class ScaleRelationType(str, Enum):
+    CONTAINS = "CONTAINS"
+    OVERLAPS = "OVERLAPS"
+    INFLUENCES = "INFLUENCES"
+    DEPENDS_ON = "DEPENDS_ON"
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -164,6 +171,7 @@ class Project:
     # spatial_scope remains optional: null means that no spatial scale is declared.
     spatial_scope: SpatialScope | None = None
     temporal_scope: TemporalScope = TemporalScope.PROYECTO
+    scale_relations: dict[str, "ScaleRelation"] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -174,6 +182,7 @@ class Objective:
     direction: str
     value: str
     version: int = 1
+    source_parent_objective_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -340,6 +349,18 @@ class NormativeSnapshot:
     interpretations_included: list[str]
     state: NormativeSnapshotState
     reviewer: str | None
+    created_at: datetime
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class ScaleRelation:
+    relation_id: str
+    parent_project_id: str
+    child_project_id: str
+    relation_type: ScaleRelationType
+    description: str | None
+    created_by: str
     created_at: datetime
     version: int = 1
 

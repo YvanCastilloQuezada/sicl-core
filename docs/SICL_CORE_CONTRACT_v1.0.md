@@ -42,7 +42,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 |---|---|
 | Project | `project_id`, `name`, `stage`, `version`, `spatial_scope?`, `temporal_scope` |
 | Stage | valor controlado: `DRAFT`, `ACTIVE`, `CLOSED` |
-| Objective | `objective_id`, `project_id`, `key`, `direction`, `value`, `version` |
+| Objective | `objective_id`, `project_id`, `key`, `direction`, `value`, `version`, `source_parent_objective_id?` |
 | Constraint | `constraint_id`, `project_id`, `key`, `operator`, `value`, `unit`, `hard=true`, `version` |
 | Role | `role_id`, `project_id`, `name`, `actor`, `version` |
 | Fact | `fact_id`, `project_id`, `statement`, `source`, `version` |
@@ -62,6 +62,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | Regulation | `regulation_id`, `jurisdiction`, `authority`, `code`, `title`, `version`, `publication_date?`, `effective_date?`, `status`, `source_url?`, `source_type`, `evidence_hash?`, `scope_applicable`, `parent_regulation_id?`, `summary?`, `version_field` |
 | NormativeInterpretation | `interpretation_id`, `regulation_id`, `article_reference`, `interpretation_text`, `applied_to_project_id?`, `interpreted_by`, `interpretation_date`, `confidence`, `state`, `disclaimer`, `version` |
 | NormativeSnapshot | `snapshot_id`, `project_id`, `cut_date`, `jurisdiction`, `regulations_included`, `interpretations_included`, `state`, `reviewer?`, `created_at`, `version` |
+| ScaleRelation | `relation_id`, `parent_project_id`, `child_project_id`, `relation_type`, `description?`, `created_by`, `created_at`, `version` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
 
 ### Multiscale Model
@@ -79,6 +80,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 /PROJECT CREATE <project_id> <name> [spatial_scope] [temporal_scope]
 /PROJECT OPEN <project_id>
 /PROJECT SET SCOPE <spatial_scope> [temporal_scope]
+/PROJECT IMPORT OBJECTIVE <source_project_id> <objective_id>
 /PROJECT SHOW
 /PROJECT LIST
 /STAGE SET <stage>
@@ -116,6 +118,10 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 /SNAPSHOT CREATE <snapshot_id> <project_id> <cut_date>
 /SNAPSHOT LIST <project_id>
 /SNAPSHOT FREEZE <snapshot_id> <reviewer>
+/SCALE PARENT <scope>
+/SCALE CHILDREN <scope>
+/SCALE RELATE <parent_project_id> <child_project_id> <relation_type> [description]
+/SCALE RELATIONS <project_id>
 /DECISION RECORD <statement> <actor> <authority>
 /STATUS
 /HISTORY
@@ -161,6 +167,10 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 34. Una Interpretation requiere revisión humana con actor y authority para estar en estado `REVIEWED`; no crea Constraint automáticamente.
 35. Un `NormativeSnapshot` en estado `FROZEN` es inmutable; los cambios normativos requieren un snapshot nuevo.
 36. Regulatory Intelligence no decide, recomienda ni certifica cumplimiento.
+37. La jerarquía espacial solo es un catálogo consultable; no infiere relaciones territoriales.
+38. `CONTAINS` requiere scopes espaciales explícitos y una relación ancestro→descendiente válida.
+39. `ScaleRelation` es append-only; no se actualiza ni elimina y toda creación conserva actor, timestamp y evento.
+40. La importación de un Objective requiere una relación `CONTAINS` explícita y conserva `source_parent_objective_id`; no copia autoridad ni crea decisiones.
 
 ## 6. Persistencia
 
@@ -185,6 +195,10 @@ La superficie canónica expone `GET /v1/planning/instruments`, `GET /v1/planning
 ### HTTP v1 — Regulatory Corpus
 
 La superficie canónica expone los diez endpoints de RFC-003 para Regulations, NormativeInterpretations y NormativeSnapshots. El corpus real, la interpretación jurídica y la certificación de vigencia están fuera de esta fase.
+
+### HTTP v1 — Multiscale Relations
+
+La superficie canónica expone `GET /v1/scales`, `GET /v1/scales/{scope}/parent`, `GET /v1/scales/{scope}/children`, `POST /v1/projects/{project_id}/scale-relations`, `GET /v1/projects/{project_id}/scale-relations` y `POST /v1/projects/{project_id}/import-objective`. Estas operaciones registran relaciones y trazabilidad explícitas; no cargan GIS ni realizan inferencia territorial.
 
 ## 7. Respuestas y errores
 

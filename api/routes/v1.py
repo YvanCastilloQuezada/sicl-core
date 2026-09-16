@@ -26,16 +26,19 @@ from api.schemas import (
     InterpretationReviewRequest,
     SnapshotCreateRequest,
     SnapshotFreezeRequest,
+    ScaleRelationCreateRequest,
+    ImportObjectiveRequest,
     SimulationCreateRequest,
     V1Envelope,
 )
 from sicl.cli import CLI
-from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, SourceType
+from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, SourceType
 from sicl.repository import SQLiteRepository
 from sicl.site_intelligence import get_site_observation
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
 from sicl.design_principles import get_principle, list_principles
 from sicl.regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_dict, snapshot_to_dict
+from sicl.multiscale import SCALE_ORDER, children_scopes, parent_scope
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -50,7 +53,7 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED"}:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
@@ -58,7 +61,7 @@ def _status_for(code: str) -> int:
         return 422
     if code == "PROJECT_NOT_FOUND":
         return 404
-    if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT", "PLANNING_INSTRUMENT_ALREADY_LINKED"}:
+    if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT", "PLANNING_INSTRUMENT_ALREADY_LINKED", "INVALID_SCOPE_RELATION"}:
         return 409
     if code in {"HUMAN_REVIEW_REQUIRED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED"}:
         return 422
@@ -127,6 +130,56 @@ def design_principle(principle_id: str) -> dict[str, Any]:
     if principle is None:
         raise HTTPException(status_code=404, detail={"contract_version": CONTRACT_VERSION, "status": "ERROR", "code": "PRINCIPLE_NOT_FOUND", "message": principle_id, "project_id": None, "observed_version": None, "data": {}})
     return {"contract_version": CONTRACT_VERSION, "status": "OK", "code": "OK", "message": "ok", "project_id": None, "observed_version": None, "data": {"principle": principle}}
+
+
+@router.get("/scales", dependencies=[Depends(_auth)])
+def scales() -> V1Envelope:
+    return _ok({"scales": [{"scope": item.value, "label": item.label, "parent": parent_scope(item).value if parent_scope(item) else None, "children": [child.value for child in children_scopes(item)]} for item in SCALE_ORDER]})
+
+
+@router.get("/scales/{scope}/parent", dependencies=[Depends(_auth)])
+def scale_parent(scope: str) -> V1Envelope:
+    try:
+        parent = parent_scope(scope)
+    except ValueError:
+        _error({"code": "INVALID_ARGUMENT", "message": f"invalid scope: {scope}"})
+    return _ok({"scope": scope.lower(), "parent": parent.value if parent else None})
+
+
+@router.get("/scales/{scope}/children", dependencies=[Depends(_auth)])
+def scale_children(scope: str) -> V1Envelope:
+    try:
+        children = children_scopes(scope)
+    except ValueError:
+        _error({"code": "INVALID_ARGUMENT", "message": f"invalid scope: {scope}"})
+    return _ok({"scope": scope.lower(), "children": [item.value for item in children]})
+
+
+@router.post("/projects/{project_id}/scale-relations", dependencies=[Depends(_auth)])
+def create_scale_relation(project_id: str, request: ScaleRelationCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if project_id not in {request.parent_project_id, request.child_project_id}:
+        _error({"code": "INVALID_ARGUMENT", "message": "path project_id must be parent or child project"}, project_id)
+    cli = CLI(repo, actor=request.created_by)
+    result = cli.scale_relate([request.parent_project_id, request.child_project_id, request.relation_type, request.description] if request.description else [request.parent_project_id, request.child_project_id, request.relation_type])
+    _error(result, project_id)
+    return _ok({"relation": result["data"]}, project_id, repo.get_project(project_id).version)
+
+
+@router.get("/projects/{project_id}/scale-relations", dependencies=[Depends(_auth)])
+def list_scale_relations(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"relations": [asdict(item) for item in repo.list_scale_relations(project_id)]}, project_id, repo.get_project(project_id).version)
+
+
+@router.post("/projects/{project_id}/import-objective", dependencies=[Depends(_auth)])
+def import_objective(project_id: str, request: ImportObjectiveRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    cli = CLI(repo, actor=request.actor)
+    opened = cli.project_open([project_id])
+    _error(opened, project_id)
+    result = cli.project_import_objective([request.source_project_id, request.objective_id])
+    _error(result, project_id)
+    return _ok({"objective": result["data"]}, project_id, repo.get_project(project_id).version)
 
 
 @router.get("/planning/instruments", dependencies=[Depends(_auth)])
