@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import uuid
 import hashlib
+import json
 from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any
@@ -15,12 +16,14 @@ from api.schemas import (
     CanonicalProjectCreateRequest,
     CanonicalWriteRequest,
     EvidenceCreateRequest,
+    SimulationCreateRequest,
     V1Envelope,
 )
 from sicl.cli import CLI
 from sicl.domain import Evidence, EvidenceType, KNOWLEDGE_STATES, Preference
 from sicl.repository import SQLiteRepository
 from sicl.site_intelligence import get_site_observation
+from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -35,6 +38,12 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND"}:
+        return 404
+    if code == "METHOD_TYPE_MISMATCH":
+        return 409
+    if code == "INSUFFICIENT_INPUTS":
+        return 422
     if code == "PROJECT_NOT_FOUND":
         return 404
     if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT"}:
@@ -88,6 +97,56 @@ def v1_health() -> dict[str, str]:
 @router.get("/operations-research/methods", dependencies=[Depends(_auth)])
 def methods() -> dict[str, Any]:
     return {"contract_version": CONTRACT_VERSION, "read_only": True, "methods": []}
+
+
+@router.get("/simulations/methods", dependencies=[Depends(_auth)])
+def simulation_methods() -> dict[str, Any]:
+    return {"contract_version": CONTRACT_VERSION, "status": "OK", "code": "OK", "message": "ok", "project_id": None, "observed_version": None, "data": {"methods": list_methods()}}
+
+
+@router.post("/projects/{project_id}/simulations", dependencies=[Depends(_auth)])
+def create_simulation(project_id: str, request: SimulationCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    try:
+        simulation_type = SimulationType(request.simulation_type.upper())
+    except ValueError:
+        _error({"code": "INVALID_ARGUMENT", "message": "invalid simulation_type"}, project_id)
+    method = METHODS.get(request.method)
+    if method is None:
+        _error({"code": "METHOD_NOT_FOUND", "message": request.method}, project_id)
+    if method["type"] != simulation_type.value:
+        _error({"code": "METHOD_TYPE_MISMATCH", "message": request.method}, project_id)
+    missing = [key for key in method["inputs_required"] if key not in request.inputs]
+    if missing:
+        _error({"code": "INSUFFICIENT_INPUTS", "message": "missing inputs: " + ", ".join(missing), "data": {"missing_inputs": missing}}, project_id)
+    cli = CLI(repo, actor="api")
+    _error(cli.execute(f'/PROJECT OPEN "{project_id}"'), project_id)
+    payload = json.dumps(request.inputs, sort_keys=True, separators=(",", ":"))
+    result = cli.execute(f"/SIMULATE RUN {simulation_type.value} {request.method} '{payload}'")
+    _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok(result.get("data", {}), project_id, project.version if project else None)
+
+
+@router.get("/projects/{project_id}/simulations", dependencies=[Depends(_auth)])
+def list_simulations(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"simulations": [simulation_to_dict(item) for item in project.simulations.values()]}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/simulations/{simulation_id}", dependencies=[Depends(_auth)])
+def get_simulation(project_id: str, simulation_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    simulation = repo.get_simulation(project_id, simulation_id)
+    if simulation is None:
+        _error({"code": "SIMULATION_NOT_FOUND", "message": simulation_id}, project_id)
+    return _ok({"simulation": simulation_to_dict(simulation)}, project_id, project.version)
 
 
 @router.get("/projects", dependencies=[Depends(_auth)])

@@ -7,6 +7,7 @@ import csv
 import hashlib
 from datetime import datetime, timezone
 from dataclasses import asdict
+from typing import Any
 
 from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, HumanReview, Fact, Objective, Project, Role, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
@@ -15,6 +16,7 @@ from .export import dashboard_text, export_csv, export_project_json, export_repo
 from .site_intelligence import get_site_observation
 from .agents import BioclimaticAgent, EconomicAgent, StructuralAgent
 from .optimization import GenerativeOptimizer, pareto_front, tradeoff_matrix
+from .simulation import METHODS, Simulation, SimulationState, SimulationType, canonical_hash, execute_method, list_methods, now_utc, simulation_to_dict
 
 
 class CLI:
@@ -101,6 +103,14 @@ class CLI:
                 return self.generate(parts[1:])
             if parts[0].upper() == "/TRADEOFF_MATRIX":
                 return self.tradeoff_matrix_command(parts[1:])
+            if head == ("/SIMULATE", "RUN"):
+                return self.simulate_run(parts[2:])
+            if head == ("/SIMULATE", "LIST"):
+                return self.simulate_list()
+            if head == ("/SIMULATE", "SHOW"):
+                return self.simulate_show(parts[2:])
+            if head == ("/SIMULATE", "METHODS"):
+                return self._ok({"methods": list_methods()})
             if parts[0].upper() == "/REPORT":
                 return self._text_response(report_text(self.repo, self._project()))
             if parts[0].upper() == "/TRADEOFFS":
@@ -486,6 +496,56 @@ class CLI:
             self._event(p.project_id, "COMPARISON_CREATED", {"comparison_id": comparison.comparison_id, "alternative_ids": comparison.alternative_ids}),
         )
         return self._ok(asdict(comparison))
+
+    def simulate_run(self, args: list[str]) -> dict:
+        if len(args) < 2:
+            raise SICLError("INVALID_ARGUMENT", "simulation_type method [params] required")
+        try:
+            simulation_type = SimulationType(args[0].upper())
+        except ValueError as exc:
+            raise SICLError("INVALID_ARGUMENT", "invalid simulation type") from exc
+        p = self._require_open()
+        inputs: dict[str, Any] = {}
+        raw = " ".join(args[2:]).strip()
+        if raw:
+            try:
+                inputs = json.loads(raw)
+            except json.JSONDecodeError:
+                for item in args[2:]:
+                    if "=" not in item:
+                        raise SICLError("INVALID_ARGUMENT", "simulation params must be JSON or key=value")
+                    key, value = item.split("=", 1)
+                    try:
+                        inputs[key] = json.loads(value)
+                    except json.JSONDecodeError:
+                        inputs[key] = value
+        started = now_utc()
+        method = args[1]
+        try:
+            state, outputs = execute_method(simulation_type, method, inputs, p)
+        except KeyError as exc:
+            raise SICLError("METHOD_NOT_FOUND", method) from exc
+        except ValueError as exc:
+            if str(exc) == "METHOD_TYPE_MISMATCH":
+                raise SICLError("METHOD_TYPE_MISMATCH", method)
+            state, outputs = SimulationState.FAILED, {"error": str(exc)}
+        finished = now_utc()
+        simulation = Simulation(f"SIM-{uuid.uuid4().hex[:10]}", p.project_id, simulation_type, method, METHODS.get(method, {}).get("method_version", "unknown"), inputs, outputs, state, started, finished, canonical_hash(inputs, outputs))
+        p.simulations[simulation.simulation_id] = simulation
+        p.version += 1
+        self.repo.insert_simulation_and_event(simulation, p, self._event(p.project_id, "SIMULATION_RECORDED", simulation_to_dict(simulation), "SIMULATION"))
+        return self._ok({"simulation": simulation_to_dict(simulation), "decision_created": False, "recommendation_created": False})
+
+    def simulate_list(self) -> dict:
+        return self._ok({"simulations": [simulation_to_dict(item) for item in self.repo.list_simulations(self._project().project_id)]})
+
+    def simulate_show(self, args: list[str]) -> dict:
+        if len(args) != 1:
+            raise SICLError("INVALID_ARGUMENT", "simulation_id required")
+        simulation = self.repo.get_simulation(self._project().project_id, args[0])
+        if simulation is None:
+            raise SICLError("SIMULATION_NOT_FOUND", args[0])
+        return self._ok({"simulation": simulation_to_dict(simulation)})
 
     def recommend(self) -> dict:
         p = self._require_open()

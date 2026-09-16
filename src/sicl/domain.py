@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any
 
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
+from .simulation import Simulation
 
 STAGES = {"DRAFT", "ACTIVE", "PRELIMINARY_DESIGN", "CLOSED"}
 DIRECTIONS = {"MAXIMIZE", "MINIMIZE"}
@@ -101,6 +102,7 @@ class Project:
     recommendations: dict[str, Recommendation] = field(default_factory=dict)
     evidence: dict[str, "Evidence"] = field(default_factory=dict)
     sources: dict[str, "Source"] = field(default_factory=dict)
+    simulations: dict[str, Simulation] = field(default_factory=dict)
     # spatial_scope remains optional: null means that no spatial scale is declared.
     spatial_scope: SpatialScope | None = None
     temporal_scope: TemporalScope = TemporalScope.PROYECTO

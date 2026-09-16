@@ -11,6 +11,7 @@ from typing import Iterator
 from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, Fact, HumanReview, Objective, Preference, Project, Role, Source, SourceType, SpatialScope, TemporalScope
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
+from .simulation import Simulation, SimulationState, SimulationType
 
 
 class SQLiteRepository:
@@ -100,6 +101,19 @@ class SQLiteRepository:
           evidence_hash TEXT NULL, state TEXT NOT NULL, version INTEGER NOT NULL,
           PRIMARY KEY (project_id, evidence_id)
         );
+        CREATE TABLE IF NOT EXISTS simulations (
+          simulation_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
+          simulation_type TEXT NOT NULL, method TEXT NOT NULL, method_version TEXT NOT NULL,
+          inputs_json TEXT NOT NULL, outputs_json TEXT NOT NULL, state TEXT NOT NULL,
+          started_at TEXT NOT NULL, finished_at TEXT NULL, evidence_hash TEXT NOT NULL,
+          version INTEGER NOT NULL
+        );
+        CREATE TRIGGER IF NOT EXISTS simulations_no_update
+        BEFORE UPDATE ON simulations
+        BEGIN SELECT RAISE(ABORT, 'simulations are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS simulations_no_delete
+        BEFORE DELETE ON simulations
+        BEGIN SELECT RAISE(ABORT, 'simulations are append-only'); END;
         CREATE TRIGGER IF NOT EXISTS evidence_no_update
         BEFORE UPDATE ON evidence
         BEGIN SELECT RAISE(ABORT, 'evidence is append-only'); END;
@@ -176,6 +190,7 @@ class SQLiteRepository:
         p.recommendations = {r["id"]: Recommendation(r["id"], r["comparison_id"], r["recommended_alternative_id"], r["reason"], r["confidence"], r["status"], r["version"]) for r in self.conn.execute("SELECT r.* FROM recommendations r JOIN comparisons c ON c.id=r.comparison_id WHERE c.project_id=?", (project_id,))}
         p.sources = {r["source_id"]: Source(r["source_id"], r["project_id"], SourceType(r["source_type"]), r["title"], r["url"], r["version"]) for r in self.conn.execute("SELECT * FROM sources WHERE project_id=?", (project_id,))}
         p.evidence = {r["evidence_id"]: Evidence(r["evidence_id"], r["project_id"], r["source_id"], r["statement"], EvidenceType(r["evidence_type"]), datetime.fromisoformat(r["captured_at"]), r["method_version"], r["evidence_url"], r["evidence_hash"], r["state"], r["version"]) for r in self.conn.execute("SELECT * FROM evidence WHERE project_id=?", (project_id,))}
+        p.simulations = {r["simulation_id"]: Simulation(r["simulation_id"], r["project_id"], SimulationType(r["simulation_type"]), r["method"], r["method_version"], json.loads(r["inputs_json"]), json.loads(r["outputs_json"]), SimulationState(r["state"]), datetime.fromisoformat(r["started_at"]), datetime.fromisoformat(r["finished_at"]) if r["finished_at"] else None, r["evidence_hash"], r["version"]) for r in self.conn.execute("SELECT * FROM simulations WHERE project_id=?", (project_id,))}
         return p
 
     def list_projects(self) -> list[Project]:
@@ -219,6 +234,22 @@ class SQLiteRepository:
         if not row:
             return None
         return Evidence(row["evidence_id"], row["project_id"], row["source_id"], row["statement"], EvidenceType(row["evidence_type"]), datetime.fromisoformat(row["captured_at"]), row["method_version"], row["evidence_url"], row["evidence_hash"], row["state"], row["version"])
+
+    def insert_simulation_and_event(self, simulation: Simulation, project: Project, event: Event) -> None:
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO simulations(simulation_id, project_id, simulation_type, method, method_version, inputs_json, outputs_json, state, started_at, finished_at, evidence_hash, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (simulation.simulation_id, simulation.project_id, simulation.simulation_type.value, simulation.method, simulation.method_version, json.dumps(simulation.inputs, sort_keys=True), json.dumps(simulation.outputs, sort_keys=True), simulation.state.value, simulation.started_at.isoformat(), simulation.finished_at.isoformat() if simulation.finished_at else None, simulation.evidence_hash, simulation.version),
+            )
+            self.conn.execute("UPDATE projects SET version=? WHERE project_id=?", (project.version, project.project_id))
+            self.add_event(event)
+
+    def list_simulations(self, project_id: str) -> list[Simulation]:
+        project = self.get_project(project_id)
+        return list(project.simulations.values()) if project else []
+
+    def get_simulation(self, project_id: str, simulation_id: str) -> Simulation | None:
+        return next((item for item in self.list_simulations(project_id) if item.simulation_id == simulation_id), None)
 
     def save(self, project: Project) -> None:
         """Persist current state only; events are never replaced or deleted."""

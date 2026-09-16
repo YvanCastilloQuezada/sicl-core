@@ -52,6 +52,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | Decision | `decision_id`, `project_id`, `statement`, `actor`, `authority`, `version` |
 | HumanReview | `review_id`, `project_id`, `statement`, `actor`, `authority`, `status`, `version` |
 | SiteObservation | `location`, valores con unidad, `source`, `state`, `captured_at`, `method`, `evidence` |
+| Simulation | `simulation_id`, `project_id`, `simulation_type`, `method`, `method_version`, `inputs`, `outputs`, `state`, `started_at`, `finished_at?`, `evidence_hash`, `version` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
 
 ### Multiscale Model
@@ -80,6 +81,10 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 /EVIDENCE ADD <evidence_id> <statement> <evidence_type> [source_id] [evidence_url]
 /EVIDENCE LIST
 /EVIDENCE SHOW <evidence_id>
+/SIMULATE RUN <simulation_type> <method> [params]
+/SIMULATE LIST
+/SIMULATE SHOW <simulation_id>
+/SIMULATE METHODS
 /DECISION RECORD <statement> <actor> <authority>
 /STATUS
 /HISTORY
@@ -105,6 +110,8 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 14. `SiteObservation` no crea restricciones normativas; la normativa requiere una fuente específica y autoridad humana.
 15. `Evidence` solo registra declaraciones capturadas; no se convierte automáticamente en `Fact` o `Assumption`.
 16. `Evidence` acepta únicamente los tipos y estados canónicos, calcula SHA-256 desde `statement` cuando falta hash y es append-only.
+17. `Simulation` es append-only, no crea Recommendation ni Decision y no convierte Assumption en Fact.
+18. Los tipos admitidos son `DETERMINISTIC`, `MONTE_CARLO`, `SCENARIO` y `SENSITIVITY`; esta fase ejecuta únicamente métodos deterministas y de sensibilidad.
 
 ## 6. Persistencia
 
