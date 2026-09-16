@@ -5,11 +5,13 @@ import uuid
 import hashlib
 import json
 import shlex
+import tempfile
+from pathlib import Path
 from dataclasses import asdict
 from datetime import date, datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 
 from api.deps import get_repository
 from api.schemas import (
@@ -66,6 +68,7 @@ from sicl.multiscale import SCALE_ORDER, children_scopes, parent_scope
 from sicl.feasibility import ProjectVariable, VariableType, evaluate_feasibility, feasible_pareto_front, normalized_key, serialize_result
 from sicl.design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery, list_items as list_knowledge_items, list_patterns as list_knowledge_patterns, list_sources as list_knowledge_sources
 from sicl.bim import BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelSnapshot, BIMReviewState, build_preview_change_set, change_set_to_dict, snapshot_to_dict as bim_snapshot_to_dict
+from sicl.ifc_adapter import parse_ifc_file
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -206,6 +209,45 @@ def create_bim_snapshot(project_id: str, request: BIMSnapshotCreateRequest, repo
         _error({"code": "INVALID_BIM_SNAPSHOT", "message": str(exc)}, project_id)
     repo.insert_bim_snapshot(item, datetime.now(timezone.utc).isoformat())
     return _ok({"snapshot": bim_snapshot_to_dict(item), "write_mode": "APPEND_ONLY"}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/bim/ifc-import", dependencies=[Depends(_auth)])
+async def import_ifc_read_only(
+    project_id: str,
+    file: UploadFile = File(...),
+    spatial_scope: str = "edificacion",
+    coordinate_reference_system: str = "UNKNOWN",
+    units: str = "SI",
+    repo: SQLiteRepository = Depends(get_repository),
+) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    if not file.filename or not file.filename.lower().endswith(".ifc"):
+        _error({"code": "INVALID_IFC_FILE", "message": "An .ifc file is required"}, project_id)
+    try:
+        scope = SpatialScope(spatial_scope)
+    except ValueError:
+        _error({"code": "INVALID_SCOPE", "message": spatial_scope}, project_id)
+    contents = await file.read()
+    if not contents:
+        _error({"code": "INVALID_IFC_FILE", "message": "The IFC file is empty"}, project_id)
+    fixture = Path(__file__).resolve().parents[2] / "data" / "regulatory" / "rne_a010_sample.json"
+    temporary_path: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as temporary:
+            temporary.write(contents)
+            temporary_path = temporary.name
+        result = parse_ifc_file(temporary_path, project_id, scope, coordinate_reference_system, units, fixture)
+        if repo.get_bim_snapshot(project_id, result.snapshot.exchange_id) is not None:
+            _error({"code": "BIM_SNAPSHOT_ALREADY_EXISTS", "message": result.snapshot.exchange_id}, project_id)
+        repo.insert_bim_snapshot(result.snapshot, datetime.now(timezone.utc).isoformat())
+        return _ok({"snapshot": bim_snapshot_to_dict(result.snapshot), "rne_validation": [asdict(row) for row in result.findings], "read_only": True, "export_applied": False}, project_id, project.version)
+    except (RuntimeError, ValueError, OSError) as exc:
+        _error({"code": "INVALID_IFC_FILE", "message": str(exc)}, project_id)
+    finally:
+        if temporary_path:
+            Path(temporary_path).unlink(missing_ok=True)
 
 
 @router.get("/projects/{project_id}/bim/snapshots", dependencies=[Depends(_auth)])

@@ -158,3 +158,20 @@ Fuentes BIM/GIS/Copiloto
 ## 9. Siguiente fase
 
 La siguiente fase puede añadir un adaptador IFC real, lectura de archivos y mappings revisables. La aplicación de cambios en Revit o Archicad requiere un RFC posterior, permisos explícitos, comparación antes/después y mecanismo de rollback.
+
+
+## 13. Adaptador físico IFC implementado
+
+La implementación incluye `src/sicl/ifc_adapter.py`, basado en IfcOpenShell. El adaptador abre un archivo físico `.ifc` en modo solo lectura, extrae productos IFC con `GlobalId`, entidad, parámetros disponibles y procedencia, y calcula un hash SHA-256 del archivo original.
+
+El adaptador produce un `BIMModelSnapshot` y puede cruzar las entidades extraídas con el fixture RNE de RFC-025. Este cruce es referencial: cuando una entidad coincide con una familia normativa, el resultado es `REVIEW_REQUIRED`. Como el fixture permanece `NO_VERIFICADA`, el adaptador no informa cumplimiento y no crea restricciones ni decisiones.
+
+El endpoint disponible es:
+
+```http
+POST /v1/projects/{project_id}/bim/ifc-import
+```
+
+Recibe un archivo multipart `.ifc` y devuelve el snapshot, los hallazgos RNE, `read_only: true` y `export_applied: false`. El archivo se procesa temporalmente y se elimina después de la lectura. El Core solo persiste el snapshot append-only.
+
+La validación se limita a extracción, trazabilidad y revisión requerida. La escritura en el archivo fuente y la exportación a Revit o Archicad permanecen fuera del alcance.
