@@ -61,6 +61,24 @@ class CanonicalWriteRequest(BaseModel):
         return self.model_dump(exclude_unset=True)
 
 
+class ActorCreateRequest(BaseModel):
+    actor_id: str = Field(min_length=1)
+    role: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    authority_level: str = Field(min_length=1)
+    interests: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+
+
+class PositionCreateRequest(BaseModel):
+    actor_id: str = Field(min_length=1)
+    subject_type: str = Field(min_length=1)
+    subject_id: str = Field(min_length=1)
+    stance: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    conditions: list[str] = Field(default_factory=list)
+
+
 class EvidenceCreateRequest(BaseModel):
     evidence_id: str = Field(min_length=1)
     statement: str = Field(min_length=1)

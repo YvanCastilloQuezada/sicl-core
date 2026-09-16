@@ -224,6 +224,14 @@ La extracción requiere `actor` y `authority` humanos y aplica anonimización po
 
 La superficie HTTP canónica expone `GET /v1/memory`, `GET /v1/memory/{memory_id}`, `GET /v1/memory/types`, `POST /v1/memory/extract`, `POST /v1/memory/{memory_id}/revoke` y `POST /v1/projects/{project_id}/memory/apply`.
 
+### Multi-Actor Model — RFC-012
+
+`Actor` y `ActorPosition` son entidades canónicas asociadas a `Project`. Actor expresa rol, nombre, autoridad explícita, intereses, restricciones y estado. ActorPosition expresa la posición de un actor sobre una `Recommendation`, `Alternative`, `DECISION_PROPOSED` o `Generation`, incluyendo postura, razón y condiciones.
+
+Los niveles de autoridad son `ADVISORY`, `CONTRIBUTORY`, `DECISIONAL` y `VETO`. Solo un actor activo `DECISIONAL` puede registrar una `Decision`; la operación continúa requiriendo `HumanReview` aprobado, actor y authority. Un `VETO` activo con postura `OPPOSE` o `CONDITIONAL` sobre un `DECISION_PROPOSED` bloquea el registro. Las posiciones no sustituyen `HumanReview` ni `Decision`, y los desacuerdos no se resuelven automáticamente.
+
+La superficie HTTP canónica expone `POST`, `GET` colección y `GET` individual para `/v1/projects/{project_id}/actors`, además de `POST`, `GET` colección y `GET` individual para `/v1/projects/{project_id}/positions`. Las tablas de actores y posiciones son append-only y sus mutaciones generan eventos auditables.
+
 ## 7. Respuestas y errores
 
 La CLI devuelve objetos `Response` con `status`, `code`, `message` y `data`. Códigos mínimos: `OK`, `INVALID_COMMAND`, `INVALID_ARGUMENT`, `PROJECT_NOT_FOUND`, `PROJECT_ALREADY_EXISTS`, `INVALID_STATE`, `PERSISTENCE_ERROR`, `UNKNOWN_COMMAND`.

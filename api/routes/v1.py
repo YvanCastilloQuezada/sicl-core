@@ -16,6 +16,8 @@ from api.schemas import (
     CanonicalCommandRequest,
     CanonicalProjectCreateRequest,
     CanonicalWriteRequest,
+    ActorCreateRequest,
+    PositionCreateRequest,
     ComparisonCreateRequest,
     EvidenceCreateRequest,
     EvaluationCreateRequest,
@@ -39,6 +41,7 @@ from api.schemas import (
 )
 from sicl.cli import CLI
 from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, SourceType
+from sicl.actors import actor_to_dict, position_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
 from sicl.memory import memory_to_dict, memory_types
 from sicl.repository import SQLiteRepository
@@ -224,6 +227,64 @@ def apply_memory_http(project_id: str, request: MemoryApplyRequest, repo: SQLite
     _error(result, project_id)
     project = repo.get_project(project_id)
     return _ok(result["data"], project_id, project.version if project else None)
+
+
+@router.post("/projects/{project_id}/actors", dependencies=[Depends(_auth)])
+def create_actor(project_id: str, request: ActorCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    cli = CLI(repo, actor=request.name)
+    command = f"/ACTOR ADD {shlex.quote(request.actor_id)} {shlex.quote(request.role)} {shlex.quote(request.name)} {shlex.quote(request.authority_level)} {shlex.quote(json.dumps(request.interests))} {shlex.quote(json.dumps(request.constraints))}"
+    result = cli.execute(f"/PROJECT OPEN {shlex.quote(project_id)}")
+    _error(result, project_id)
+    result = cli.execute(command)
+    _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok(result["data"], project_id, project.version if project else None)
+
+
+@router.get("/projects/{project_id}/actors", dependencies=[Depends(_auth)])
+def list_actors(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"actors": [actor_to_dict(item) for item in repo.list_actors(project_id)]}, project_id, repo.get_project(project_id).version)
+
+
+@router.get("/projects/{project_id}/actors/{actor_id}", dependencies=[Depends(_auth)])
+def get_actor(project_id: str, actor_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    actor = repo.get_actor(project_id, actor_id)
+    if actor is None:
+        _error({"code": "ACTOR_NOT_FOUND", "message": actor_id}, project_id)
+    return _ok({"actor": actor_to_dict(actor)}, project_id, repo.get_project(project_id).version)
+
+
+@router.post("/projects/{project_id}/positions", dependencies=[Depends(_auth)])
+def create_position(project_id: str, request: PositionCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    cli = CLI(repo, actor=request.actor_id)
+    opened = cli.execute(f"/PROJECT OPEN {shlex.quote(project_id)}")
+    _error(opened, project_id)
+    command = f"/POSITION ADD {shlex.quote(request.actor_id)} {shlex.quote(request.subject_type)} {shlex.quote(request.subject_id)} {shlex.quote(request.stance)} {shlex.quote(request.reason)} {shlex.quote(json.dumps(request.conditions))}"
+    result = cli.execute(command)
+    _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok(result["data"], project_id, project.version if project else None)
+
+
+@router.get("/projects/{project_id}/positions", dependencies=[Depends(_auth)])
+def list_positions(project_id: str, subject_id: str | None = None, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"positions": [position_to_dict(item) for item in repo.list_positions(project_id, subject_id)]}, project_id, repo.get_project(project_id).version)
+
+
+@router.get("/projects/{project_id}/positions/{position_id}", dependencies=[Depends(_auth)])
+def get_position(project_id: str, position_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    position = repo.get_position(project_id, position_id)
+    if position is None:
+        _error({"code": "POSITION_NOT_FOUND", "message": position_id}, project_id)
+    return _ok({"position": position_to_dict(position)}, project_id, repo.get_project(project_id).version)
 
 
 @router.get("/design/principles", dependencies=[Depends(_auth)])
