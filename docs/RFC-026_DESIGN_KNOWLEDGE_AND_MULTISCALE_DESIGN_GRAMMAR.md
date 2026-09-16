@@ -1,6 +1,6 @@
 # RFC-026 — Design Knowledge and Multiscale Design Grammar
 
-**Estado:** IMPLEMENTED — piloto funcional; aprobación del Product Owner pendiente para ampliar el corpus  
+**Estado:** IMPLEMENTED ON MAIN — piloto funcional; aprobación del Product Owner pendiente para ampliar el corpus
 **Fecha:** 16 de septiembre de 2026  
 **Autor:** Manus AI  
 **Sistema:** SiMS-DeI  
