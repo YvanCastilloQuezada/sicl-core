@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -77,6 +77,29 @@ class PositionCreateRequest(BaseModel):
     stance: str = Field(min_length=1)
     reason: str = Field(min_length=1)
     conditions: list[str] = Field(default_factory=list)
+
+
+class CycleCreateRequest(BaseModel):
+    cycle_id: str = Field(min_length=1)
+    horizon: str = Field(min_length=1)
+    start_date: date
+    end_date: date | None = None
+    assumptions: list[str] = Field(default_factory=list)
+    objectives_at_horizon: list[str] = Field(default_factory=list)
+    actors_involved: list[str] = Field(default_factory=list)
+
+
+class ScenarioCreateRequest(BaseModel):
+    branch_id: str = Field(min_length=1)
+    parent_cycle_id: str | None = None
+    scenario_name: str = Field(min_length=1)
+    conditions: dict[str, Any] = Field(default_factory=dict)
+    objectives: list[str] = Field(default_factory=list)
+
+
+class ScenarioSelectRequest(BaseModel):
+    actor: str = Field(min_length=1)
+    authority: str = Field(min_length=1)
 
 
 class EvidenceCreateRequest(BaseModel):

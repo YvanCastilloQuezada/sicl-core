@@ -232,6 +232,14 @@ Los niveles de autoridad son `ADVISORY`, `CONTRIBUTORY`, `DECISIONAL` y `VETO`. 
 
 La superficie HTTP canónica expone `POST`, `GET` colección y `GET` individual para `/v1/projects/{project_id}/actors`, además de `POST`, `GET` colección y `GET` individual para `/v1/projects/{project_id}/positions`. Las tablas de actores y posiciones son append-only y sus mutaciones generan eventos auditables.
 
+### Temporal Cycles — RFC-013
+
+`TemporalCycle` representa un horizonte operativo `2030`, `2040`, `2050` o `CUSTOM`, con fechas, supuestos, objetivos a horizonte y actores involucrados. `ScenarioBranch` representa una rama de escenario asociada opcionalmente a un ciclo, con condiciones, objetivos y estado explícito.
+
+Los ciclos no modifican decisiones pasadas. Las ramas no sobrescriben otras ramas: toda evolución se conserva como una nueva versión append-only. La selección de escenario requiere un actor activo y un `HumanReview` aprobado con actor y authority coincidentes. No existe selección automática ni supuesto de corrección del escenario.
+
+La superficie HTTP canónica expone `POST`, `GET` colección y `GET` individual para `/v1/projects/{project_id}/cycles`, `POST` y `GET` colección para `/v1/projects/{project_id}/scenarios`, y `POST /v1/projects/{project_id}/scenarios/{branch_id}/select`. Los comandos equivalentes son `/CYCLE CREATE`, `/CYCLE LIST`, `/CYCLE SHOW`, `/SCENARIO CREATE`, `/SCENARIO LIST` y `/SCENARIO SELECT`.
+
 ## 7. Respuestas y errores
 
 La CLI devuelve objetos `Response` con `status`, `code`, `message` y `data`. Códigos mínimos: `OK`, `INVALID_COMMAND`, `INVALID_ARGUMENT`, `PROJECT_NOT_FOUND`, `PROJECT_ALREADY_EXISTS`, `INVALID_STATE`, `PERSISTENCE_ERROR`, `UNKNOWN_COMMAND`.

@@ -83,6 +83,26 @@ class Stance(str, Enum):
     NEUTRAL = "NEUTRAL"
     CONDITIONAL = "CONDITIONAL"
 
+
+class CycleHorizon(str, Enum):
+    Y2030 = "2030"
+    Y2040 = "2040"
+    Y2050 = "2050"
+    CUSTOM = "CUSTOM"
+
+
+class CycleState(str, Enum):
+    DRAFT = "DRAFT"
+    ACTIVE = "ACTIVE"
+    SUPERSEDED = "SUPERSEDED"
+
+
+class ScenarioState(str, Enum):
+    PROPOSED = "PROPOSED"
+    EVALUATED = "EVALUATED"
+    SELECTED = "SELECTED"
+    DISCARDED = "DISCARDED"
+
 STAGES = {"DRAFT", "ACTIVE", "PRELIMINARY_DESIGN", "CLOSED"}
 DIRECTIONS = {"MAXIMIZE", "MINIMIZE"}
 KNOWLEDGE_STATES = {"UNKNOWN", "CONFLICTING", "INSUFFICIENT", "OBSERVED"}
@@ -223,6 +243,8 @@ class Project:
     roles: dict[str, "Role"] = field(default_factory=dict)
     actors: dict[str, "Actor"] = field(default_factory=dict)
     positions: dict[str, "ActorPosition"] = field(default_factory=dict)
+    temporal_cycles: dict[str, "TemporalCycle"] = field(default_factory=dict)
+    scenario_branches: dict[str, "ScenarioBranch"] = field(default_factory=dict)
     facts: dict[str, "Fact"] = field(default_factory=dict)
     assumptions: dict[str, "Assumption"] = field(default_factory=dict)
     preferences: dict[str, "Preference"] = field(default_factory=dict)
@@ -303,6 +325,36 @@ class ActorPosition:
     stance: Stance
     reason: str
     conditions: list[str] = field(default_factory=list)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class TemporalCycle:
+    cycle_id: str
+    project_id: str
+    horizon: CycleHorizon
+    start_date: date
+    end_date: date | None = None
+    assumptions: list[str] = field(default_factory=list)
+    objectives_at_horizon: list[str] = field(default_factory=list)
+    actors_involved: list[str] = field(default_factory=list)
+    state: CycleState = CycleState.DRAFT
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class ScenarioBranch:
+    branch_id: str
+    project_id: str
+    parent_cycle_id: str | None
+    scenario_name: str
+    conditions: dict[str, Any] = field(default_factory=dict)
+    objectives: list[str] = field(default_factory=list)
+    state: ScenarioState = ScenarioState.PROPOSED
+    selected_by: str | None = None
+    selected_at: datetime | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     version: int = 1
 
