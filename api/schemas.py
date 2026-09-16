@@ -139,6 +139,20 @@ class SnapshotFreezeRequest(BaseModel):
     reviewer: str = Field(min_length=1)
 
 
+class ScaleRelationCreateRequest(BaseModel):
+    parent_project_id: str = Field(min_length=1)
+    child_project_id: str = Field(min_length=1)
+    relation_type: str = Field(min_length=1)
+    description: str | None = None
+    created_by: str = Field(default="api", min_length=1)
+
+
+class ImportObjectiveRequest(BaseModel):
+    source_project_id: str = Field(min_length=1)
+    objective_id: str = Field(min_length=1)
+    actor: str = Field(default="api", min_length=1)
+
+
 class ProjectResponse(BaseModel):
     project_id: str
     name: str
