@@ -60,6 +60,23 @@ class TemporalScope(str, Enum):
         }[self]
 
 
+class EvidenceType(str, Enum):
+    DOCUMENT = "DOCUMENT"
+    OBSERVATION = "OBSERVATION"
+    MEASUREMENT = "MEASUREMENT"
+    REFERENCE = "REFERENCE"
+    TESTIMONY = "TESTIMONY"
+    NORMATIVE = "NORMATIVE"
+    OTHER = "OTHER"
+
+
+class SourceType(str, Enum):
+    OFFICIAL = "OFFICIAL"
+    SECONDARY = "SECONDARY"
+    USER_PROVIDED = "USER_PROVIDED"
+    UNKNOWN = "UNKNOWN"
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -75,12 +92,15 @@ class Project:
     roles: dict[str, "Role"] = field(default_factory=dict)
     facts: dict[str, "Fact"] = field(default_factory=dict)
     assumptions: dict[str, "Assumption"] = field(default_factory=dict)
+    preferences: dict[str, "Preference"] = field(default_factory=dict)
     decisions: dict[str, "Decision"] = field(default_factory=dict)
     human_reviews: dict[str, "HumanReview"] = field(default_factory=dict)
     alternatives: dict[str, Alternative] = field(default_factory=dict)
     evaluations: dict[str, Evaluation] = field(default_factory=dict)
     comparisons: dict[str, Comparison] = field(default_factory=dict)
     recommendations: dict[str, Recommendation] = field(default_factory=dict)
+    evidence: dict[str, "Evidence"] = field(default_factory=dict)
+    sources: dict[str, "Source"] = field(default_factory=dict)
     # spatial_scope remains optional: null means that no spatial scale is declared.
     spatial_scope: SpatialScope | None = None
     temporal_scope: TemporalScope = TemporalScope.PROYECTO
@@ -136,6 +156,15 @@ class Assumption:
 
 
 @dataclass(frozen=True)
+class Preference:
+    preference_id: str
+    project_id: str
+    statement: str
+    actor: str
+    version: int = 1
+
+
+@dataclass(frozen=True)
 class Decision:
     decision_id: str
     project_id: str
@@ -167,3 +196,36 @@ class Event:
     payload: dict[str, Any]
     actor: str
     source: str
+
+
+@dataclass(frozen=True)
+class Source:
+    """Optional provenance record referenced by one or more Evidence items."""
+
+    source_id: str
+    project_id: str
+    source_type: SourceType
+    title: str
+    url: str | None = None
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class Evidence:
+    """Immutable declaration captured from a source, observation, or testimony.
+
+    Evidence records what was captured; it does not become a Fact or Assumption
+    automatically. A missing hash is deterministically derived from statement.
+    """
+
+    evidence_id: str
+    project_id: str
+    source_id: str | None
+    statement: str
+    evidence_type: EvidenceType
+    captured_at: datetime
+    method_version: str
+    evidence_url: str | None
+    evidence_hash: str | None
+    state: str
+    version: int = 1

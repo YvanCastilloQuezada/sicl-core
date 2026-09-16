@@ -4,10 +4,11 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
-from .domain import Assumption, Constraint, Decision, Event, Fact, HumanReview, Objective, Project, Role, SpatialScope, TemporalScope
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, Fact, HumanReview, Objective, Preference, Project, Role, Source, SourceType, SpatialScope, TemporalScope
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 
@@ -52,6 +53,10 @@ class SQLiteRepository:
           assumption_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
           statement TEXT NOT NULL, basis TEXT NOT NULL, version INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS preferences (
+          preference_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
+          statement TEXT NOT NULL, actor TEXT NOT NULL, version INTEGER NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS decisions (
           decision_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
           statement TEXT NOT NULL, actor TEXT NOT NULL, authority TEXT NOT NULL, version INTEGER NOT NULL
@@ -83,6 +88,24 @@ class SQLiteRepository:
           recommended_alternative_id TEXT NOT NULL, reason TEXT NOT NULL,
           confidence REAL NOT NULL, status TEXT NOT NULL, version INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS sources (
+          source_id TEXT NOT NULL, project_id TEXT NOT NULL REFERENCES projects(project_id),
+          source_type TEXT NOT NULL, title TEXT NOT NULL, url TEXT NULL, version INTEGER NOT NULL,
+          PRIMARY KEY (project_id, source_id)
+        );
+        CREATE TABLE IF NOT EXISTS evidence (
+          evidence_id TEXT NOT NULL, project_id TEXT NOT NULL REFERENCES projects(project_id),
+          source_id TEXT NULL, statement TEXT NOT NULL, evidence_type TEXT NOT NULL,
+          captured_at TEXT NOT NULL, method_version TEXT NOT NULL, evidence_url TEXT NULL,
+          evidence_hash TEXT NULL, state TEXT NOT NULL, version INTEGER NOT NULL,
+          PRIMARY KEY (project_id, evidence_id)
+        );
+        CREATE TRIGGER IF NOT EXISTS evidence_no_update
+        BEFORE UPDATE ON evidence
+        BEGIN SELECT RAISE(ABORT, 'evidence is append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS evidence_no_delete
+        BEFORE DELETE ON evidence
+        BEGIN SELECT RAISE(ABORT, 'evidence is append-only'); END;
         CREATE TABLE IF NOT EXISTS events (
           id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL,
           project_id TEXT NOT NULL, type TEXT NOT NULL, payload TEXT NOT NULL,
@@ -144,12 +167,15 @@ class SQLiteRepository:
         p.roles = {r["role_id"]: Role(**dict(r)) for r in self.conn.execute("SELECT * FROM roles WHERE project_id=?", (project_id,))}
         p.facts = {r["fact_id"]: Fact(**dict(r)) for r in self.conn.execute("SELECT * FROM facts WHERE project_id=?", (project_id,))}
         p.assumptions = {r["assumption_id"]: Assumption(**dict(r)) for r in self.conn.execute("SELECT * FROM assumptions WHERE project_id=?", (project_id,))}
+        p.preferences = {r["preference_id"]: Preference(**dict(r)) for r in self.conn.execute("SELECT * FROM preferences WHERE project_id=?", (project_id,))}
         p.decisions = {r["decision_id"]: Decision(**dict(r)) for r in self.conn.execute("SELECT * FROM decisions WHERE project_id=?", (project_id,))}
         p.human_reviews = {r["review_id"]: HumanReview(**dict(r)) for r in self.conn.execute("SELECT * FROM human_reviews WHERE project_id=?", (project_id,))}
         p.alternatives = {r["id"]: Alternative(r["id"], r["project_id"], r["name"], r["description"], json.loads(r["parameters_json"]), r["status"], r["version"], r["source"]) for r in self.conn.execute("SELECT * FROM alternatives WHERE project_id=?", (project_id,))}
         p.evaluations = {r["id"]: Evaluation(r["id"], r["alternative_id"], r["objective_id"], r["value"], r["unit"], r["confidence"], r["source"], r["version"]) for r in self.conn.execute("SELECT e.* FROM evaluations e JOIN alternatives a ON a.id=e.alternative_id WHERE a.project_id=?", (project_id,))}
         p.comparisons = {r["id"]: Comparison(r["id"], r["project_id"], json.loads(r["alternative_ids_json"]), [p.evaluations[eid] for eid in json.loads(r["evaluations_json"])], json.loads(r["tradeoffs_json"]), r["version"]) for r in self.conn.execute("SELECT * FROM comparisons WHERE project_id=?", (project_id,))}
         p.recommendations = {r["id"]: Recommendation(r["id"], r["comparison_id"], r["recommended_alternative_id"], r["reason"], r["confidence"], r["status"], r["version"]) for r in self.conn.execute("SELECT r.* FROM recommendations r JOIN comparisons c ON c.id=r.comparison_id WHERE c.project_id=?", (project_id,))}
+        p.sources = {r["source_id"]: Source(r["source_id"], r["project_id"], SourceType(r["source_type"]), r["title"], r["url"], r["version"]) for r in self.conn.execute("SELECT * FROM sources WHERE project_id=?", (project_id,))}
+        p.evidence = {r["evidence_id"]: Evidence(r["evidence_id"], r["project_id"], r["source_id"], r["statement"], EvidenceType(r["evidence_type"]), datetime.fromisoformat(r["captured_at"]), r["method_version"], r["evidence_url"], r["evidence_hash"], r["state"], r["version"]) for r in self.conn.execute("SELECT * FROM evidence WHERE project_id=?", (project_id,))}
         return p
 
     def list_projects(self) -> list[Project]:
@@ -174,6 +200,25 @@ class SQLiteRepository:
             self.conn.execute(sql, params)
             self.conn.execute("UPDATE projects SET version=? WHERE project_id=?", (project.version, project.project_id))
             self.add_event(event)
+
+    def insert_evidence_and_event(self, evidence: Evidence, project: Project, event: Event) -> None:
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO evidence(evidence_id, project_id, source_id, statement, evidence_type, captured_at, method_version, evidence_url, evidence_hash, state, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (evidence.evidence_id, evidence.project_id, evidence.source_id, evidence.statement, evidence.evidence_type.value, evidence.captured_at.isoformat(), evidence.method_version, evidence.evidence_url, evidence.evidence_hash, evidence.state, evidence.version),
+            )
+            self.conn.execute("UPDATE projects SET version=? WHERE project_id=?", (project.version, project.project_id))
+            self.add_event(event)
+
+    def list_evidence(self, project_id: str) -> list[Evidence]:
+        project = self.get_project(project_id)
+        return list(project.evidence.values()) if project else []
+
+    def get_evidence(self, project_id: str, evidence_id: str) -> Evidence | None:
+        row = self.conn.execute("SELECT * FROM evidence WHERE project_id=? AND evidence_id=?", (project_id, evidence_id)).fetchone()
+        if not row:
+            return None
+        return Evidence(row["evidence_id"], row["project_id"], row["source_id"], row["statement"], EvidenceType(row["evidence_type"]), datetime.fromisoformat(row["captured_at"]), row["method_version"], row["evidence_url"], row["evidence_hash"], row["state"], row["version"])
 
     def save(self, project: Project) -> None:
         """Persist current state only; events are never replaced or deleted."""

@@ -4,9 +4,11 @@ import shlex
 import uuid
 import json
 import csv
+import hashlib
+from datetime import datetime, timezone
 from dataclasses import asdict
 
-from .domain import Assumption, Constraint, Decision, Event, HumanReview, Fact, Objective, Project, Role, SpatialScope, TemporalScope, DIRECTIONS, STAGES, now_iso
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, HumanReview, Fact, Objective, Project, Role, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
@@ -38,7 +40,7 @@ class CLI:
         try:
             parts = shlex.split(command)
             if not parts or parts[0] == "/HELP":
-                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
+                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
             head = tuple(p.upper() for p in parts[:2])
             if head == ("/EXIT",):
                 self.closed = True
@@ -65,6 +67,12 @@ class CLI:
                 return self.fact_set(parts[2:])
             if head == ("/ASSUMPTION", "SET"):
                 return self.assumption_set(parts[2:])
+            if head == ("/EVIDENCE", "ADD"):
+                return self.evidence_add(parts[2:])
+            if head == ("/EVIDENCE", "LIST"):
+                return self.evidence_list()
+            if head == ("/EVIDENCE", "SHOW"):
+                return self.evidence_show(parts[2:])
             if head == ("/HUMAN", "REVIEW"):
                 return self.human_review(parts[2:])
             if head == ("/SITE", "INTELLIGENCE"):
@@ -237,6 +245,56 @@ class CLI:
         self.repo.insert_entity_and_event("INSERT INTO assumptions VALUES (?, ?, ?, ?, ?)", (aid, p.project_id, statement, basis, 1), p, self._event(p.project_id, "ASSUMPTION_SET", asdict(a)))
         return self._ok(asdict(a))
 
+    def evidence_add(self, args: list[str]) -> dict:
+        if len(args) < 3 or len(args) > 5:
+            raise SICLError("INVALID_ARGUMENT", "evidence_id statement evidence_type [source_id] [evidence_url] required")
+        p = self._require_open()
+        evidence_id, statement, evidence_type_text = args[:3]
+        try:
+            evidence_type = EvidenceType(evidence_type_text.upper())
+        except ValueError as exc:
+            raise SICLError("INVALID_EVIDENCE_TYPE", evidence_type_text) from exc
+        if evidence_id in p.evidence:
+            raise SICLError("EVIDENCE_ALREADY_EXISTS", evidence_id)
+        source_id = args[3] if len(args) >= 4 else None
+        evidence_url = args[4] if len(args) == 5 else None
+        evidence = Evidence(
+            evidence_id=evidence_id,
+            project_id=p.project_id,
+            source_id=source_id,
+            statement=statement,
+            evidence_type=evidence_type,
+            captured_at=datetime.now(timezone.utc),
+            method_version="CLI/1.0",
+            evidence_url=evidence_url,
+            evidence_hash=hashlib.sha256(statement.encode("utf-8")).hexdigest(),
+            state="OBSERVED",
+        )
+        p.evidence[evidence_id] = evidence
+        p.version += 1
+        event_payload = {
+            "evidence_id": evidence.evidence_id,
+            "statement": evidence.statement,
+            "evidence_type": evidence.evidence_type.value,
+            "source_id": evidence.source_id,
+            "evidence_url": evidence.evidence_url,
+            "evidence_hash": evidence.evidence_hash,
+            "state": evidence.state,
+        }
+        self.repo.insert_evidence_and_event(evidence, p, self._event(p.project_id, "EVIDENCE_ADDED", event_payload))
+        return self._ok(asdict(evidence))
+
+    def evidence_list(self) -> dict:
+        return self._ok({"evidence": [asdict(item) for item in self.repo.list_evidence(self._project().project_id)]})
+
+    def evidence_show(self, args: list[str]) -> dict:
+        if len(args) != 1:
+            raise SICLError("INVALID_ARGUMENT", "evidence_id required")
+        evidence = self.repo.get_evidence(self._project().project_id, args[0])
+        if evidence is None:
+            raise SICLError("EVIDENCE_NOT_FOUND", args[0])
+        return self._ok(asdict(evidence))
+
     def decision_record(self, args: list[str]) -> dict:
         if len(args) < 3: raise SICLError("INVALID_ARGUMENT", "statement actor authority required")
         p = self._require_open(); statement, actor, authority = args[0], args[1], " ".join(args[2:])
@@ -302,13 +360,15 @@ class CLI:
         return self._ok({"alternatives": [asdict(a) for a in p.alternatives.values()]})
 
     def agent_run(self, args: list[str]) -> dict:
-        if len(args) != 2 or args[0].upper() != "BIOCLIMATIC":
-            raise SICLError("INVALID_ARGUMENT", "usage: /AGENT RUN BIOCLIMATIC alternative")
+        if len(args) != 2 or args[0].upper() not in {"BIOCLIMATIC", "STRUCTURAL", "ECONOMIC"}:
+            raise SICLError("INVALID_ARGUMENT", "usage: /AGENT RUN BIOCLIMATIC|STRUCTURAL|ECONOMIC alternative")
         p = self._require_open()
         alternative = next((item for item in p.alternatives.values() if item.alternative_id == args[1] or item.name == args[1].upper()), None)
         if alternative is None:
             raise SICLError("INVALID_ARGUMENT", f"alternative not found: {args[1]}")
-        evaluation = BioclimaticAgent().evaluate(alternative, p)
+        agent_name = args[0].upper()
+        agent = {"BIOCLIMATIC": BioclimaticAgent, "STRUCTURAL": StructuralAgent, "ECONOMIC": EconomicAgent}[agent_name]()
+        evaluation = agent.evaluate(alternative, p)
         p.evaluations[evaluation.evaluation_id] = evaluation
         p.version += 1
         self.repo.insert_entity_and_event(
@@ -317,7 +377,7 @@ class CLI:
             p,
             self._event(p.project_id, "AGENT_EVALUATION_RECORDED", asdict(evaluation), "EXPERT_SYSTEM"),
         )
-        return self._ok({"agent": "BIOCLIMATIC", "evaluation": asdict(evaluation), "decision_created": False})
+        return self._ok({"agent": agent_name, "evaluation": asdict(evaluation), "decision_created": False})
 
     def pareto(self, args: list[str]) -> dict:
         if len(args) != 2:

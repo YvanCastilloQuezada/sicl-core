@@ -15,6 +15,7 @@ La base canónica implementa el MVP fundacional y las capacidades analíticas v2
 - `Role`
 - `Fact`
 - `Assumption`
+- `Evidence` y `Source` como registros de procedencia explícita
 - `Decision` como registro básico humano
 - `Event` append-only estricto
 
@@ -46,6 +47,8 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | Role | `role_id`, `project_id`, `name`, `actor`, `version` |
 | Fact | `fact_id`, `project_id`, `statement`, `source`, `version` |
 | Assumption | `assumption_id`, `project_id`, `statement`, `basis`, `version` |
+| Evidence | `evidence_id`, `project_id`, `source_id?`, `statement`, `evidence_type`, `captured_at`, `method_version`, `evidence_url?`, `evidence_hash?`, `state`, `version` |
+| Source | `source_id`, `project_id`, `source_type`, `title`, `url?`, `version` |
 | Decision | `decision_id`, `project_id`, `statement`, `actor`, `authority`, `version` |
 | HumanReview | `review_id`, `project_id`, `statement`, `actor`, `authority`, `status`, `version` |
 | SiteObservation | `location`, valores con unidad, `source`, `state`, `captured_at`, `method`, `evidence` |
@@ -74,6 +77,9 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 /ROLE ADD <name> <actor>
 /FACT SET <statement> [source]
 /ASSUMPTION SET <statement> [basis]
+/EVIDENCE ADD <evidence_id> <statement> <evidence_type> [source_id] [evidence_url]
+/EVIDENCE LIST
+/EVIDENCE SHOW <evidence_id>
 /DECISION RECORD <statement> <actor> <authority>
 /STATUS
 /HISTORY
@@ -97,6 +103,8 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 12. El historial devuelve eventos ordenados por inserción temporal.
 13. Los estados de conocimiento admitidos son `UNKNOWN`, `CONFLICTING`, `INSUFFICIENT` y `OBSERVED`; ningún estado se sustituye silenciosamente por otro.
 14. `SiteObservation` no crea restricciones normativas; la normativa requiere una fuente específica y autoridad humana.
+15. `Evidence` solo registra declaraciones capturadas; no se convierte automáticamente en `Fact` o `Assumption`.
+16. `Evidence` acepta únicamente los tipos y estados canónicos, calcula SHA-256 desde `statement` cuando falta hash y es append-only.
 
 ## 6. Persistencia
 
