@@ -2,7 +2,7 @@
 
 **Sistema:** SiMS-DeI — Sistema de Inteligencia de Diseño Espacial Multiescala  
 **Lenguaje formal:** SICL — Spatial Intelligence Command Language  
-**Versión documental:** 2.1  
+**Versión documental:** 2.2
 **Audiencia:** arquitectos, urbanistas, analistas y responsables de proyecto
 
 ## 1. Introducción
@@ -190,11 +190,12 @@ Consulte primero los métodos disponibles.
 ```text
 /SIMULATE METHODS
 /SIMULATE RUN SENSITIVITY BASELINE
+/SIMULATE RUN MONTE_CARLO monte_carlo_v1 {"alternative_id":"ALT-...","objective_id":"OBJ-...","parameter_name":"height","parameter_distribution":{"type":"NORMAL","parameters":{"mean":10,"std_dev":1}},"iterations":1000,"seed":20260916}
 /SIMULATE LIST
 /SIMULATE SHOW <simulation_id>
 ```
 
-Una simulación produce un resultado descriptivo. No crea una Decision. El método utilizado y sus parámetros deben quedar identificables.
+Una simulación produce un resultado descriptivo. No crea una Decision. El método utilizado y sus parámetros deben quedar identificables. `monte_carlo_v1` acepta distribuciones `NORMAL`, `UNIFORM` y `TRIANGULAR`, conserva la semilla y limita las ejecuciones a 10 000 iteraciones. Repetir los mismos inputs y la misma semilla permite reproducir los resultados; cambiar la semilla produce otra ejecución.
 
 ### 4.11 Multiobjective
 
@@ -406,6 +407,9 @@ curl -X POST https://core.example/v1/projects \
 POST /v1/projects/{project_id}/evidence
 GET  /v1/projects/{project_id}/evidence
 GET  /v1/projects/{project_id}/evidence/{evidence_id}
+POST /v1/projects/{project_id}/sources
+GET  /v1/projects/{project_id}/sources
+GET  /v1/projects/{project_id}/sources/{source_id}
 POST /v1/projects/{project_id}/evaluations
 GET  /v1/projects/{project_id}/evaluations
 POST /v1/projects/{project_id}/comparisons
@@ -462,7 +466,64 @@ GET  /v1/projects/{project_id}/scenarios
 POST /v1/projects/{project_id}/scenarios/{branch_id}/select
 ```
 
-## 7. Estados de conocimiento
+### 6.8 Memoria institucional, actores y copilot
+
+La memoria institucional se extrae de proyectos cerrados y se conserva como una proyección anonimizada. Su aplicación requiere actor y autoridad. Los actores y sus posiciones hacen explícitos los niveles de autoridad y no sustituyen `HumanReview` ni `Decision`.
+
+```text
+GET  /v1/memory
+GET  /v1/memory/{memory_id}
+GET  /v1/memory/types
+POST /v1/memory/extract
+POST /v1/memory/{memory_id}/revoke
+POST /v1/projects/{project_id}/memory/apply
+POST /v1/projects/{project_id}/actors
+GET  /v1/projects/{project_id}/actors
+GET  /v1/projects/{project_id}/actors/{actor_id}
+POST /v1/projects/{project_id}/positions
+GET  /v1/projects/{project_id}/positions
+GET  /v1/projects/{project_id}/positions/{position_id}
+```
+
+El User Copilot es una capacidad de asistencia, no una autoridad. Puede explicar, traducir lenguaje natural a comandos propuestos y señalar datos faltantes. No ejecuta comandos sin confirmación, no afirma sin fuente, no crea decisiones y no convierte recomendaciones en decisiones. La integración LLM de RFC-014 permanece definida como contrato y no debe interpretarse como una autorización para usar un modelo no configurado.
+
+## 7. Capacidades incorporadas en SiMS-DeI 2.1 y 2.2
+
+### 7.1 Generación de diseño
+
+`GeneratedAlternative` conserva candidatos generados por métodos declarados. La generación paramétrica y por patrones producen propuestas; no producen una `Alternative` formal hasta que una persona las promueve con actor y autoridad. La generación no recomienda ni decide.
+
+```text
+/GENERATE DESIGN <method> <json_inputs>
+/GENERATE LIST
+/GENERATE SHOW <generation_id>
+/GENERATE METHODS
+/ALTERNATIVE PROMOTE <generation_id> <candidate_index> <actor> <authority>
+```
+
+### 7.2 Memoria institucional
+
+`InstitutionalMemory` resume patrones o lecciones de proyectos cerrados. Se extrae con revisión humana, se anonimiza por defecto, puede revocarse y no se autoaplica. Aplicarla registra la intención de uso sin reescribir los hechos, eventos o decisiones del proyecto destino.
+
+### 7.3 Modelo multi-actor
+
+`Actor` expresa identidad, rol, autoridad, intereses y restricciones. `ActorPosition` registra apoyo, oposición, neutralidad o condiciones respecto de una alternativa, recomendación, generación o decisión propuesta. Una posición no equivale a una decisión y un desacuerdo no se resuelve automáticamente.
+
+### 7.4 Ciclos temporales y escenarios
+
+`TemporalCycle` organiza horizontes `2030`, `2040`, `2050` o `CUSTOM`. `ScenarioBranch` conserva ramas alternativas sin sobrescribir otras ramas. Seleccionar una rama exige actor activo y `HumanReview` aprobado. Ningún ciclo modifica decisiones históricas.
+
+### 7.5 Source HTTP
+
+Una `Source` identifica el origen de una evidencia u observación. Puede crearse y consultarse mediante `/v1`; `source_id` debe ser único dentro del proyecto y `source_type` debe ser `OFFICIAL`, `SECONDARY`, `USER_PROVIDED` o `UNKNOWN`. Crear una fuente no verifica automáticamente su contenido ni convierte la evidencia asociada en un Fact.
+
+### 7.6 Frontend v2
+
+El frontend v2 es una interfaz operativa para trabajar con las entidades del Core. Su prioridad es la funcionalidad: crear proyectos, registrar contexto, operar alternativas, evaluar, comparar, revisar, decidir y consultar trazabilidad. La interfaz no amplía la autoridad del Core. La autenticación y el token de servicio permanecen server-side; el navegador no debe recibir secretos.
+
+El frontend presenta claramente los estados epistemológicos y mantiene separados `Recommendation`, `HumanReview` y `Decision`. Si una capacidad no está disponible en el contrato HTTP, debe mostrarse como no disponible y no sustituirse silenciosamente por un fallback local en producción.
+
+## 8. Estados de conocimiento
 
 ### UNKNOWN
 
@@ -484,7 +545,7 @@ POST /v1/projects/{project_id}/scenarios/{branch_id}/select
 
 Los estados deben aparecer explícitamente en snapshots, respuestas y explicaciones. Nunca deben reemplazarse por texto ambiguo como “parece correcto”. Si el estado impide el análisis, complete la evidencia o solicite revisión humana.
 
-## 8. Escalas
+## 9. Escalas
 
 SiMS-DeI utiliza nueve escalas espaciales:
 
@@ -502,7 +563,7 @@ Una relación `CONTAINS` conecta un ámbito mayor con uno menor cuando ambos sco
 
 Las relaciones no se infieren automáticamente. El usuario debe declarar los proyectos y la relación. La importación de objetivos conserva la referencia al objetivo padre.
 
-## 9. Caso de uso UPAO-001
+## 10. Caso de uso UPAO-001
 
 UPAO-001 es un caso sintético para demostrar el flujo completo. Puede representar un proyecto en Trujillo con un área de 2000 m² y FAR 5.0.
 
@@ -551,7 +612,7 @@ UPAO-001 es un caso sintético para demostrar el flujo completo. Puede represent
 
 El resultado correcto muestra Recommendation y Decision como registros diferentes. La Decision tiene actor, autoridad y HumanReview previo.
 
-## 10. Errores comunes
+## 11. Errores comunes
 
 ### PROJECT_NOT_FOUND
 
@@ -589,7 +650,7 @@ Se intentó modificar o eliminar un registro histórico protegido. Los eventos y
 
 La API rechazó el origen o el token. Revise la configuración server-side y nunca copie secretos al navegador.
 
-## 11. Preguntas frecuentes
+## 12. Preguntas frecuentes
 
 ### ¿El sistema decide por mí?
 
@@ -639,7 +700,7 @@ Es el horizonte de trabajo asociado con un ciclo o proyecto. Los ciclos 2030, 20
 
 Cualquier persona que necesite comprender el sistema, pero las operaciones decisionales requieren el actor y la autoridad correspondientes.
 
-## 12. Referencias
+## 13. Referencias
 
 [1]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/SICL_CORE_CONTRACT_v1.0.md "SICL Core Contract v1.0"
 [2]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/SIMS_DEI_MASTER_ARCHITECTURE_v2.md "SiMS-DeI Master Architecture v2"
@@ -649,3 +710,10 @@ Cualquier persona que necesite comprender el sistema, pero las operaciones decis
 [6]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-007_MULTIOBJECTIVE_CONTRACT.md "RFC-007 Multiobjective Contract"
 [7]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-009_MULTISCALE_RELATIONS.md "RFC-009 Multiscale Relations"
 [8]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-013_TEMPORAL_CYCLES.md "RFC-013 Temporal Cycles"
+[9]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-006.1_MONTE_CARLO.md "RFC-006.1 Monte Carlo"
+[10]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-010_DESIGN_GENERATION.md "RFC-010 Design Generation"
+[11]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-011_INSTITUTIONAL_MEMORY.md "RFC-011 Institutional Memory"
+[12]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-012_MULTI_ACTOR_MODEL.md "RFC-012 Multi-Actor Model"
+[13]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-014_USER_COPILOT.md "RFC-014 User Copilot"
+[14]: https://github.com/YvanCastilloQuezada/sicl-web/blob/main/docs/RFC-015_FRONTEND_V2.md "RFC-015 Frontend v2"
+[15]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-002_EVIDENCE_HTTP.md#source-http "RFC-016 Source HTTP"

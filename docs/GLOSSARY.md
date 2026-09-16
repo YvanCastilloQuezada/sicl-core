@@ -184,6 +184,34 @@ Este glosario define las entidades que aparecen en el Core 2.1. Cada entrada inc
 **Referencia RFC:** RFC-006.  
 **Estados:** `REQUESTED`, `RUNNING`, `COMPLETE`, `FAILED`, `INSUFFICIENT`.
 
+### Monte Carlo
+
+**Definición:** Método `monte_carlo_v1` de RFC-006.1 que muestrea un parámetro declarado mediante una distribución `NORMAL`, `UNIFORM` o `TRIANGULAR`. La semilla, los inputs y los outputs quedan registrados para permitir reproducibilidad.
+**Ejemplo:** Estimar la distribución de `height` con 1000 iteraciones y una semilla explícita.
+**Referencia RFC:** RFC-006.1.
+**Estados:** `EXECUTED`, `INSUFFICIENT`, `FAILED`.
+
+## Source HTTP
+
+**Definición:** Superficie REST canónica para crear, listar y recuperar fuentes asociadas a un proyecto. Una fuente identifica procedencia, pero no verifica automáticamente la afirmación ni crea un Fact.
+**Ejemplo:** Registrar `OPEN_METEO_API` como fuente secundaria de una observación climática.
+**Referencia RFC:** RFC-016 y RFC-002.
+**Estados:** `DECLARED`, `VERIFIED`, `UNVERIFIED`, `REVOKED`.
+
+## User Copilot
+
+**Definición:** Asistente de uso que explica el sistema, propone comandos o señala información faltante. No ejecuta comandos sin confirmación, no afirma sin fuente y no decide.
+**Ejemplo:** Convertir una petición en lenguaje natural en un comando SICL propuesto para revisión humana.
+**Referencia RFC:** RFC-014.
+**Estados:** `PROPOSED`, `CONFIRMED`, `REJECTED`, `EXPIRED`.
+
+## Frontend v2
+
+**Definición:** Interfaz operativa para trabajar con las entidades y capacidades expuestas por el Core. Es una capa de presentación y no modifica la ontología ni la autoridad del contrato.
+**Ejemplo:** Operar el flujo de proyecto, alternativa, evaluación, revisión humana y decisión desde el navegador.
+**Referencia:** RFC-015.
+**Estados:** `AVAILABLE`, `DEGRADED`, `UNAVAILABLE`.
+
 ## SiteObservation
 
 **Definición:** Observación de un sitio obtenida mediante una fuente y un método trazables. No es una obligación normativa.  
