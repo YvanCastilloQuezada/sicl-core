@@ -4,6 +4,7 @@ import os
 import uuid
 import hashlib
 import json
+import shlex
 from dataclasses import asdict
 from datetime import date, datetime, timezone
 from typing import Any
@@ -18,6 +19,8 @@ from api.schemas import (
     ComparisonCreateRequest,
     EvidenceCreateRequest,
     EvaluationCreateRequest,
+    GenerationCreateRequest,
+    GenerationPromoteRequest,
     MultiobjectiveRequest,
     PlanningInstrumentLinkRequest,
     RegulationCreateRequest,
@@ -33,6 +36,7 @@ from api.schemas import (
 )
 from sicl.cli import CLI
 from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, SourceType
+from sicl.generation import generation_to_dict, list_generation_methods
 from sicl.repository import SQLiteRepository
 from sicl.site_intelligence import get_site_observation
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
@@ -53,7 +57,7 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED"}:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
@@ -63,7 +67,7 @@ def _status_for(code: str) -> int:
         return 404
     if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT", "PLANNING_INSTRUMENT_ALREADY_LINKED", "INVALID_SCOPE_RELATION"}:
         return 409
-    if code in {"HUMAN_REVIEW_REQUIRED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED"}:
+    if code in {"HUMAN_REVIEW_REQUIRED", "HUMAN_AUTHORITY_REQUIRED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED"}:
         return 422
     return 400
 
@@ -117,6 +121,57 @@ def methods() -> dict[str, Any]:
 @router.get("/simulations/methods", dependencies=[Depends(_auth)])
 def simulation_methods() -> dict[str, Any]:
     return {"contract_version": CONTRACT_VERSION, "status": "OK", "code": "OK", "message": "ok", "project_id": None, "observed_version": None, "data": {"methods": list_methods()}}
+
+
+@router.get("/generations/methods", dependencies=[Depends(_auth)])
+def generation_methods() -> V1Envelope:
+    return _ok({"methods": list_generation_methods()})
+
+
+@router.post("/projects/{project_id}/generations", dependencies=[Depends(_auth)])
+def create_generation(project_id: str, request: GenerationCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    cli = CLI(repo, actor="api")
+    _error(cli.execute(f"/PROJECT OPEN {shlex.quote(project_id)}"), project_id)
+    command = f"/GENERATE DESIGN {shlex.quote(request.method)} {shlex.quote(json.dumps(request.inputs, sort_keys=True))}"
+    result = cli.execute(command)
+    _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok({"generation": result["data"]["generation"]}, project_id, project.version if project else None)
+
+
+@router.get("/projects/{project_id}/generations", dependencies=[Depends(_auth)])
+def list_generations(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"generations": [generation_to_dict(item) for item in repo.list_generations(project_id)]}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/generations/{generation_id}", dependencies=[Depends(_auth)])
+def get_generation(project_id: str, generation_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    generation = repo.get_generation(project_id, generation_id)
+    if generation is None:
+        _error({"code": "GENERATION_NOT_FOUND", "message": generation_id}, project_id)
+    return _ok({"generation": generation_to_dict(generation)}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/generations/{generation_id}/promote", dependencies=[Depends(_auth)])
+def promote_generation(project_id: str, generation_id: str, request: GenerationPromoteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    cli = CLI(repo, actor=request.actor)
+    _error(cli.execute(f"/PROJECT OPEN {shlex.quote(project_id)}"), project_id)
+    command = f"/ALTERNATIVE PROMOTE {shlex.quote(generation_id)} {request.candidate_index} {shlex.quote(request.actor)} {shlex.quote(request.authority)}"
+    result = cli.execute(command)
+    _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok(result["data"], project_id, project.version if project else None)
 
 
 @router.get("/design/principles", dependencies=[Depends(_auth)])

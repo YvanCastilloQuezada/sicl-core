@@ -58,6 +58,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | Simulation | `simulation_id`, `project_id`, `simulation_type`, `method`, `method_version`, `inputs`, `outputs`, `state`, `started_at`, `finished_at?`, `evidence_hash`, `version` |
 | DesignPrinciple | `principle_id`, `name`, `category`, `description`, `applicable_scopes`, `source` |
 | MultiobjectiveResult | `multiobjective_id`, `project_id`, `method`, `method_version`, `objectives`, `alternatives`, `pareto_front`, `dominated`, `incomplete`, `tradeoffs`, `state`, `inputs_hash`, `created_at`, `version` |
+| GeneratedAlternative | `generation_id`, `project_id`, `generator`, `generator_version`, `method`, `inputs`, `candidates`, `rationale`, `state`, `generation_hash`, `created_at`, `version` |
 | PlanningInstrument | `instrument_id`, `project_id?`, `instrument_type`, `name`, `jurisdiction`, `authority?`, `approval_date?`, `validity_period?`, `scope_applicable`, `status`, `objectives`, `url?`, `summary?`, `source`, `version` |
 | Regulation | `regulation_id`, `jurisdiction`, `authority`, `code`, `title`, `version`, `publication_date?`, `effective_date?`, `status`, `source_url?`, `source_type`, `evidence_hash?`, `scope_applicable`, `parent_regulation_id?`, `summary?`, `version_field` |
 | NormativeInterpretation | `interpretation_id`, `regulation_id`, `article_reference`, `interpretation_text`, `applied_to_project_id?`, `interpreted_by`, `interpretation_date`, `confidence`, `state`, `disclaimer`, `version` |
@@ -98,6 +99,11 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 /SIMULATE LIST
 /SIMULATE SHOW <simulation_id>
 /SIMULATE METHODS
+/GENERATE DESIGN <method> <json_inputs>
+/GENERATE LIST
+/GENERATE SHOW <generation_id>
+/GENERATE METHODS
+/ALTERNATIVE PROMOTE <generation_id> <candidate_index> <actor> <authority>
 /DESIGN PRINCIPLES
 /DESIGN PRINCIPLE <principle_id>
 /MULTIOBJECTIVE PARETO <obj_1> <obj_2> [...]
@@ -171,6 +177,12 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 38. `CONTAINS` requiere scopes espaciales explícitos y una relación ancestro→descendiente válida.
 39. `ScaleRelation` es append-only; no se actualiza ni elimina y toda creación conserva actor, timestamp y evento.
 40. La importación de un Objective requiere una relación `CONTAINS` explícita y conserva `source_parent_objective_id`; no copia autoridad ni crea decisiones.
+41. `GeneratedAlternative` es una propuesta de candidatos y no es `Alternative`; su generación no crea Recommendation ni Decision.
+42. `parametric_grid_v1` y `pattern_variation_v1` operan únicamente sobre inputs declarados y no aplican filtros ocultos.
+43. Los métodos `llm_assisted_v1` y `evolutionary_v1` están catalogados pero inactivos; no se ejecutan sin contrato adicional.
+44. Una generación con inputs críticos ausentes conserva `state=INSUFFICIENT`; un método desconocido produce `METHOD_NOT_FOUND`.
+45. La promoción de un candidato a `Alternative` requiere `actor` y `authority` humanos explícitos y no crea Recommendation ni Decision.
+46. `GeneratedAlternative` y su tabla de persistencia son append-only y conservan `generation_hash`.
 
 ## 6. Persistencia
 
@@ -200,12 +212,16 @@ La superficie canónica expone los diez endpoints de RFC-003 para Regulations, N
 
 La superficie canónica expone `GET /v1/scales`, `GET /v1/scales/{scope}/parent`, `GET /v1/scales/{scope}/children`, `POST /v1/projects/{project_id}/scale-relations`, `GET /v1/projects/{project_id}/scale-relations` y `POST /v1/projects/{project_id}/import-objective`. Estas operaciones registran relaciones y trazabilidad explícitas; no cargan GIS ni realizan inferencia territorial.
 
+### HTTP v1 — Design Generation
+
+La superficie canónica expone `POST /v1/projects/{project_id}/generations`, `GET /v1/projects/{project_id}/generations`, `GET /v1/projects/{project_id}/generations/{generation_id}`, `POST /v1/projects/{project_id}/generations/{generation_id}/promote` y `GET /v1/generations/methods`. La generación no decide ni recomienda; la promoción exige actor y authority y crea únicamente una Alternative formal.
+
 ## 7. Respuestas y errores
 
 La CLI devuelve objetos `Response` con `status`, `code`, `message` y `data`. Códigos mínimos: `OK`, `INVALID_COMMAND`, `INVALID_ARGUMENT`, `PROJECT_NOT_FOUND`, `PROJECT_ALREADY_EXISTS`, `INVALID_STATE`, `PERSISTENCE_ERROR`, `UNKNOWN_COMMAND`.
 
 ## 8. Límites y exclusiones
 
-Los agentes, Pareto, generación, debate y Site Intelligence son analíticos y no autoritativos. No se implementan Project DNA, Requirements formales, UI, BIM, GIS, Digital Twin, IoT ni decisiones automáticas.
+Los agentes, Pareto, generación, debate y Site Intelligence son analíticos y no autoritativos. RFC-010 implementa únicamente generación paramétrica y por patrón; no se implementan generación asistida por LLM, generación evolutiva, Project DNA, Requirements formales, UI, BIM, GIS, Digital Twin, IoT ni decisiones automáticas.
 
 **Este contrato no modifica SICL 0.6.**

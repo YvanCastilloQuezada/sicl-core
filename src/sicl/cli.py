@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 from dataclasses import asdict
 from typing import Any
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, HumanReview, Fact, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, GeneratedAlternative, GenerationMethod, GenerationState, HumanReview, Fact, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
@@ -20,6 +20,7 @@ from .simulation import METHODS, Simulation, SimulationState, SimulationType, ca
 from .design_principles import get_principle, list_principles
 from .regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_dict, snapshot_to_dict
 from .multiscale import SCALE_ORDER, children_scopes, is_ancestor, parent_scope
+from .generation import generate_candidates, generation_to_dict, list_generation_methods
 
 
 class CLI:
@@ -45,7 +46,7 @@ class CLI:
         try:
             parts = shlex.split(command)
             if not parts or parts[0] == "/HELP":
-                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT IMPORT OBJECTIVE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/SCALE PARENT", "/SCALE CHILDREN", "/SCALE RELATE", "/SCALE RELATIONS", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/REGULATION ADD", "/REGULATION LIST", "/REGULATION SHOW", "/REGULATION STATUS", "/INTERPRET ADD", "/INTERPRET LIST", "/INTERPRET REVIEW", "/SNAPSHOT CREATE", "/SNAPSHOT LIST", "/SNAPSHOT FREEZE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
+                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT IMPORT OBJECTIVE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE DESIGN", "/GENERATE LIST", "/GENERATE SHOW", "/GENERATE METHODS", "/ALTERNATIVE PROMOTE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/SCALE PARENT", "/SCALE CHILDREN", "/SCALE RELATE", "/SCALE RELATIONS", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/REGULATION ADD", "/REGULATION LIST", "/REGULATION SHOW", "/REGULATION STATUS", "/INTERPRET ADD", "/INTERPRET LIST", "/INTERPRET REVIEW", "/SNAPSHOT CREATE", "/SNAPSHOT LIST", "/SNAPSHOT FREEZE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
             head = tuple(p.upper() for p in parts[:2])
             if head == ("/EXIT",):
                 self.closed = True
@@ -112,6 +113,8 @@ class CLI:
                 return self.alternative_set(parts[2:])
             if head == ("/ALTERNATIVE", "LIST"):
                 return self.alternative_list()
+            if head == ("/ALTERNATIVE", "PROMOTE"):
+                return self.alternative_promote(parts[2:])
             if parts[0].upper() == "/EVALUATE":
                 return self.evaluate(parts[1:])
             if parts[0].upper() == "/COMPARE":
@@ -123,6 +126,14 @@ class CLI:
             if parts[0].upper() == "/DEBATE":
                 return self.debate(parts[1:])
             if parts[0].upper() == "/GENERATE":
+                if len(parts) > 1 and parts[1].upper() in {"DESIGN", "LIST", "SHOW", "METHODS"}:
+                    if parts[1].upper() == "DESIGN":
+                        return self.generate_design(parts[2:])
+                    if parts[1].upper() == "LIST":
+                        return self.generate_list()
+                    if parts[1].upper() == "SHOW":
+                        return self.generate_show(parts[2:])
+                    return self._ok({"methods": list_generation_methods()})
                 return self.generate(parts[1:])
             if parts[0].upper() == "/TRADEOFF_MATRIX":
                 return self.tradeoff_matrix_command(parts[1:])
@@ -629,6 +640,65 @@ class CLI:
     def alternative_list(self) -> dict:
         p = self._project()
         return self._ok({"alternatives": [asdict(a) for a in p.alternatives.values()]})
+
+    def generate_design(self, args: list[str]) -> dict:
+        if len(args) < 1:
+            raise SICLError("INVALID_ARGUMENT", "method and JSON inputs required")
+        p = self._require_open()
+        method = args[0].lower()
+        try:
+            inputs = json.loads(" ".join(args[1:])) if len(args) > 1 else {}
+        except json.JSONDecodeError as exc:
+            raise SICLError("INVALID_ARGUMENT", "inputs must be valid JSON") from exc
+        if not isinstance(inputs, dict):
+            raise SICLError("INVALID_ARGUMENT", "inputs must be a JSON object")
+        if method not in {"parametric_grid_v1", "pattern_variation_v1"}:
+            raise SICLError("METHOD_NOT_FOUND", method)
+        generation = generate_candidates(p.project_id, method, inputs, f"GEN-{uuid.uuid4().hex[:10]}")
+        p.generated_alternatives[generation.generation_id] = generation
+        p.version += 1
+        self.repo.insert_generation_and_event(generation, p, self._event(p.project_id, "DESIGN_GENERATION_RECORDED", generation_to_dict(generation), "SYSTEM_CALCULATION"))
+        return self._ok({"generation": generation_to_dict(generation), "decision_created": False, "recommendation_created": False})
+
+    def generate_list(self) -> dict:
+        return self._ok({"generations": [generation_to_dict(item) for item in self.repo.list_generations(self._project().project_id)]})
+
+    def generate_show(self, args: list[str]) -> dict:
+        if len(args) != 1:
+            raise SICLError("INVALID_ARGUMENT", "generation_id required")
+        item = self.repo.get_generation(self._project().project_id, args[0])
+        if item is None:
+            raise SICLError("GENERATION_NOT_FOUND", args[0])
+        return self._ok({"generation": generation_to_dict(item)})
+
+    def alternative_promote(self, args: list[str]) -> dict:
+        if len(args) < 4:
+            raise SICLError("INVALID_ARGUMENT", "generation_id candidate_index actor authority required")
+        p = self._require_open()
+        generation = self.repo.get_generation(p.project_id, args[0])
+        if generation is None:
+            raise SICLError("GENERATION_NOT_FOUND", args[0])
+        if generation.state is not GenerationState.GENERATED:
+            raise SICLError("INVALID_STATE", "only GENERATED results can be promoted")
+        try:
+            index = int(args[1])
+        except ValueError as exc:
+            raise SICLError("INVALID_ARGUMENT", "candidate_index must be an integer") from exc
+        actor, authority = args[2], " ".join(args[3:])
+        if not actor.strip() or not authority.strip():
+            raise SICLError("HUMAN_AUTHORITY_REQUIRED", "actor and authority are required")
+        if index < 0 or index >= len(generation.candidates):
+            raise SICLError("CANDIDATE_NOT_FOUND", str(index))
+        candidate = generation.candidates[index]
+        alternative_id = f"ALT-{uuid.uuid4().hex[:10]}"
+        name = str(candidate.get("name") or f"GENERATED_{generation.generation_id}_{index}")
+        description = str(candidate.get("description") or generation.rationale)
+        parameters = {key: value for key, value in candidate.items() if key not in {"name", "description"}}
+        alternative = Alternative(alternative_id, p.project_id, name, description, parameters, "PROPOSED", 1, "DESIGN_GENERATION")
+        p.alternatives[alternative_id] = alternative
+        p.version += 1
+        self.repo.insert_entity_and_event("INSERT INTO alternatives VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (alternative_id, p.project_id, alternative.name, alternative.description, json.dumps(alternative.parameters, sort_keys=True), alternative.status, alternative.version, alternative.source), p, self._event(p.project_id, "GENERATED_ALTERNATIVE_PROMOTED", {"generation_id": generation.generation_id, "candidate_index": index, "alternative": asdict(alternative), "actor": actor, "authority": authority}))
+        return self._ok({"alternative": asdict(alternative), "generation_id": generation.generation_id, "candidate_index": index, "decision_created": False, "recommendation_created": False})
 
     def agent_run(self, args: list[str]) -> dict:
         if len(args) != 2 or args[0].upper() not in {"BIOCLIMATIC", "STRUCTURAL", "ECONOMIC"}:

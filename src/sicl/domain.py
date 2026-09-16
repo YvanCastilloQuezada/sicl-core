@@ -13,6 +13,19 @@ class MultiobjectiveState(str, Enum):
     EXECUTED = "EXECUTED"
     INSUFFICIENT = "INSUFFICIENT"
 
+
+class GenerationMethod(str, Enum):
+    PARAMETRIC = "PARAMETRIC"
+    PATTERN_BASED = "PATTERN_BASED"
+    RULE_BASED = "RULE_BASED"
+    HYBRID = "HYBRID"
+
+
+class GenerationState(str, Enum):
+    GENERATED = "GENERATED"
+    INSUFFICIENT = "INSUFFICIENT"
+    FAILED = "FAILED"
+
 STAGES = {"DRAFT", "ACTIVE", "PRELIMINARY_DESIGN", "CLOSED"}
 DIRECTIONS = {"MAXIMIZE", "MINIMIZE"}
 KNOWLEDGE_STATES = {"UNKNOWN", "CONFLICTING", "INSUFFICIENT", "OBSERVED"}
@@ -164,6 +177,7 @@ class Project:
     sources: dict[str, "Source"] = field(default_factory=dict)
     simulations: dict[str, Simulation] = field(default_factory=dict)
     multiobjective_results: dict[str, "MultiobjectiveResult"] = field(default_factory=dict)
+    generated_alternatives: dict[str, "GeneratedAlternative"] = field(default_factory=dict)
     planning_instruments: dict[str, "PlanningInstrument"] = field(default_factory=dict)
     regulations: dict[str, "Regulation"] = field(default_factory=dict)
     interpretations: dict[str, "NormativeInterpretation"] = field(default_factory=dict)
@@ -281,6 +295,24 @@ class MultiobjectiveResult:
     tradeoffs: dict[str, Any]
     state: MultiobjectiveState
     inputs_hash: str
+    created_at: datetime
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class GeneratedAlternative:
+    """Candidate set produced by an explicit, non-decisional generator."""
+
+    generation_id: str
+    project_id: str
+    generator: str
+    generator_version: str
+    method: GenerationMethod
+    inputs: dict[str, Any]
+    candidates: list[dict[str, Any]]
+    rationale: str
+    state: GenerationState
+    generation_hash: str
     created_at: datetime
     version: int = 1
 
