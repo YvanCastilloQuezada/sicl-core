@@ -1,0 +1,226 @@
+{
+  "schema_version": "rne-corpus-fixture/1",
+  "corpus_status": "SAMPLE_UNVERIFIED",
+  "retrieved_at": "2026-09-16T23:08:00Z",
+  "jurisdiction": "PE",
+  "authority": "Ministerio de Vivienda, Construcción y Saneamiento",
+  "sources": [
+    {
+      "source_id": "SRC-RNE-PORTAL-OFFICIAL",
+      "source_type": "OFFICIAL",
+      "title": "Reglamento Nacional de Edificaciones - RNE",
+      "url": "https://www.gob.pe/institucion/vivienda/informes-publicaciones/2309793-reglamento-nacional-de-edificaciones-rne",
+      "version": "portal-2021-11-04"
+    },
+    {
+      "source_id": "SRC-RNE-A010-PDF",
+      "source_type": "OFFICIAL",
+      "title": "A.010 Condiciones Generales de Diseño - RM N° 191-2021-VIVIENDA",
+      "url": "https://cdn.www.gob.pe/uploads/document/file/2366528/35%20A.010%20CONDICIONES%20GENERALES%20DE%20DISE%C3%91O%20-%20RM%20N%C2%B0%20191-2021-VIVIENDA.pdf?v=1636058378",
+      "version": "RM-191-2021-VIVIENDA"
+    },
+    {
+      "source_id": "SRC-RNE-E030-PDF",
+      "source_type": "OFFICIAL",
+      "title": "E.030 Diseño Sismorresistente - RM-043-2019-VIVIENDA",
+      "url": "https://cdn.www.gob.pe/uploads/document/file/2366641/51%20E.030%20DISE%C3%91O%20SISMORRESISTENTE%20RM-043-2019-VIVIENDA.pdf?v=1677250657",
+      "version": "RM-043-2019-VIVIENDA"
+    },
+    {
+      "source_id": "SRC-RNE-E060-PDF",
+      "source_type": "OFFICIAL",
+      "title": "E.060 Concreto Armado - DS N° 010-2009",
+      "url": "https://cdn.www.gob.pe/uploads/document/file/2366660/55%20E.060%20CONCRETO%20ARMADO%20DS%20N%C2%B0%20010-2009.pdf?v=1677250657",
+      "version": "DS-010-2009-VIVIENDA"
+    },
+    {
+      "source_id": "SRC-RNE-IS010-PDF",
+      "source_type": "OFFICIAL",
+      "title": "IS.010 Instalaciones Sanitarias para Edificaciones - DS N° 017-2012",
+      "url": "https://cdn.www.gob.pe/uploads/document/file/2366675/60%20IS.010%20INSTALACIONES%20SANITARIAS%20PARA%20EDIFICACIONES%20DS%20N%C2%B0%20017-2012.pdf?v=1677250657",
+      "version": "DS-017-2012-VIVIENDA"
+    },
+    {
+      "source_id": "SRC-RNE-EM010-PDF",
+      "source_type": "OFFICIAL",
+      "title": "EM.010 Instalaciones Eléctricas Interiores - RM N° 083-2019-VIVIENDA",
+      "url": "https://cdn.www.gob.pe/uploads/document/file/2366690/62%20EM.010%20INSTALACIONES%20EL%C3%89CTRICAS%20INTERIORES%20-%20RM%20N%C2%B0%20083-2019-VIVIENDA.pdf?v=1677250657",
+      "version": "RM-083-2019-VIVIENDA"
+    }
+  ],
+  "regulations": [
+    {
+      "regulation_id": "RNE-A010-SAMPLE",
+      "code": "A.010",
+      "title": "Condiciones Generales de Diseño",
+      "authority": "Ministerio de Vivienda, Construcción y Saneamiento",
+      "jurisdiction": "PE",
+      "version": "RM-191-2021-VIVIENDA",
+      "publication_date": "2021-07-08",
+      "effective_date": null,
+      "status": "NO_VERIFICADA",
+      "source_id": "SRC-RNE-A010-PDF",
+      "scope_applicable": [
+        "EDIFICACION",
+        "ESPACIO"
+      ],
+      "summary": "Fixture de prueba para validar ingesta, trazabilidad y revisión humana; no es una certificación de vigencia ni de cumplimiento."
+    },
+    {
+      "regulation_id": "RNE-E030-SAMPLE",
+      "code": "E.030",
+      "title": "Diseño Sismorresistente",
+      "authority": "Ministerio de Vivienda, Construcción y Saneamiento",
+      "jurisdiction": "PE",
+      "version": "RM-043-2019-VIVIENDA",
+      "publication_date": null,
+      "effective_date": null,
+      "status": "NO_VERIFICADA",
+      "source_id": "SRC-RNE-E030-PDF",
+      "scope_applicable": [
+        "EDIFICACION",
+        "SISTEMA"
+      ],
+      "summary": "Metadato estructural de prueba; requiere revisión de vigencia y aplicabilidad antes de uso normativo."
+    },
+    {
+      "regulation_id": "RNE-E060-SAMPLE",
+      "code": "E.060",
+      "title": "Concreto Armado",
+      "authority": "Ministerio de Vivienda, Construcción y Saneamiento",
+      "jurisdiction": "PE",
+      "version": "DS-010-2009-VIVIENDA",
+      "publication_date": null,
+      "effective_date": null,
+      "status": "NO_VERIFICADA",
+      "source_id": "SRC-RNE-E060-PDF",
+      "scope_applicable": [
+        "EDIFICACION",
+        "SISTEMA"
+      ],
+      "summary": "Metadato estructural de prueba; no crea una comprobación de diseño ni una certificación de cálculo."
+    },
+    {
+      "regulation_id": "RNE-IS010-SAMPLE",
+      "code": "IS.010",
+      "title": "Instalaciones Sanitarias para Edificaciones",
+      "authority": "Ministerio de Vivienda, Construcción y Saneamiento",
+      "jurisdiction": "PE",
+      "version": "DS-017-2012-VIVIENDA",
+      "publication_date": null,
+      "effective_date": null,
+      "status": "NO_VERIFICADA",
+      "source_id": "SRC-RNE-IS010-PDF",
+      "scope_applicable": [
+        "EDIFICACION",
+        "SISTEMA",
+        "ESPACIO"
+      ],
+      "summary": "Metadato sanitario de prueba; no crea una validación automática de instalaciones."
+    },
+    {
+      "regulation_id": "RNE-EM010-SAMPLE",
+      "code": "EM.010",
+      "title": "Instalaciones Eléctricas Interiores",
+      "authority": "Ministerio de Vivienda, Construcción y Saneamiento",
+      "jurisdiction": "PE",
+      "version": "RM-083-2019-VIVIENDA",
+      "publication_date": null,
+      "effective_date": null,
+      "status": "NO_VERIFICADA",
+      "source_id": "SRC-RNE-EM010-PDF",
+      "scope_applicable": [
+        "EDIFICACION",
+        "SISTEMA",
+        "ESPACIO"
+      ],
+      "summary": "Metadato eléctrico de prueba; no crea una validación automática de instalaciones."
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "EVD-RNE-A010-001",
+      "source_id": "SRC-RNE-A010-PDF",
+      "evidence_type": "NORMATIVE",
+      "article_reference": "A.010-INTRO",
+      "statement": "La Norma A.010 se registra como referencia normativa para condiciones generales de diseño arquitectónico.",
+      "method_version": "MANUAL_REVIEW_REQUIRED/1",
+      "state": "UNVERIFIED"
+    },
+    {
+      "evidence_id": "EVD-RNE-A010-002",
+      "source_id": "SRC-RNE-A010-PDF",
+      "evidence_type": "NORMATIVE",
+      "article_reference": "A.010-SCOPE",
+      "statement": "El subconjunto se limita a metadatos y referencias de prueba; no convierte el documento en regla computable automática.",
+      "method_version": "CORPUS_FIXTURE/1",
+      "state": "UNVERIFIED"
+    },
+    {
+      "evidence_id": "EVD-RNE-A010-003",
+      "source_id": "SRC-RNE-PORTAL-OFFICIAL",
+      "evidence_type": "REFERENCE",
+      "article_reference": "PORTAL-RNE",
+      "statement": "El portal oficial del MVCS identifica al RNE como marco técnico nacional y publica el documento A.010 asociado a la RM N° 191-2021-VIVIENDA.",
+      "method_version": "OFFICIAL_PORTAL_CAPTURE/1",
+      "state": "OBSERVED"
+    },
+    {
+      "evidence_id": "EVD-RNE-E030-001",
+      "source_id": "SRC-RNE-E030-PDF",
+      "evidence_type": "REFERENCE",
+      "article_reference": "E.030-DOCUMENT",
+      "statement": "El compendio oficial del RNE publica una entrada E.030 Diseño Sismorresistente asociada a la RM-043-2019-VIVIENDA.",
+      "method_version": "OFFICIAL_PORTAL_CAPTURE/1",
+      "state": "OBSERVED"
+    },
+    {
+      "evidence_id": "EVD-RNE-E060-001",
+      "source_id": "SRC-RNE-E060-PDF",
+      "evidence_type": "REFERENCE",
+      "article_reference": "E.060-DOCUMENT",
+      "statement": "El compendio oficial del RNE publica una entrada E.060 Concreto Armado asociada al DS N° 010-2009.",
+      "method_version": "OFFICIAL_PORTAL_CAPTURE/1",
+      "state": "OBSERVED"
+    },
+    {
+      "evidence_id": "EVD-RNE-IS010-001",
+      "source_id": "SRC-RNE-IS010-PDF",
+      "evidence_type": "REFERENCE",
+      "article_reference": "IS.010-DOCUMENT",
+      "statement": "El compendio oficial del RNE publica una entrada IS.010 Instalaciones Sanitarias para Edificaciones asociada al DS N° 017-2012.",
+      "method_version": "OFFICIAL_PORTAL_CAPTURE/1",
+      "state": "OBSERVED"
+    },
+    {
+      "evidence_id": "EVD-RNE-EM010-001",
+      "source_id": "SRC-RNE-EM010-PDF",
+      "evidence_type": "REFERENCE",
+      "article_reference": "EM.010-DOCUMENT",
+      "statement": "El compendio oficial del RNE publica una entrada EM.010 Instalaciones Eléctricas Interiores asociada a la RM N° 083-2019-VIVIENDA.",
+      "method_version": "OFFICIAL_PORTAL_CAPTURE/1",
+      "state": "OBSERVED"
+    }
+  ],
+  "promotion_review": {
+    "review_id": "PROMOTION-REVIEW-RFC025-2026-09-16",
+    "reviewed_at": "2026-09-16T23:13:00Z",
+    "reviewer": "Manus AI — evidence pre-review",
+    "status": "BLOCKED",
+    "source_availability": "ALL_SIX_SOURCES_HTTP_200",
+    "decision": "NO_AUTOMATIC_PROMOTION",
+    "reason": "HTTP availability does not prove legal vigency; E.030 and IS.010 have official modification notices after the fixture versions, while current status evidence is incomplete for the full five-norm set.",
+    "blocked_regulations": [
+      "A.010",
+      "E.030",
+      "E.060",
+      "IS.010",
+      "EM.010"
+    ],
+    "follow_up_sources": [
+      "https://www.gob.pe/institucion/vivienda/normas-legales/8081915-183-2026-vivienda",
+      "https://www.gob.pe/institucion/vivienda/normas-legales/6500515-055-2025-vivienda",
+      "https://www.gob.pe/institucion/vivienda/normas-legales/6667128-107-2025-vivienda"
+    ]
+  }
+}
