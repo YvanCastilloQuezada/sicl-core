@@ -46,10 +46,11 @@ from api.schemas import (
     ProjectVariableCreateRequest,
     FeasibilityCheckRequest,
     FeasibleParetoRequest,
+    DesignKnowledgeQueryRequest,
     V1Envelope,
 )
 from sicl.cli import CLI
-from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, Source, SourceType
+from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, Source, SourceType, SpatialScope
 from sicl.actors import actor_to_dict, position_to_dict
 from sicl.temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
@@ -61,6 +62,7 @@ from sicl.design_principles import get_principle, list_principles
 from sicl.regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_dict, snapshot_to_dict
 from sicl.multiscale import SCALE_ORDER, children_scopes, parent_scope
 from sicl.feasibility import ProjectVariable, VariableType, evaluate_feasibility, feasible_pareto_front, normalized_key, serialize_result
+from sicl.design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery, list_items as list_knowledge_items, list_patterns as list_knowledge_patterns, list_sources as list_knowledge_sources
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -144,6 +146,40 @@ def simulation_methods() -> dict[str, Any]:
 @router.get("/generations/methods", dependencies=[Depends(_auth)])
 def generation_methods() -> V1Envelope:
     return _ok({"methods": list_generation_methods()})
+
+
+@router.get("/design-knowledge/catalog", dependencies=[Depends(_auth)])
+def design_knowledge_catalog(scope: str | None = None, typology: str | None = None) -> V1Envelope:
+    spatial_scope = None
+    if scope is not None:
+        try:
+            spatial_scope = SpatialScope(scope)
+        except ValueError:
+            _error({"code": "INVALID_SCOPE", "message": scope})
+    return _ok({"sources": list_knowledge_sources(), "items": list_knowledge_items(spatial_scope, typology), "patterns": list_knowledge_patterns(spatial_scope, typology), "scales": [item.value for item in SpatialScope]})
+
+
+@router.post("/design-knowledge/query", dependencies=[Depends(_auth)])
+def query_design_knowledge(request: DesignKnowledgeQueryRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    spatial_scope = None
+    if request.spatial_scope is not None:
+        try:
+            spatial_scope = SpatialScope(request.spatial_scope)
+        except ValueError:
+            _error({"code": "INVALID_SCOPE", "message": request.spatial_scope})
+    regulations = [regulation_to_dict(item) for item in repo.list_regulations()]
+    result = DesignKnowledgeAgent(regulations).query(DesignKnowledgeQuery(
+        spatial_scope=spatial_scope,
+        typology=request.typology,
+        jurisdiction=request.jurisdiction,
+        objectives=request.objectives,
+        problem_terms=request.problem_terms,
+        requested_operation=request.requested_operation,
+        facts=request.facts,
+        assumptions=request.assumptions,
+        preferences=request.preferences,
+    ))
+    return _ok(asdict(result))
 
 
 @router.post("/projects/{project_id}/generations", dependencies=[Depends(_auth)])

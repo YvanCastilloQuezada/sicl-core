@@ -191,6 +191,18 @@ class GenerationPromoteRequest(BaseModel):
     authority: str = Field(min_length=1)
 
 
+class DesignKnowledgeQueryRequest(BaseModel):
+    spatial_scope: str | None = None
+    typology: str | None = None
+    jurisdiction: str | None = None
+    objectives: list[str] = Field(default_factory=list)
+    problem_terms: list[str] = Field(default_factory=list)
+    requested_operation: str = "KNOWLEDGE_RETRIEVAL"
+    facts: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+    preferences: list[str] = Field(default_factory=list)
+
+
 class MemoryExtractRequest(BaseModel):
     project_id: str = Field(min_length=1)
     actor: str = Field(min_length=1)
