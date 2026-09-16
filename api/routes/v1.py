@@ -23,6 +23,7 @@ from api.schemas import (
     ScenarioSelectRequest,
     ComparisonCreateRequest,
     EvidenceCreateRequest,
+    SourceCreateRequest,
     EvaluationCreateRequest,
     GenerationCreateRequest,
     GenerationPromoteRequest,
@@ -43,7 +44,7 @@ from api.schemas import (
     V1Envelope,
 )
 from sicl.cli import CLI
-from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, SourceType
+from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, Source, SourceType
 from sicl.actors import actor_to_dict, position_to_dict
 from sicl.temporal import cycle_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
@@ -68,7 +69,7 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "SCALE_RELATION_REQUIRED"}:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
@@ -76,9 +77,9 @@ def _status_for(code: str) -> int:
         return 422
     if code == "PROJECT_NOT_FOUND":
         return 404
-    if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT", "PLANNING_INSTRUMENT_ALREADY_LINKED", "INVALID_SCOPE_RELATION"}:
+    if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT", "SOURCE_ALREADY_EXISTS", "PLANNING_INSTRUMENT_ALREADY_LINKED", "INVALID_SCOPE_RELATION"}:
         return 409
-    if code in {"HUMAN_REVIEW_REQUIRED", "HUMAN_AUTHORITY_REQUIRED", "MEMORY_REVOKED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED"}:
+    if code in {"HUMAN_REVIEW_REQUIRED", "HUMAN_AUTHORITY_REQUIRED", "MEMORY_REVOKED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED", "INVALID_SOURCE_TYPE"}:
         return 422
     return 400
 
@@ -901,6 +902,51 @@ def create_evidence(project_id: str, request: EvidenceCreateRequest, repo: SQLit
         cli._event(project_id, "EVIDENCE_ADDED", {"evidence_id": evidence.evidence_id, "statement": evidence.statement, "evidence_type": evidence.evidence_type.value, "state": evidence.state}),
     )
     return _ok({"evidence": asdict(evidence)}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/sources", dependencies=[Depends(_auth)])
+def create_source(project_id: str, request: SourceCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    if project.stage == "CLOSED":
+        _error({"code": "INVALID_STATE", "message": "Project is CLOSED"}, project_id)
+    if request.source_id in project.sources:
+        _error({"code": "SOURCE_ALREADY_EXISTS", "message": request.source_id}, project_id)
+    try:
+        source_type = SourceType(request.source_type.upper())
+    except ValueError:
+        _error({"code": "INVALID_SOURCE_TYPE", "message": request.source_type}, project_id)
+    source = Source(request.source_id, project_id, source_type, request.title, request.url, 1)
+    project.sources[source.source_id] = source
+    project.version += 1
+    cli = CLI(repo, actor="api")
+    repo.insert_entity_and_event(
+        "INSERT INTO sources(source_id, project_id, source_type, title, url, version) VALUES (?, ?, ?, ?, ?, ?)",
+        (source.source_id, source.project_id, source.source_type.value, source.title, source.url, source.version),
+        project,
+        cli._event(project_id, "SOURCE_ADDED", asdict(source)),
+    )
+    return _ok({"source": asdict(source)}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/sources", dependencies=[Depends(_auth)])
+def list_sources(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"sources": [asdict(item) for item in project.sources.values()]}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/sources/{source_id}", dependencies=[Depends(_auth)])
+def get_source(project_id: str, source_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    source = project.sources.get(source_id)
+    if source is None:
+        _error({"code": "SOURCE_NOT_FOUND", "message": source_id}, project_id)
+    return _ok({"source": asdict(source)}, project_id, project.version)
 
 
 @router.post("/projects/{project_id}/evaluations", dependencies=[Depends(_auth)])

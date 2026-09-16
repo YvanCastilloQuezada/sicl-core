@@ -249,3 +249,7 @@ La CLI devuelve objetos `Response` con `status`, `code`, `message` y `data`. Có
 Los agentes, Pareto, generación, debate y Site Intelligence son analíticos y no autoritativos. RFC-010 implementa únicamente generación paramétrica y por patrón; no se implementan generación asistida por LLM, generación evolutiva, Project DNA, Requirements formales, UI, BIM, GIS, Digital Twin, IoT ni decisiones automáticas.
 
 **Este contrato no modifica SICL 0.6.**
+
+### HTTP v1 — Source
+
+La superficie canónica expone `POST /v1/projects/{project_id}/sources`, `GET /v1/projects/{project_id}/sources` y `GET /v1/projects/{project_id}/sources/{source_id}`. Source es un registro de procedencia project-scoped, con tipos `OFFICIAL`, `SECONDARY`, `USER_PROVIDED` y `UNKNOWN`; su creación es append-only, produce `SOURCE_ADDED` y no crea Evidence, Fact, Recommendation ni Decision. No existen endpoints HTTP de actualización o eliminación.
