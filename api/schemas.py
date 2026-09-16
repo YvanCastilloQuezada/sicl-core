@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProjectCreateRequest(BaseModel):
@@ -25,6 +25,37 @@ class APIResponse(BaseModel):
     code: str
     message: str
     data: dict[str, Any] = Field(default_factory=dict)
+
+
+class V1Envelope(BaseModel):
+    contract_version: str
+    status: str
+    code: str
+    message: str
+    project_id: str | None = None
+    observed_version: int | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+class CanonicalProjectCreateRequest(BaseModel):
+    project_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    spatial_scope: dict[str, Any] | None = None
+    temporal_scope: dict[str, Any] | None = None
+    actor: str = Field(default="api", min_length=1)
+
+
+class CanonicalCommandRequest(BaseModel):
+    command: str = Field(min_length=1)
+    actor: str = Field(default="api", min_length=1)
+
+
+class CanonicalWriteRequest(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    @property
+    def payload(self) -> dict[str, Any]:
+        return self.model_dump(exclude_unset=True)
 
 
 class ProjectResponse(BaseModel):

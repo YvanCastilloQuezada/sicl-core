@@ -265,13 +265,15 @@ class CLI:
         return self._ok({"alternatives": [asdict(a) for a in p.alternatives.values()]})
 
     def agent_run(self, args: list[str]) -> dict:
-        if len(args) != 2 or args[0].upper() != "BIOCLIMATIC":
-            raise SICLError("INVALID_ARGUMENT", "usage: /AGENT RUN BIOCLIMATIC alternative")
+        if len(args) != 2 or args[0].upper() not in {"BIOCLIMATIC", "STRUCTURAL", "ECONOMIC"}:
+            raise SICLError("INVALID_ARGUMENT", "usage: /AGENT RUN BIOCLIMATIC|STRUCTURAL|ECONOMIC alternative")
         p = self._require_open()
         alternative = next((item for item in p.alternatives.values() if item.alternative_id == args[1] or item.name == args[1].upper()), None)
         if alternative is None:
             raise SICLError("INVALID_ARGUMENT", f"alternative not found: {args[1]}")
-        evaluation = BioclimaticAgent().evaluate(alternative, p)
+        agent_name = args[0].upper()
+        agent = {"BIOCLIMATIC": BioclimaticAgent, "STRUCTURAL": StructuralAgent, "ECONOMIC": EconomicAgent}[agent_name]()
+        evaluation = agent.evaluate(alternative, p)
         p.evaluations[evaluation.evaluation_id] = evaluation
         p.version += 1
         self.repo.insert_entity_and_event(
@@ -280,7 +282,7 @@ class CLI:
             p,
             self._event(p.project_id, "AGENT_EVALUATION_RECORDED", asdict(evaluation), "EXPERT_SYSTEM"),
         )
-        return self._ok({"agent": "BIOCLIMATIC", "evaluation": asdict(evaluation), "decision_created": False})
+        return self._ok({"agent": agent_name, "evaluation": asdict(evaluation), "decision_created": False})
 
     def pareto(self, args: list[str]) -> dict:
         if len(args) != 2:

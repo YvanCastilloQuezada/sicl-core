@@ -7,7 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Iterator
 
-from .domain import Assumption, Constraint, Decision, Event, Fact, HumanReview, Objective, Project, Role
+from .domain import Assumption, Constraint, Decision, Event, Fact, HumanReview, Objective, Preference, Project, Role
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 
@@ -49,6 +49,10 @@ class SQLiteRepository:
         CREATE TABLE IF NOT EXISTS assumptions (
           assumption_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
           statement TEXT NOT NULL, basis TEXT NOT NULL, version INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS preferences (
+          preference_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
+          statement TEXT NOT NULL, actor TEXT NOT NULL, version INTEGER NOT NULL
         );
         CREATE TABLE IF NOT EXISTS decisions (
           decision_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
@@ -135,6 +139,7 @@ class SQLiteRepository:
         p.roles = {r["role_id"]: Role(**dict(r)) for r in self.conn.execute("SELECT * FROM roles WHERE project_id=?", (project_id,))}
         p.facts = {r["fact_id"]: Fact(**dict(r)) for r in self.conn.execute("SELECT * FROM facts WHERE project_id=?", (project_id,))}
         p.assumptions = {r["assumption_id"]: Assumption(**dict(r)) for r in self.conn.execute("SELECT * FROM assumptions WHERE project_id=?", (project_id,))}
+        p.preferences = {r["preference_id"]: Preference(**dict(r)) for r in self.conn.execute("SELECT * FROM preferences WHERE project_id=?", (project_id,))}
         p.decisions = {r["decision_id"]: Decision(**dict(r)) for r in self.conn.execute("SELECT * FROM decisions WHERE project_id=?", (project_id,))}
         p.human_reviews = {r["review_id"]: HumanReview(**dict(r)) for r in self.conn.execute("SELECT * FROM human_reviews WHERE project_id=?", (project_id,))}
         p.alternatives = {r["id"]: Alternative(r["id"], r["project_id"], r["name"], r["description"], json.loads(r["parameters_json"]), r["status"], r["version"], r["source"]) for r in self.conn.execute("SELECT * FROM alternatives WHERE project_id=?", (project_id,))}

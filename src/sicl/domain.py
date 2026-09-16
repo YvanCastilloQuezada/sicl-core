@@ -26,6 +26,7 @@ class Project:
     roles: dict[str, "Role"] = field(default_factory=dict)
     facts: dict[str, "Fact"] = field(default_factory=dict)
     assumptions: dict[str, "Assumption"] = field(default_factory=dict)
+    preferences: dict[str, "Preference"] = field(default_factory=dict)
     decisions: dict[str, "Decision"] = field(default_factory=dict)
     human_reviews: dict[str, "HumanReview"] = field(default_factory=dict)
     alternatives: dict[str, Alternative] = field(default_factory=dict)
@@ -80,6 +81,15 @@ class Assumption:
     project_id: str
     statement: str
     basis: str = ""
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class Preference:
+    preference_id: str
+    project_id: str
+    statement: str
+    actor: str
     version: int = 1
 
 
