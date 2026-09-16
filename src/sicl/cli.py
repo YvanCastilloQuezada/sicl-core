@@ -24,6 +24,7 @@ from .generation import generate_candidates, generation_to_dict, list_generation
 from .memory import extract_memory, memory_to_dict, memory_types
 from .actors import actor_to_dict, position_to_dict
 from .temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
+from .feasibility import ProjectVariable, VariableType, evaluate_feasibility, feasible_pareto_front, normalized_key, project_variable_dict, serialize_result, validate_project_variable_uniqueness
 
 
 class CLI:
@@ -90,6 +91,12 @@ class CLI:
                 return self.objective_set(parts[2:])
             if head == ("/CONSTRAINT", "SET"):
                 return self.constraint_set(parts[2:])
+            if head == ("/VARIABLE", "ADD"):
+                return self.variable_add(parts[2:])
+            if head == ("/VARIABLE", "LIST"):
+                return self.variable_list()
+            if head == ("/FEASIBILITY", "CHECK"):
+                return self.feasibility_check(parts[2:])
             if head == ("/ROLE", "ADD"):
                 return self.role_add(parts[2:])
             if head == ("/ACTOR", "ADD"):
@@ -186,6 +193,8 @@ class CLI:
                 return self.tradeoff_matrix_command(parts[1:])
             if head == ("/MULTIOBJECTIVE", "PARETO"):
                 return self.multiobjective_pareto(parts[2:])
+            if head == ("/MULTIOBJECTIVE", "FEASIBLE_PARETO"):
+                return self.multiobjective_feasible_pareto(parts[2:])
             if head == ("/MULTIOBJECTIVE", "TRADEOFFS"):
                 return self.multiobjective_tradeoffs(parts[2:])
             if head == ("/MULTIOBJECTIVE", "LIST"):
@@ -1361,3 +1370,63 @@ class CLI:
             if result["code"] != "OK":
                 raise SICLError("IMPORT_FAILED", result["message"])
         return self._ok({"imported": len(rows), "entity_type": entity_type})
+
+
+    def variable_add(self, args: list[str]) -> dict:
+        if len(args) < 6:
+            raise SICLError("INVALID_ARGUMENT", "variable_id key type value actor authority [unit] [scope]")
+        project = self._require_open()
+        variable_id, key, kind, raw_value, actor_id, authority = args[:6]
+        unit = args[6] if len(args) > 6 else None
+        scope = args[7] if len(args) > 7 else (project.spatial_scope.value if project.spatial_scope else "edificacion")
+        try:
+            variable_type = VariableType(kind.upper())
+            value: Any = json.loads(raw_value)
+        except (ValueError, json.JSONDecodeError) as exc:
+            if isinstance(exc, json.JSONDecodeError):
+                value = raw_value
+            else:
+                raise SICLError("INVALID_ARGUMENT", "type must be OBJECTIVE, CONSTRAINT or PARAMETER") from exc
+        variable = ProjectVariable(variable_id, project.project_id, normalized_key(key), variable_type, value, actor_id, authority, unit, scope)
+        existing = [ProjectVariable(**v) if isinstance(v, dict) else v for v in project.project_variables.values()]
+        try:
+            validate_project_variable_uniqueness(existing, variable)
+        except ValueError as exc:
+            raise SICLError("CONFLICT", str(exc)) from exc
+        project.project_variables[variable.variable_id] = project_variable_dict(variable)
+        project.version += 1
+        self.repo.add_event(self._event(project.project_id, "PROJECT_VARIABLE_RECORDED", project_variable_dict(variable)))
+        return self._ok({"variable": project_variable_dict(variable), "decision_created": False})
+
+    def variable_list(self) -> dict:
+        project = self._project()
+        return self._ok({"variables": list(project.project_variables.values())})
+
+    def feasibility_check(self, args: list[str]) -> dict:
+        if len(args) != 2:
+            raise SICLError("INVALID_ARGUMENT", "alternative_id values_json required")
+        project = self._project()
+        try:
+            values = json.loads(args[1])
+        except json.JSONDecodeError as exc:
+            raise SICLError("INVALID_ARGUMENT", "values_json must be valid JSON") from exc
+        constraints = [asdict(item) for item in project.constraints.values()]
+        result = evaluate_feasibility(args[0], values, constraints, evaluated_by=self.actor)
+        project.feasibility_results[result.alternative_id] = serialize_result(result)
+        self.repo.add_event(self._event(project.project_id, "FEASIBILITY_EVALUATED", serialize_result(result)))
+        return self._ok({"feasibility": serialize_result(result), "decision_created": False, "recommendation_created": False})
+
+    def multiobjective_feasible_pareto(self, args: list[str]) -> dict:
+        if len(args) != 1:
+            raise SICLError("INVALID_ARGUMENT", "pareto_ids_json required")
+        project = self._project()
+        try:
+            front = json.loads(args[0])
+        except json.JSONDecodeError as exc:
+            raise SICLError("INVALID_ARGUMENT", "pareto_ids_json must be valid JSON") from exc
+        results = []
+        for payload in project.feasibility_results.values():
+            from .feasibility import FeasibilityState, FeasibilityResult, ConstraintCheck
+            checks = tuple(ConstraintCheck(**item) for item in payload.get("checks", []))
+            results.append(FeasibilityResult(payload["alternative_id"], FeasibilityState(payload["state"]), checks, tuple(payload.get("failed_constraint_ids", [])), tuple(payload.get("unknown_constraint_ids", [])), tuple(payload.get("insufficient_constraint_ids", [])), tuple(), tuple(), payload.get("evaluated_by", self.actor)))
+        return self._ok({"pareto_front": front, "feasible_pareto_front": feasible_pareto_front(front, results)})

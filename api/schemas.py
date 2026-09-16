@@ -158,6 +158,28 @@ class MultiobjectiveRequest(BaseModel):
     objectives: list[str] = Field(min_length=2)
 
 
+class ProjectVariableCreateRequest(BaseModel):
+    variable_id: str = Field(min_length=1)
+    normalized_key: str = Field(min_length=1)
+    variable_type: str = Field(min_length=1)
+    value: Any
+    actor_id: str = Field(min_length=1)
+    authority: str = Field(min_length=1)
+    unit: str | None = None
+    spatial_scope: str = "edificacion"
+    source: str = "USER_INPUT"
+    normative_reference: str | None = None
+
+
+class FeasibilityCheckRequest(BaseModel):
+    alternative_id: str = Field(min_length=1)
+    values: dict[str, Any] = Field(default_factory=dict)
+
+
+class FeasibleParetoRequest(BaseModel):
+    pareto_front: list[str] = Field(min_length=1)
+
+
 class GenerationCreateRequest(BaseModel):
     method: str = Field(min_length=1)
     inputs: dict[str, Any] = Field(default_factory=dict)
