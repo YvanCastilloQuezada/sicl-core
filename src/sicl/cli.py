@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 from dataclasses import asdict
 from typing import Any
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, GeneratedAlternative, GenerationMethod, GenerationState, HumanReview, Fact, InterpretationConfidence, InterpretationState, MemoryState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
+from .domain import Actor, ActorPosition, ActorRole, ActorState, Assumption, AuthorityLevel, Constraint, Decision, Evidence, EvidenceType, Event, GeneratedAlternative, GenerationMethod, GenerationState, HumanReview, Fact, InterpretationConfidence, InterpretationState, MemoryState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, SpatialScope, SourceType, Stance, SubjectType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
@@ -22,6 +22,7 @@ from .regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_
 from .multiscale import SCALE_ORDER, children_scopes, is_ancestor, parent_scope
 from .generation import generate_candidates, generation_to_dict, list_generation_methods
 from .memory import extract_memory, memory_to_dict, memory_types
+from .actors import actor_to_dict, position_to_dict
 
 
 class CLI:
@@ -47,7 +48,7 @@ class CLI:
         try:
             parts = shlex.split(command)
             if not parts or parts[0] == "/HELP":
-                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT IMPORT OBJECTIVE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE DESIGN", "/GENERATE LIST", "/GENERATE SHOW", "/GENERATE METHODS", "/ALTERNATIVE PROMOTE", "/MEMORY LIST", "/MEMORY SHOW", "/MEMORY EXTRACT", "/MEMORY REVOKE", "/MEMORY APPLY", "/MEMORY TYPES", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/SCALE PARENT", "/SCALE CHILDREN", "/SCALE RELATE", "/SCALE RELATIONS", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/REGULATION ADD", "/REGULATION LIST", "/REGULATION SHOW", "/REGULATION STATUS", "/INTERPRET ADD", "/INTERPRET LIST", "/INTERPRET REVIEW", "/SNAPSHOT CREATE", "/SNAPSHOT LIST", "/SNAPSHOT FREEZE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
+                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT IMPORT OBJECTIVE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/ACTOR ADD", "/ACTOR LIST", "/ACTOR SHOW", "/POSITION ADD", "/POSITION LIST", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE DESIGN", "/GENERATE LIST", "/GENERATE SHOW", "/GENERATE METHODS", "/ALTERNATIVE PROMOTE", "/MEMORY LIST", "/MEMORY SHOW", "/MEMORY EXTRACT", "/MEMORY REVOKE", "/MEMORY APPLY", "/MEMORY TYPES", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/SCALE PARENT", "/SCALE CHILDREN", "/SCALE RELATE", "/SCALE RELATIONS", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/REGULATION ADD", "/REGULATION LIST", "/REGULATION SHOW", "/REGULATION STATUS", "/INTERPRET ADD", "/INTERPRET LIST", "/INTERPRET REVIEW", "/SNAPSHOT CREATE", "/SNAPSHOT LIST", "/SNAPSHOT FREEZE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
             head = tuple(p.upper() for p in parts[:2])
             if head == ("/EXIT",):
                 self.closed = True
@@ -90,6 +91,16 @@ class CLI:
                 return self.constraint_set(parts[2:])
             if head == ("/ROLE", "ADD"):
                 return self.role_add(parts[2:])
+            if head == ("/ACTOR", "ADD"):
+                return self.actor_add(parts[2:])
+            if head == ("/ACTOR", "LIST"):
+                return self.actor_list()
+            if head == ("/ACTOR", "SHOW"):
+                return self.actor_show(parts[2:])
+            if head == ("/POSITION", "ADD"):
+                return self.position_add(parts[2:])
+            if head == ("/POSITION", "LIST"):
+                return self.position_list(parts[2:])
             if head == ("/FACT", "SET"):
                 return self.fact_set(parts[2:])
             if head == ("/ASSUMPTION", "SET"):
@@ -507,6 +518,85 @@ class CLI:
         self.repo.insert_entity_and_event("INSERT INTO roles VALUES (?, ?, ?, ?, ?)", (rid, p.project_id, name, actor, 1), p, self._event(p.project_id, "ROLE_ADDED", asdict(r)))
         return self._ok(asdict(r))
 
+    def actor_add(self, args: list[str]) -> dict:
+        if len(args) not in {4, 6}:
+            raise SICLError("INVALID_ARGUMENT", "actor_id role name authority_level [interests_json constraints_json] required")
+        p = self._require_open()
+        actor_id, role_text, name, authority_text = args[:4]
+        if actor_id in p.actors:
+            raise SICLError("CONFLICT", f"actor already exists: {actor_id}")
+        try:
+            role = ActorRole(role_text.upper())
+            authority = AuthorityLevel(authority_text.upper())
+        except ValueError as exc:
+            raise SICLError("INVALID_ARGUMENT", "invalid actor role or authority level") from exc
+        try:
+            interests = json.loads(args[4]) if len(args) == 6 else []
+            constraints = json.loads(args[5]) if len(args) == 6 else []
+            if not isinstance(interests, list) or not isinstance(constraints, list):
+                raise ValueError
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise SICLError("INVALID_ARGUMENT", "interests and constraints must be JSON lists") from exc
+        actor = Actor(actor_id, p.project_id, role, name, authority, interests, constraints)
+        p.actors[actor_id] = actor
+        p.version += 1
+        self.repo.insert_entity_and_event(
+            "INSERT INTO actors VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (actor.actor_id, actor.project_id, actor.role.value, actor.name, actor.authority_level.value, json.dumps(actor.interests), json.dumps(actor.constraints), actor.state.value, actor.created_at.isoformat(), actor.version),
+            p,
+            self._event(p.project_id, "ACTOR_ADDED", actor_to_dict(actor)),
+        )
+        return self._ok({"actor": actor_to_dict(actor)})
+
+    def actor_list(self) -> dict:
+        return self._ok({"actors": [actor_to_dict(item) for item in self.repo.list_actors(self._project().project_id)]})
+
+    def actor_show(self, args: list[str]) -> dict:
+        if len(args) != 1:
+            raise SICLError("INVALID_ARGUMENT", "actor_id required")
+        actor = self.repo.get_actor(self._project().project_id, args[0])
+        if actor is None:
+            raise SICLError("ACTOR_NOT_FOUND", args[0])
+        return self._ok({"actor": actor_to_dict(actor)})
+
+    def position_add(self, args: list[str]) -> dict:
+        if len(args) < 5:
+            raise SICLError("INVALID_ARGUMENT", "actor_id subject_type subject_id stance reason required")
+        p = self._require_open()
+        actor_id, subject_text, subject_id, stance_text = args[:4]
+        reason = args[4]
+        conditions = []
+        if len(args) > 5:
+            try:
+                conditions = json.loads(args[5])
+                if not isinstance(conditions, list):
+                    raise ValueError
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                raise SICLError("INVALID_ARGUMENT", "conditions must be a JSON list") from exc
+        actor = p.actors.get(actor_id)
+        if actor is None:
+            raise SICLError("ACTOR_NOT_FOUND", actor_id)
+        try:
+            subject_type = SubjectType(subject_text.upper())
+            stance = Stance(stance_text.upper())
+        except ValueError as exc:
+            raise SICLError("INVALID_ARGUMENT", "invalid subject type or stance") from exc
+        position = ActorPosition(f"POS-{uuid.uuid4().hex[:10]}", p.project_id, actor_id, subject_type, subject_id, stance, reason, conditions)
+        p.positions[position.position_id] = position
+        p.version += 1
+        self.repo.insert_entity_and_event(
+            "INSERT INTO actor_positions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (position.position_id, position.project_id, position.actor_id, position.subject_type.value, position.subject_id, position.stance.value, position.reason, json.dumps(position.conditions), position.created_at.isoformat(), position.version),
+            p,
+            self._event(p.project_id, "ACTOR_POSITION_RECORDED", position_to_dict(position)),
+        )
+        return self._ok({"position": position_to_dict(position)})
+
+    def position_list(self, args: list[str]) -> dict:
+        if len(args) > 1:
+            raise SICLError("INVALID_ARGUMENT", "optional subject_id only")
+        return self._ok({"positions": [position_to_dict(item) for item in self.repo.list_positions(self._project().project_id, args[0] if args else None)]})
+
     def fact_set(self, args: list[str], *, event_source: str = "USER_COMMAND") -> dict:
         if not args: raise SICLError("INVALID_ARGUMENT", "statement required")
         p = self._require_open(); statement, source = args[0], " ".join(args[1:]); fid = f"FACT-{uuid.uuid4().hex[:10]}"; f = Fact(fid, p.project_id, statement, source); p.facts[fid] = f; p.version += 1
@@ -593,6 +683,13 @@ class CLI:
     def decision_record(self, args: list[str]) -> dict:
         if len(args) < 3: raise SICLError("INVALID_ARGUMENT", "statement actor authority required")
         p = self._require_open(); statement, actor, authority = args[0], args[1], " ".join(args[2:])
+        registered_actor = p.actors.get(actor)
+        if p.actors and (registered_actor is None or registered_actor.state is not ActorState.ACTIVE):
+            raise SICLError("DECISIONAL_ACTOR_REQUIRED", "an active registered actor is required")
+        if registered_actor and registered_actor.authority_level is not AuthorityLevel.DECISIONAL:
+            raise SICLError("DECISIONAL_ACTOR_REQUIRED", "only DECISIONAL actors may register a Decision")
+        if any(v.actor_id != actor and p.actors.get(v.actor_id, registered_actor).authority_level is AuthorityLevel.VETO and p.actors.get(v.actor_id).state is ActorState.ACTIVE and v.stance in {Stance.OPPOSE, Stance.CONDITIONAL} and v.subject_type is SubjectType.DECISION_PROPOSED for v in p.positions.values()):
+            raise SICLError("VETO_BLOCKED", "an active VETO actor blocks this Decision")
         if not any(review.status == "APPROVED" and review.actor == actor and review.authority == authority for review in p.human_reviews.values()):
             raise SICLError("HUMAN_REVIEW_REQUIRED", "an approved HumanReview by the same actor and authority is required")
         did = f"DEC-{uuid.uuid4().hex[:10]}"; d = Decision(did, p.project_id, statement, actor, authority); p.decisions[did] = d; p.version += 1

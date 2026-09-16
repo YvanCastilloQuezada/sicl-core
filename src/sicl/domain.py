@@ -47,6 +47,42 @@ class MemoryConfidence(str, Enum):
     LOW = "LOW"
     UNKNOWN = "UNKNOWN"
 
+
+class ActorRole(str, Enum):
+    CLIENT = "CLIENT"
+    ARCHITECT = "ARCHITECT"
+    ENGINEER = "ENGINEER"
+    REGULATOR = "REGULATOR"
+    COMMUNITY = "COMMUNITY"
+    DEVELOPER = "DEVELOPER"
+    OTHER = "OTHER"
+
+
+class AuthorityLevel(str, Enum):
+    ADVISORY = "ADVISORY"
+    CONTRIBUTORY = "CONTRIBUTORY"
+    DECISIONAL = "DECISIONAL"
+    VETO = "VETO"
+
+
+class ActorState(str, Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+
+
+class SubjectType(str, Enum):
+    RECOMMENDATION = "RECOMMENDATION"
+    ALTERNATIVE = "ALTERNATIVE"
+    DECISION_PROPOSED = "DECISION_PROPOSED"
+    GENERATION = "GENERATION"
+
+
+class Stance(str, Enum):
+    SUPPORT = "SUPPORT"
+    OPPOSE = "OPPOSE"
+    NEUTRAL = "NEUTRAL"
+    CONDITIONAL = "CONDITIONAL"
+
 STAGES = {"DRAFT", "ACTIVE", "PRELIMINARY_DESIGN", "CLOSED"}
 DIRECTIONS = {"MAXIMIZE", "MINIMIZE"}
 KNOWLEDGE_STATES = {"UNKNOWN", "CONFLICTING", "INSUFFICIENT", "OBSERVED"}
@@ -185,6 +221,8 @@ class Project:
     objectives: dict[str, "Objective"] = field(default_factory=dict)
     constraints: dict[str, "Constraint"] = field(default_factory=dict)
     roles: dict[str, "Role"] = field(default_factory=dict)
+    actors: dict[str, "Actor"] = field(default_factory=dict)
+    positions: dict[str, "ActorPosition"] = field(default_factory=dict)
     facts: dict[str, "Fact"] = field(default_factory=dict)
     assumptions: dict[str, "Assumption"] = field(default_factory=dict)
     preferences: dict[str, "Preference"] = field(default_factory=dict)
@@ -238,6 +276,34 @@ class Role:
     project_id: str
     name: str
     actor: str
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class Actor:
+    actor_id: str
+    project_id: str
+    role: ActorRole
+    name: str
+    authority_level: AuthorityLevel
+    interests: list[str] = field(default_factory=list)
+    constraints: list[str] = field(default_factory=list)
+    state: ActorState = ActorState.ACTIVE
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class ActorPosition:
+    position_id: str
+    project_id: str
+    actor_id: str
+    subject_type: SubjectType
+    subject_id: str
+    stance: Stance
+    reason: str
+    conditions: list[str] = field(default_factory=list)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     version: int = 1
 
 

@@ -8,7 +8,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Iterator
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, GeneratedAlternative, GenerationMethod, GenerationState, InstitutionalMemory, MemoryConfidence, MemoryState, MemoryType, Fact, HumanReview, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, Source, SourceType, SpatialScope, TemporalScope
+from .domain import Actor, ActorPosition, ActorRole, ActorState, Assumption, AuthorityLevel, Constraint, Decision, Evidence, EvidenceType, Event, GeneratedAlternative, GenerationMethod, GenerationState, InstitutionalMemory, MemoryConfidence, MemoryState, MemoryType, Fact, HumanReview, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, Source, SourceType, SpatialScope, Stance, SubjectType, TemporalScope
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 from .simulation import Simulation, SimulationState, SimulationType
@@ -47,6 +47,30 @@ class SQLiteRepository:
           role_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
           name TEXT NOT NULL, actor TEXT NOT NULL, version INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS actors (
+          actor_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
+          role TEXT NOT NULL, name TEXT NOT NULL, authority_level TEXT NOT NULL,
+          interests_json TEXT NOT NULL, constraints_json TEXT NOT NULL,
+          state TEXT NOT NULL, created_at TEXT NOT NULL, version INTEGER NOT NULL
+        );
+        CREATE TRIGGER IF NOT EXISTS actors_no_update
+        BEFORE UPDATE ON actors
+        BEGIN SELECT RAISE(ABORT, 'actors are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS actors_no_delete
+        BEFORE DELETE ON actors
+        BEGIN SELECT RAISE(ABORT, 'actors are append-only'); END;
+        CREATE TABLE IF NOT EXISTS actor_positions (
+          position_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
+          actor_id TEXT NOT NULL REFERENCES actors(actor_id), subject_type TEXT NOT NULL,
+          subject_id TEXT NOT NULL, stance TEXT NOT NULL, reason TEXT NOT NULL,
+          conditions_json TEXT NOT NULL, created_at TEXT NOT NULL, version INTEGER NOT NULL
+        );
+        CREATE TRIGGER IF NOT EXISTS actor_positions_no_update
+        BEFORE UPDATE ON actor_positions
+        BEGIN SELECT RAISE(ABORT, 'actor positions are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS actor_positions_no_delete
+        BEFORE DELETE ON actor_positions
+        BEGIN SELECT RAISE(ABORT, 'actor positions are append-only'); END;
         CREATE TABLE IF NOT EXISTS facts (
           fact_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
           statement TEXT NOT NULL, source TEXT NOT NULL, version INTEGER NOT NULL
@@ -334,6 +358,8 @@ class SQLiteRepository:
         p.objectives = {r["objective_id"]: Objective(**dict(r)) for r in self.conn.execute("SELECT * FROM objectives WHERE project_id=?", (project_id,))}
         p.constraints = {r["constraint_id"]: Constraint(r["constraint_id"], r["project_id"], r["key"], r["operator"], r["value"], r["unit"], bool(r["hard"]), r["version"]) for r in self.conn.execute("SELECT * FROM constraints_ WHERE project_id=?", (project_id,))}
         p.roles = {r["role_id"]: Role(**dict(r)) for r in self.conn.execute("SELECT * FROM roles WHERE project_id=?", (project_id,))}
+        p.actors = {r["actor_id"]: Actor(r["actor_id"], r["project_id"], ActorRole(r["role"]), r["name"], AuthorityLevel(r["authority_level"]), json.loads(r["interests_json"]), json.loads(r["constraints_json"]), ActorState(r["state"]), datetime.fromisoformat(r["created_at"]), r["version"]) for r in self.conn.execute("SELECT * FROM actors WHERE project_id=?", (project_id,))}
+        p.positions = {r["position_id"]: ActorPosition(r["position_id"], r["project_id"], r["actor_id"], SubjectType(r["subject_type"]), r["subject_id"], Stance(r["stance"]), r["reason"], json.loads(r["conditions_json"]), datetime.fromisoformat(r["created_at"]), r["version"]) for r in self.conn.execute("SELECT * FROM actor_positions WHERE project_id=?", (project_id,))}
         p.facts = {r["fact_id"]: Fact(**dict(r)) for r in self.conn.execute("SELECT * FROM facts WHERE project_id=?", (project_id,))}
         p.assumptions = {r["assumption_id"]: Assumption(**dict(r)) for r in self.conn.execute("SELECT * FROM assumptions WHERE project_id=?", (project_id,))}
         p.preferences = {r["preference_id"]: Preference(**dict(r)) for r in self.conn.execute("SELECT * FROM preferences WHERE project_id=?", (project_id,))}
@@ -355,6 +381,23 @@ class SQLiteRepository:
 
     def list_projects(self) -> list[Project]:
         return [self.get_project(r["project_id"]) for r in self.conn.execute("SELECT project_id FROM projects ORDER BY project_id")]
+
+    def list_actors(self, project_id: str) -> list[Actor]:
+        project = self.get_project(project_id)
+        return list(project.actors.values()) if project else []
+
+    def get_actor(self, project_id: str, actor_id: str) -> Actor | None:
+        project = self.get_project(project_id)
+        return project.actors.get(actor_id) if project else None
+
+    def list_positions(self, project_id: str, subject_id: str | None = None) -> list[ActorPosition]:
+        project = self.get_project(project_id)
+        values = list(project.positions.values()) if project else []
+        return [item for item in values if subject_id is None or item.subject_id == subject_id]
+
+    def get_position(self, project_id: str, position_id: str) -> ActorPosition | None:
+        project = self.get_project(project_id)
+        return project.positions.get(position_id) if project else None
 
     def insert_project(self, project: Project, event: Event) -> None:
         with self.transaction():
