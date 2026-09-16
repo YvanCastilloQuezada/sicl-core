@@ -98,6 +98,17 @@ class MultiobjectiveRequest(BaseModel):
     objectives: list[str] = Field(min_length=2)
 
 
+class GenerationCreateRequest(BaseModel):
+    method: str = Field(min_length=1)
+    inputs: dict[str, Any] = Field(default_factory=dict)
+
+
+class GenerationPromoteRequest(BaseModel):
+    candidate_index: int = Field(ge=0)
+    actor: str = Field(min_length=1)
+    authority: str = Field(min_length=1)
+
+
 class PlanningInstrumentLinkRequest(BaseModel):
     instrument_id: str = Field(min_length=1)
 
