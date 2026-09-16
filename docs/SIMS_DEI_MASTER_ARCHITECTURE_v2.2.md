@@ -116,33 +116,37 @@ Decision es el registro formal del acto humano. El Core valida las condiciones c
 
 InstitutionalMemory conserva conocimiento institucional derivado con alcance, evidencia, confianza y estado. La memoria no se transforma automáticamente en una decisión.
 
-## 5. Mapa de 9 escalas
+## 5. Mapa de 11 escalas
 
-SiMS-DeI utiliza nueve escalas espaciales conceptuales, desde lo territorial hasta el objeto.
+SiMS-DeI utiliza once escalas espaciales canónicas, desde lo territorial hasta el objeto.
 
 ```mermaid
 flowchart TD
-    A[País] --> B[Región]
-    B --> C[Provincia / Metrópoli]
-    C --> D[Ciudad / Distrito]
-    D --> E[Barrio / Sector]
-    E --> F[Parcela / Sitio]
-    F --> G[Edificio]
-    G --> H[Espacio]
-    H --> I[Objeto]
+    A[País] --> B[Macro-región]
+    B --> C[Región]
+    C --> D[Provincia / Metrópoli]
+    D --> E[Distrito / Ciudad]
+    E --> F[Zona / Barrio / Sector]
+    F --> G[Parcela / Sitio]
+    G --> H[Edificación]
+    H --> I[Sistema]
+    I --> J[Espacio]
+    J --> K[Objeto]
 ```
 
 | Orden | Escala | Pregunta guía |
 |---|---|---|
 | 1 | País | ¿Qué marco nacional condiciona el problema? |
-| 2 | Región | ¿Qué sistemas regionales y climáticos intervienen? |
-| 3 | Provincia / Metrópoli | ¿Qué coordinación supramunicipal existe? |
-| 4 | Ciudad / Distrito | ¿Qué estructura urbana organiza la decisión? |
-| 5 | Barrio / Sector | ¿Qué tejido local y actores están involucrados? |
-| 6 | Parcela / Sitio | ¿Qué condiciones específicas del lugar se observan? |
-| 7 | Edificio | ¿Qué configuración arquitectónica se evalúa? |
-| 8 | Espacio | ¿Cómo se organiza la experiencia y operación? |
-| 9 | Objeto | ¿Qué componente material o técnico se decide? |
+| 2 | Macro-región | ¿Qué coordinación interregional interviene? |
+| 3 | Región | ¿Qué sistemas regionales y climáticos intervienen? |
+| 4 | Provincia / Metrópoli | ¿Qué coordinación supramunicipal existe? |
+| 5 | Distrito / Ciudad | ¿Qué estructura urbana organiza la decisión? |
+| 6 | Zona / Barrio / Sector | ¿Qué tejido local y actores están involucrados? |
+| 7 | Parcela / Sitio | ¿Qué condiciones específicas del lugar se observan? |
+| 8 | Edificación | ¿Qué configuración arquitectónica se evalúa? |
+| 9 | Sistema | ¿Qué sistema técnico o funcional se integra? |
+| 10 | Espacio | ¿Cómo se organiza la experiencia y operación? |
+| 11 | Objeto | ¿Qué componente material o técnico se decide? |
 
 Las relaciones entre escalas se registran mediante ScaleRelation. Una relación no implica que la escala superior decida automáticamente por la inferior.
 

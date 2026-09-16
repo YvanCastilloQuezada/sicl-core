@@ -32,7 +32,7 @@ def test_planning_all_fields_and_invalid_type(tmp_path):
     try:
         instrument = PlanningInstrument(
             "PI-FULL", None, PlanningInstrumentType.PLAN_REGIONAL, "Regional Plan", "La Libertad",
-            "Authority", date(2026, 1, 2), "2026-2030", [SpatialScope.REGION, SpatialScope.CIUDAD_DISTRITO],
+            "Authority", date(2026, 1, 2), "2026-2030", [SpatialScope.REGION, SpatialScope.DISTRITO_CIUDAD],
             PlanningInstrumentStatus.ACTIVE, ["Coordinate growth"], "https://official.example/plan", "Summary", "OFFICIAL_SOURCE",
         )
         cli = CLI(repo)
@@ -41,7 +41,7 @@ def test_planning_all_fields_and_invalid_type(tmp_path):
         restored = repo.get_planning_instrument("PI-FULL")
         assert restored is not None
         assert restored.approval_date == date(2026, 1, 2)
-        assert restored.scope_applicable == [SpatialScope.REGION, SpatialScope.CIUDAD_DISTRITO]
+        assert restored.scope_applicable == [SpatialScope.REGION, SpatialScope.DISTRITO_CIUDAD]
         assert cli.execute('/PLANNING ADD PI-BAD NOT_A_TYPE "Bad"')["code"] == "INVALID_ARGUMENT"
     finally:
         repo.close()

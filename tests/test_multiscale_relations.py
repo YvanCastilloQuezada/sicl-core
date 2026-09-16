@@ -11,15 +11,15 @@ from sicl.repository import SQLiteRepository
 
 def test_scale_hierarchy_is_explicit():
     cli = CLI(SQLiteRepository())
-    assert cli.execute('/SCALE PARENT ciudad_distrito')['data']['parent'] == 'provincia_metropoli'
-    assert cli.execute('/SCALE CHILDREN ciudad_distrito')['data']['children'] == ['barrio_sector']
+    assert cli.execute('/SCALE PARENT distrito_ciudad')['data']['parent'] == 'provincia_metropoli'
+    assert cli.execute('/SCALE CHILDREN distrito_ciudad')['data']['children'] == ['zona_barrio_sector']
     assert cli.execute('/SCALE PARENT pais')['data']['parent'] is None
 
 
 def test_relation_requires_ancestor_scope_and_persists():
     repo = SQLiteRepository()
     cli = CLI(repo, actor='architect')
-    assert cli.execute('/PROJECT CREATE CITY "City" ciudad_distrito')['code'] == 'OK'
+    assert cli.execute('/PROJECT CREATE CITY "City" distrito_ciudad')['code'] == 'OK'
     assert cli.execute('/PROJECT CREATE SITE "Site" parcela_sitio')['code'] == 'OK'
     result = cli.execute('/SCALE RELATE CITY SITE CONTAINS "contains site"')
     assert result['code'] == 'OK'
@@ -32,8 +32,8 @@ def test_relation_requires_ancestor_scope_and_persists():
 def test_contains_relation_rejects_incompatible_scopes():
     repo = SQLiteRepository()
     cli = CLI(repo)
-    cli.execute('/PROJECT CREATE A "A" edificio')
-    cli.execute('/PROJECT CREATE B "B" ciudad_distrito')
+    cli.execute('/PROJECT CREATE A "A" edificacion')
+    cli.execute('/PROJECT CREATE B "B" distrito_ciudad')
     result = cli.execute('/SCALE RELATE A B CONTAINS')
     assert result['code'] == 'INVALID_SCOPE_RELATION'
     assert repo.list_scale_relations('A') == []
@@ -42,7 +42,7 @@ def test_contains_relation_rejects_incompatible_scopes():
 def test_objective_import_requires_relation_and_keeps_provenance():
     repo = SQLiteRepository()
     cli = CLI(repo, actor='architect')
-    cli.execute('/PROJECT CREATE CITY "City" ciudad_distrito')
+    cli.execute('/PROJECT CREATE CITY "City" distrito_ciudad')
     source = CLI(repo, actor='architect')
     source.execute('/PROJECT OPEN CITY')
     objective = source.execute('/OBJECTIVE SET ENERGY_SAVINGS MAXIMIZE 80')['data']
@@ -61,7 +61,7 @@ def test_relation_survives_reload(tmp_path):
     first = SQLiteRepository(path)
     cli = CLI(first)
     cli.execute('/PROJECT CREATE REGION "Region" region')
-    cli.execute('/PROJECT CREATE CITY "City" ciudad_distrito')
+    cli.execute('/PROJECT CREATE CITY "City" distrito_ciudad')
     cli.execute('/SCALE RELATE REGION CITY CONTAINS')
     first.close()
     second = SQLiteRepository(path)
@@ -78,7 +78,7 @@ def test_http_scales_and_relation_and_import(tmp_path, monkeypatch):
         with TestClient(app) as client:
             assert client.get('/v1/scales').status_code == 200
             assert client.post('/projects', json={'project_id': 'REGION', 'name': 'Region', 'spatial_scope': 'region'}).status_code == 201
-            assert client.post('/projects', json={'project_id': 'CITY', 'name': 'City', 'spatial_scope': 'ciudad_distrito'}).status_code == 201
+            assert client.post('/projects', json={'project_id': 'CITY', 'name': 'City', 'spatial_scope': 'distrito_ciudad'}).status_code == 201
             objective = client.post('/v1/projects/REGION/commands', json={'command': '/OBJECTIVE SET CLIMATE MAXIMIZE 80'}).json()
             oid = objective['data']['objective_id']
             created = client.post('/v1/projects/CITY/scale-relations', json={'parent_project_id': 'REGION', 'child_project_id': 'CITY', 'relation_type': 'CONTAINS'}).json()
@@ -95,7 +95,7 @@ def test_scale_relation_is_append_only():
     repo = SQLiteRepository()
     cli = CLI(repo)
     cli.execute('/PROJECT CREATE REGION "Region" region')
-    cli.execute('/PROJECT CREATE CITY "City" ciudad_distrito')
+    cli.execute('/PROJECT CREATE CITY "City" distrito_ciudad')
     cli.execute('/SCALE RELATE REGION CITY CONTAINS')
     relation_id = repo.list_scale_relations('CITY')[0].relation_id
     try:
@@ -112,10 +112,10 @@ def test_scale_relation_is_append_only():
 
 def test_project_scale_scope_is_persisted():
     repo = SQLiteRepository()
-    result = CLI(repo).execute('/PROJECT CREATE BUILDING "Building" edificio escenario_2030')
+    result = CLI(repo).execute('/PROJECT CREATE BUILDING "Building" edificacion escenario_2030')
     assert result['code'] == 'OK'
     project = repo.get_project('BUILDING')
-    assert project.spatial_scope is SpatialScope.EDIFICIO
+    assert project.spatial_scope is SpatialScope.EDIFICACION
     assert project.temporal_scope.value == 'escenario_2030'
 
 
@@ -128,6 +128,6 @@ def test_relation_duplicate_is_rejected():
     repo = SQLiteRepository()
     cli = CLI(repo)
     cli.execute('/PROJECT CREATE REGION "Region" region')
-    cli.execute('/PROJECT CREATE CITY "City" ciudad_distrito')
+    cli.execute('/PROJECT CREATE CITY "City" distrito_ciudad')
     assert cli.execute('/SCALE RELATE REGION CITY CONTAINS')['code'] == 'OK'
     assert cli.execute('/SCALE RELATE REGION CITY CONTAINS')['code'] == 'CONFLICT'

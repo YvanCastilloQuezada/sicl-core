@@ -22,10 +22,10 @@ def test_project_defaults_to_undeclared_spatial_and_project_temporal():
 
 def test_project_create_with_valid_scopes_persists():
     repo = SQLiteRepository()
-    result = CLI(repo).execute('/PROJECT CREATE P-002 "Building" edificio escenario_2030')
+    result = CLI(repo).execute('/PROJECT CREATE P-002 "Building" edificacion escenario_2030')
     assert result["code"] == "OK"
     project = repo.get_project("P-002")
-    assert project.spatial_scope is SpatialScope.EDIFICIO
+    assert project.spatial_scope is SpatialScope.EDIFICACION
     assert project.temporal_scope is TemporalScope.ESCENARIO_2030
 
 
@@ -66,11 +66,11 @@ def test_project_scope_survives_reload(tmp_path):
     db = tmp_path / "scope.sqlite"
     first = SQLiteRepository(db)
     cli = CLI(first)
-    cli.execute('/PROJECT CREATE P-005 "Persistent" ciudad_distrito largo_plazo')
+    cli.execute('/PROJECT CREATE P-005 "Persistent" distrito_ciudad largo_plazo')
     first.close()
     second = SQLiteRepository(db)
     project = second.get_project("P-005")
-    assert project.spatial_scope is SpatialScope.CIUDAD_DISTRITO
+    assert project.spatial_scope is SpatialScope.DISTRITO_CIUDAD
     assert project.temporal_scope is TemporalScope.LARGO_PLAZO
 
 
@@ -112,6 +112,65 @@ def test_api_invalid_scope_returns_bad_request(tmp_path):
             response = client.post("/projects", json={"project_id": "API-002", "name": "API", "spatial_scope": "unknown"})
             assert response.status_code == 400
             assert response.json()["detail"]["code"] == "INVALID_SCOPE"
+    finally:
+        app.dependency_overrides.clear()
+        repo.close()
+
+
+
+def test_rfc019_exposes_eleven_canonical_scopes_and_labels():
+    expected = [
+        "pais", "macro_region", "region", "provincia_metropoli",
+        "distrito_ciudad", "zona_barrio_sector", "parcela_sitio",
+        "edificacion", "sistema", "espacio", "objeto",
+    ]
+    assert [scope.value for scope in SpatialScope] == expected
+    assert SpatialScope.MACRO_REGION.label == "Macro-región"
+    assert SpatialScope.SISTEMA.label == "Sistema"
+
+
+def test_rfc019_parent_child_chain_has_eleven_scopes():
+    from sicl.multiscale import SCALE_ORDER, children_scopes, parent_scope
+
+    assert len(SCALE_ORDER) == 11
+    assert parent_scope("macro_region") is SpatialScope.PAIS
+    assert children_scopes("pais") == [SpatialScope.MACRO_REGION]
+    assert parent_scope("sistema") is SpatialScope.EDIFICACION
+    assert children_scopes("sistema") == [SpatialScope.ESPACIO]
+    assert parent_scope("objeto") is SpatialScope.ESPACIO
+
+
+def test_rfc019_new_scopes_support_ancestor_relations():
+    from sicl.multiscale import is_ancestor
+
+    assert is_ancestor("pais", "sistema")
+    assert is_ancestor("edificacion", "objeto")
+    assert not is_ancestor("sistema", "edificacion")
+
+
+def test_rfc019_http_scales_and_project_scope_validation(tmp_path, monkeypatch):
+    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    repo = SQLiteRepository(tmp_path / "rfc019-api.sqlite", check_same_thread=False)
+    app.dependency_overrides[get_repository] = lambda: repo
+    try:
+        with TestClient(app) as client:
+            scales = client.get("/v1/scales")
+            assert scales.status_code == 200
+            values = scales.json()["data"]["scales"]
+            assert len(values) == 11
+            assert values[0] == {"scope": "pais", "label": "País", "parent": None, "children": ["macro_region"]}
+            assert values[7]["scope"] == "edificacion"
+            assert values[7]["children"] == ["sistema"]
+
+            for index, scope in enumerate(("macro_region", "sistema", "edificacion", "distrito_ciudad", "zona_barrio_sector")):
+                response = client.post("/v1/projects", json={"project_id": f"RFC019-{index}", "name": scope, "spatial_scope": scope})
+                assert response.status_code == 200
+                assert response.json()["data"]["snapshot"]["spatial_scope"] == scope
+
+            for index, scope in enumerate(("edificio", "ciudad_distrito", "barrio_sector", "multiscale")):
+                response = client.post("/v1/projects", json={"project_id": f"RFC019-OLD-{index}", "name": scope, "spatial_scope": scope})
+                assert response.status_code == 400
+                assert response.json()["detail"]["code"] == "INVALID_SCOPE"
     finally:
         app.dependency_overrides.clear()
         repo.close()

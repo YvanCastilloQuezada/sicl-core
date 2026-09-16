@@ -69,7 +69,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 
 ### Multiscale Model
 
-`SpatialScope` admite exactamente nueve valores: `pais`, `region`, `provincia_metropoli`, `ciudad_distrito`, `barrio_sector`, `parcela_sitio`, `edificio`, `espacio` y `objeto`. Sus etiquetas de presentación son, respectivamente, País, Región, Provincia / Metrópoli, Ciudad / Distrito, Barrio / Sector, Parcela / Sitio, Edificio, Espacio y Objeto.
+`SpatialScope` admite exactamente once valores canónicos, en orden: `pais`, `macro_region`, `region`, `provincia_metropoli`, `distrito_ciudad`, `zona_barrio_sector`, `parcela_sitio`, `edificacion`, `sistema`, `espacio` y `objeto`. Los valores heredados `edificio`, `ciudad_distrito` y `barrio_sector` se migran mediante RFC-019 y no son aliases silenciosos. La jerarquía es estricta; las relaciones no adyacentes se modelan mediante `ScaleRelation`.
 
 `TemporalScope` admite `proyecto`, `corto_plazo`, `mediano_plazo`, `largo_plazo`, `escenario_2030`, `escenario_2040` y `escenario_2050`. El valor por defecto es `proyecto`.
 

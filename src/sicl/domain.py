@@ -116,13 +116,23 @@ KNOWLEDGE_STATES = {"UNKNOWN", "CONFLICTING", "INSUFFICIENT", "OBSERVED"}
 
 
 class SpatialScope(str, Enum):
+    """Canonical 11-level spatial ontology.
+
+    RFC-019 adds ``macro_region`` and ``sistema`` and renames the legacy
+    values ``edificio`` → ``edificacion``, ``ciudad_distrito`` →
+    ``distrito_ciudad`` and ``barrio_sector`` → ``zona_barrio_sector``.
+    Legacy database values are migrated explicitly; they are not accepted as
+    silent aliases by the new contract.
+    """
     PAIS = "pais"
+    MACRO_REGION = "macro_region"
     REGION = "region"
     PROVINCIA_METROPOLI = "provincia_metropoli"
-    CIUDAD_DISTRITO = "ciudad_distrito"
-    BARRIO_SECTOR = "barrio_sector"
+    DISTRITO_CIUDAD = "distrito_ciudad"
+    ZONA_BARRIO_SECTOR = "zona_barrio_sector"
     PARCELA_SITIO = "parcela_sitio"
-    EDIFICIO = "edificio"
+    EDIFICACION = "edificacion"
+    SISTEMA = "sistema"
     ESPACIO = "espacio"
     OBJETO = "objeto"
 
@@ -130,12 +140,14 @@ class SpatialScope(str, Enum):
     def label(self) -> str:
         return {
             SpatialScope.PAIS: "País",
+            SpatialScope.MACRO_REGION: "Macro-región",
             SpatialScope.REGION: "Región",
             SpatialScope.PROVINCIA_METROPOLI: "Provincia / Metrópoli",
-            SpatialScope.CIUDAD_DISTRITO: "Ciudad / Distrito",
-            SpatialScope.BARRIO_SECTOR: "Barrio / Sector",
+            SpatialScope.DISTRITO_CIUDAD: "Distrito / Ciudad",
+            SpatialScope.ZONA_BARRIO_SECTOR: "Zona / Barrio / Sector",
             SpatialScope.PARCELA_SITIO: "Parcela / Sitio",
-            SpatialScope.EDIFICIO: "Edificio",
+            SpatialScope.EDIFICACION: "Edificación",
+            SpatialScope.SISTEMA: "Sistema",
             SpatialScope.ESPACIO: "Espacio",
             SpatialScope.OBJETO: "Objeto",
         }[self]
@@ -275,6 +287,8 @@ class Project:
     spatial_scope: SpatialScope | None = None
     temporal_scope: TemporalScope = TemporalScope.PROYECTO
     scale_relations: dict[str, "ScaleRelation"] = field(default_factory=dict)
+    project_variables: dict[str, Any] = field(default_factory=dict)
+    feasibility_results: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

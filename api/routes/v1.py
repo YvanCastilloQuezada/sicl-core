@@ -43,6 +43,9 @@ from api.schemas import (
     ScaleRelationCreateRequest,
     ImportObjectiveRequest,
     SimulationCreateRequest,
+    ProjectVariableCreateRequest,
+    FeasibilityCheckRequest,
+    FeasibleParetoRequest,
     V1Envelope,
 )
 from sicl.cli import CLI
@@ -57,6 +60,7 @@ from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to
 from sicl.design_principles import get_principle, list_principles
 from sicl.regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_dict, snapshot_to_dict
 from sicl.multiscale import SCALE_ORDER, children_scopes, parent_scope
+from sicl.feasibility import ProjectVariable, VariableType, evaluate_feasibility, feasible_pareto_front, normalized_key, serialize_result
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -736,6 +740,54 @@ def get_multiobjective(project_id: str, multiobjective_id: str, repo: SQLiteRepo
     return _ok({"multiobjective": value}, project_id, project.version)
 
 
+@router.post("/projects/{project_id}/variables", dependencies=[Depends(_auth)])
+def create_project_variable(project_id: str, request: ProjectVariableCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    try:
+        variable = ProjectVariable(request.variable_id, project_id, normalized_key(request.normalized_key), VariableType(request.variable_type.upper()), request.value, request.actor_id, request.authority, request.unit, request.spatial_scope, request.source, 1, None, request.normative_reference)
+        if variable.variable_id in project.project_variables or any(item.get("normalized_key") == variable.normalized_key for item in project.project_variables.values()):
+            _error({"code": "CONFLICT", "message": "project variable key already exists"}, project_id)
+        variable_payload = {**asdict(variable), "variable_type": variable.variable_type.value}
+        event = CLI(repo, actor=request.actor_id)._event(project_id, "PROJECT_VARIABLE_RECORDED", variable_payload)
+        repo.add_event(event)
+    except (ValueError, KeyError) as exc:
+        _error({"code": "INVALID_INPUTS", "message": str(exc)}, project_id)
+    return _ok({"variable": variable_payload}, project_id, repo.get_project(project_id).version)
+
+
+@router.get("/projects/{project_id}/variables", dependencies=[Depends(_auth)])
+def list_project_variables(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"variables": list(project.project_variables.values())}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/feasibility", dependencies=[Depends(_auth)])
+def check_feasibility(project_id: str, request: FeasibilityCheckRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    result = evaluate_feasibility(request.alternative_id, request.values, [asdict(item) for item in project.constraints.values()])
+    repo.add_event(CLI(repo, actor="api")._event(project_id, "FEASIBILITY_EVALUATED", serialize_result(result)))
+    return _ok({"feasibility": serialize_result(result), "decision_created": False, "recommendation_created": False}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/multiobjective/feasible-pareto", dependencies=[Depends(_auth)])
+def feasible_pareto(project_id: str, request: FeasibleParetoRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    from sicl.feasibility import FeasibilityState, FeasibilityResult, ConstraintCheck
+    results = []
+    for payload in project.feasibility_results.values():
+        checks = tuple(ConstraintCheck(**item) for item in payload.get("checks", []))
+        results.append(FeasibilityResult(payload["alternative_id"], FeasibilityState(payload["state"]), checks, tuple(payload.get("failed_constraint_ids", [])), tuple(payload.get("unknown_constraint_ids", [])), tuple(payload.get("insufficient_constraint_ids", [])), tuple(), tuple(), payload.get("evaluated_by", "api")))
+    return _ok({"pareto_front": request.pareto_front, "feasible_pareto_front": feasible_pareto_front(request.pareto_front, results)}, project_id, project.version)
+
+
 @router.get("/projects", dependencies=[Depends(_auth)])
 def list_projects(repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
     projects = [asdict(project) for project in repo.list_projects()]
@@ -745,7 +797,18 @@ def list_projects(repo: SQLiteRepository = Depends(get_repository)) -> V1Envelop
 @router.post("/projects", dependencies=[Depends(_auth)])
 def create_project(request: CanonicalProjectCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
     cli = CLI(repo, actor=request.actor)
-    result = cli.execute(f'/PROJECT CREATE "{request.project_id}" "{request.name}"')
+    spatial_scope = request.spatial_scope
+    temporal_scope = request.temporal_scope
+    if isinstance(spatial_scope, dict):
+        spatial_scope = spatial_scope.get("scope") or spatial_scope.get("value")
+    if isinstance(temporal_scope, dict):
+        temporal_scope = temporal_scope.get("scope") or temporal_scope.get("value")
+    command = f'/PROJECT CREATE "{request.project_id}" "{request.name}"'
+    if spatial_scope is not None:
+        command += f' "{spatial_scope}"'
+        if temporal_scope is not None:
+            command += f' "{temporal_scope}"'
+    result = cli.execute(command)
     _error(result, request.project_id)
     snapshot, version = _snapshot(repo, request.project_id)
     return _ok({"snapshot": snapshot}, request.project_id, version)

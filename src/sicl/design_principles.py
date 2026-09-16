@@ -48,8 +48,8 @@ class Referent:
 
 
 _ALL_SCOPES = [
-    "pais", "region", "provincia_metropoli", "ciudad_distrito",
-    "barrio_sector", "parcela_sitio", "edificio", "espacio", "objeto",
+    "pais", "region", "provincia_metropoli", "distrito_ciudad",
+    "zona_barrio_sector", "parcela_sitio", "edificacion", "espacio", "objeto",
 ]
 
 
@@ -63,13 +63,13 @@ PRINCIPLES: tuple[DesignPrinciple, ...] = (
     DesignPrinciple("P-06", "Contraste", PrincipleCategory.CONTRASTE, "Diferenciación controlada de elementos para establecer énfasis y legibilidad.", _ALL_SCOPES, "Ching, Francis D. K. (2014), Architecture: Form, Space, and Order, 4th ed., Wiley."),
     DesignPrinciple("P-07", "Unidad", PrincipleCategory.UNIDAD, "Coherencia perceptual y conceptual que integra las partes en un conjunto reconocible.", _ALL_SCOPES, "Ching, Francis D. K. (2014), Architecture: Form, Space, and Order, 4th ed., Wiley."),
     DesignPrinciple("P-08", "Secuencia", PrincipleCategory.SECUENCIA, "Orden de percepción y experiencia producido por la sucesión de espacios o elementos.", _ALL_SCOPES, "Ching, Francis D. K. (2014), Architecture: Form, Space, and Order, 4th ed., Wiley."),
-    DesignPrinciple("P-09", "Luz", PrincipleCategory.LUZ, "Uso intencional de iluminación natural y artificial para configurar espacio y percepción.", ["edificio", "espacio", "objeto"], "Zumthor, Peter (2006), Atmospheres: Architectural Environments, Surrounding Objects, Birkhäuser."),
-    DesignPrinciple("P-10", "Materialidad", PrincipleCategory.MATERIALIDAD, "Reconocimiento de las propiedades, expresión y comportamiento de los materiales en el diseño.", ["parcela_sitio", "edificio", "espacio", "objeto"], "Zumthor, Peter (2010), Thinking Architecture, 3rd ed., Birkhäuser."),
-    DesignPrinciple("P-11", "Textura", PrincipleCategory.TEXTURA, "Cualidad superficial táctil y visual que contribuye a la experiencia del elemento o espacio.", ["edificio", "espacio", "objeto"], "Zumthor, Peter (2006), Atmospheres: Architectural Environments, Surrounding Objects, Birkhäuser."),
+    DesignPrinciple("P-09", "Luz", PrincipleCategory.LUZ, "Uso intencional de iluminación natural y artificial para configurar espacio y percepción.", ["edificacion", "espacio", "objeto"], "Zumthor, Peter (2006), Atmospheres: Architectural Environments, Surrounding Objects, Birkhäuser."),
+    DesignPrinciple("P-10", "Materialidad", PrincipleCategory.MATERIALIDAD, "Reconocimiento de las propiedades, expresión y comportamiento de los materiales en el diseño.", ["parcela_sitio", "edificacion", "espacio", "objeto"], "Zumthor, Peter (2010), Thinking Architecture, 3rd ed., Birkhäuser."),
+    DesignPrinciple("P-11", "Textura", PrincipleCategory.TEXTURA, "Cualidad superficial táctil y visual que contribuye a la experiencia del elemento o espacio.", ["edificacion", "espacio", "objeto"], "Zumthor, Peter (2006), Atmospheres: Architectural Environments, Surrounding Objects, Birkhäuser."),
     DesignPrinciple("P-12", "Lleno-vacío", PrincipleCategory.LLENO_VACIO, "Relación compositiva entre masa construida, vacío espacial y campo de percepción.", _ALL_SCOPES, "Ching, Francis D. K. (2014), Architecture: Form, Space, and Order, 4th ed., Wiley."),
-    DesignPrinciple("P-13", "Integración", PrincipleCategory.INTEGRACION, "Relación deliberada entre una intervención y las condiciones físicas, sociales y espaciales de su entorno.", ["ciudad_distrito", "barrio_sector", "parcela_sitio", "edificio", "espacio"], "Alexander, Christopher et al. (1977), A Pattern Language, Oxford University Press."),
-    DesignPrinciple("P-14", "Contexto", PrincipleCategory.CONTEXTO, "Reconocimiento de las condiciones culturales, territoriales e históricas que informan el diseño.", ["region", "provincia_metropoli", "ciudad_distrito", "barrio_sector", "parcela_sitio", "edificio"], "Norberg-Schulz, Christian (1980), Genius Loci: Towards a Phenomenology of Architecture, Rizzoli."),
-    DesignPrinciple("P-15", "Ergonomía", PrincipleCategory.ERGONOMIA, "Adaptación dimensional y funcional del entorno construido a las capacidades y actividades humanas.", ["edificio", "espacio", "objeto"], "Neufert, Ernst (2012), Architects' Data, 4th ed., Wiley-Blackwell."),
+    DesignPrinciple("P-13", "Integración", PrincipleCategory.INTEGRACION, "Relación deliberada entre una intervención y las condiciones físicas, sociales y espaciales de su entorno.", ["distrito_ciudad", "zona_barrio_sector", "parcela_sitio", "edificacion", "espacio"], "Alexander, Christopher et al. (1977), A Pattern Language, Oxford University Press."),
+    DesignPrinciple("P-14", "Contexto", PrincipleCategory.CONTEXTO, "Reconocimiento de las condiciones culturales, territoriales e históricas que informan el diseño.", ["region", "provincia_metropoli", "distrito_ciudad", "zona_barrio_sector", "parcela_sitio", "edificacion"], "Norberg-Schulz, Christian (1980), Genius Loci: Towards a Phenomenology of Architecture, Rizzoli."),
+    DesignPrinciple("P-15", "Ergonomía", PrincipleCategory.ERGONOMIA, "Adaptación dimensional y funcional del entorno construido a las capacidades y actividades humanas.", ["edificacion", "espacio", "objeto"], "Neufert, Ernst (2012), Architects' Data, 4th ed., Wiley-Blackwell."),
 )
 
 REFERENTS: tuple[Referent, ...] = ()

@@ -7,12 +7,14 @@ from .domain import SpatialScope
 
 SCALE_ORDER = (
     SpatialScope.PAIS,
+    SpatialScope.MACRO_REGION,
     SpatialScope.REGION,
     SpatialScope.PROVINCIA_METROPOLI,
-    SpatialScope.CIUDAD_DISTRITO,
-    SpatialScope.BARRIO_SECTOR,
+    SpatialScope.DISTRITO_CIUDAD,
+    SpatialScope.ZONA_BARRIO_SECTOR,
     SpatialScope.PARCELA_SITIO,
-    SpatialScope.EDIFICIO,
+    SpatialScope.EDIFICACION,
+    SpatialScope.SISTEMA,
     SpatialScope.ESPACIO,
     SpatialScope.OBJETO,
 )

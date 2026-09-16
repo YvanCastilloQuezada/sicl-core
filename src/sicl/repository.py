@@ -351,6 +351,7 @@ class SQLiteRepository:
             "INSERT INTO events(timestamp, project_id, type, payload, actor, source) VALUES (?, ?, ?, ?, ?, ?)",
             (event.timestamp, event.project_id, event.type, json.dumps(event.payload, sort_keys=True), event.actor, event.source),
         )
+        self.conn.commit()
         return Event(cur.lastrowid, event.timestamp, event.project_id, event.type, event.payload, event.actor, event.source)
 
     def events(self, project_id: str | None = None) -> list[Event]:
@@ -418,6 +419,13 @@ class SQLiteRepository:
         p.planning_instruments = {item.instrument_id: item for item in self.list_project_planning_instruments(project_id)}
         p.normative_snapshots = {item.snapshot_id: item for item in self.list_normative_snapshots(project_id)}
         p.scale_relations = {item.relation_id: item for item in self.list_scale_relations(project_id)}
+        for event in self.events(project_id):
+            payload = dict(event.payload)
+            payload.pop("actor", None)
+            if event.type == "PROJECT_VARIABLE_RECORDED" and "variable_id" in payload:
+                p.project_variables[payload["variable_id"]] = payload
+            elif event.type == "FEASIBILITY_EVALUATED" and "alternative_id" in payload:
+                p.feasibility_results[payload["alternative_id"]] = payload
         return p
 
     def list_projects(self) -> list[Project]:
