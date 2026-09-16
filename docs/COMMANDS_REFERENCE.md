@@ -47,7 +47,7 @@ Cada ficha contiene nombre, sintaxis exacta, argumentos, ejemplo, comportamiento
 **Ejemplo:**
 
 ```text
-/PROJECT SET SCOPE edificio proyecto
+/PROJECT SET SCOPE edificacion proyecto
 ```
 
 **Validación y comportamiento:** Requiere proyecto abierto; actualiza scopes y versión.
@@ -1519,7 +1519,7 @@ Usar /STATUS o /PROJECT SHOW
 
 ### Scopes espaciales
 
-`pais`, `region`, `provincia_metropoli`, `ciudad_distrito`, `barrio_sector`, `parcela_sitio`, `edificio`, `espacio`, `objeto`.
+`pais`, `region`, `provincia_metropoli`, `distrito_ciudad`, `zona_barrio_sector`, `parcela_sitio`, `edificacion`, `espacio`, `objeto`.
 
 ### Scopes temporales
 

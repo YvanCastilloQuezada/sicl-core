@@ -9,7 +9,7 @@
 
 ### 1.1 Qué es SiMS-DeI
 
-SiMS-DeI es un sistema para organizar, documentar y analizar decisiones de diseño espacial en múltiples escalas. Puede trabajar con un edificio, una parcela, un barrio, una ciudad, una región o un país cuando la escala se declara de forma explícita.
+SiMS-DeI es un sistema para organizar, documentar y analizar decisiones de diseño espacial en múltiples escalas. Puede trabajar con un edificacion, una parcela, un barrio, una ciudad, una región o un país cuando la escala se declara de forma explícita.
 
 El sistema conserva el contexto del proyecto, registra fuentes y evidencia, separa hechos de supuestos, ejecuta análisis reproducibles y deja una trazabilidad de las operaciones realizadas.
 
@@ -82,7 +82,7 @@ Declare una escala espacial cuando sea conocida. No deje que el sistema la infie
 /PROJECT SET SCOPE parcela_sitio proyecto
 ```
 
-Las nueve escalas disponibles son `pais`, `region`, `provincia_metropoli`, `ciudad_distrito`, `barrio_sector`, `parcela_sitio`, `edificio`, `espacio` y `objeto`.
+Las nueve escalas disponibles son `pais`, `region`, `provincia_metropoli`, `distrito_ciudad`, `zona_barrio_sector`, `parcela_sitio`, `edificacion`, `espacio` y `objeto`.
 
 ### 3.4 Definir objetivos
 
@@ -568,10 +568,10 @@ SiMS-DeI utiliza nueve escalas espaciales:
 1. `pais` — país.
 2. `region` — región.
 3. `provincia_metropoli` — provincia o metrópoli.
-4. `ciudad_distrito` — ciudad o distrito.
-5. `barrio_sector` — barrio o sector.
+4. `distrito_ciudad` — ciudad o distrito.
+5. `zona_barrio_sector` — barrio o sector.
 6. `parcela_sitio` — parcela o sitio.
-7. `edificio` — edificio.
+7. `edificacion` — edificacion.
 8. `espacio` — espacio.
 9. `objeto` — objeto.
 

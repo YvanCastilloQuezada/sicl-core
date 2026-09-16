@@ -116,6 +116,14 @@ KNOWLEDGE_STATES = {"UNKNOWN", "CONFLICTING", "INSUFFICIENT", "OBSERVED"}
 
 
 class SpatialScope(str, Enum):
+    """Canonical 11-level spatial ontology.
+
+    RFC-019 adds ``macro_region`` and ``sistema`` and renames the legacy
+    values ``edificio`` → ``edificacion``, ``ciudad_distrito`` →
+    ``distrito_ciudad`` and ``barrio_sector`` → ``zona_barrio_sector``.
+    Legacy database values are migrated explicitly; they are not accepted as
+    silent aliases by the new contract.
+    """
     PAIS = "pais"
     MACRO_REGION = "macro_region"
     REGION = "region"

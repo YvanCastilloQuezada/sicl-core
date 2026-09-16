@@ -15,10 +15,10 @@ Formalizar en `Project` la escala espacial canónica y el alcance temporal de Si
 | `pais` | País | País |
 | `region` | Región | Región |
 | `provincia_metropoli` | Provincia / Metrópoli | Provincia / Metrópoli |
-| `ciudad_distrito` | Ciudad / Distrito | Ciudad / Distrito |
-| `barrio_sector` | Barrio / Sector | Barrio / Sector |
+| `distrito_ciudad` | Ciudad / Distrito | Ciudad / Distrito |
+| `zona_barrio_sector` | Barrio / Sector | Barrio / Sector |
 | `parcela_sitio` | Parcela / Sitio | Parcela / Sitio |
-| `edificio` | Edificio | Edificio |
+| `edificacion` | Edificio | Edificio |
 | `espacio` | Espacio | Espacio |
 | `objeto` | Objeto | Objeto |
 
@@ -35,3 +35,10 @@ La creación puede declarar ambos scopes. El comando `/PROJECT SET SCOPE` modifi
 ## Relación con el Decision Register
 
 El modelo implementa el mapa canónico de nueve escalas descendentes aprobado para SiMS-DeI: País, Región, Provincia/Metrópoli, Ciudad/Distrito, Barrio/Sector, Parcela/Sitio, Edificio, Espacio y Objeto. Esta RFC no crea nuevas entidades ni modifica la autoridad humana, los eventos ni las capacidades HTTP v1 existentes.
+
+
+## RFC-019 — Refinamiento posterior
+
+El refinamiento RFC-019 actualiza el modelo a once escalas canónicas: `pais`, `macro_region`, `region`, `provincia_metropoli`, `distrito_ciudad`, `zona_barrio_sector`, `parcela_sitio`, `edificacion`, `sistema`, `espacio` y `objeto`.
+
+Los cambios `edificio` → `edificacion`, `ciudad_distrito` → `distrito_ciudad` y `barrio_sector` → `zona_barrio_sector` requieren migración explícita. `macro_region` y `sistema` se añaden para representar, respectivamente, la escala interregional y la escala de sistemas que conecta edificación, espacio y objeto.
