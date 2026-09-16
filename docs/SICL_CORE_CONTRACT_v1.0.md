@@ -56,6 +56,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | Evaluation | `evaluation_id`, `alternative_id`, `objective_id`, `value`, `unit`, `confidence`, `source`, `version` |
 | Comparison | `comparison_id`, `project_id`, `alternative_ids`, `evaluations`, `tradeoffs`, `version` |
 | Simulation | `simulation_id`, `project_id`, `simulation_type`, `method`, `method_version`, `inputs`, `outputs`, `state`, `started_at`, `finished_at?`, `evidence_hash`, `version` |
+| DesignPrinciple | `principle_id`, `name`, `category`, `description`, `applicable_scopes`, `source` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
 
 ### Multiscale Model
@@ -90,6 +91,8 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 /SIMULATE LIST
 /SIMULATE SHOW <simulation_id>
 /SIMULATE METHODS
+/DESIGN PRINCIPLES
+/DESIGN PRINCIPLE <principle_id>
 /DECISION RECORD <statement> <actor> <authority>
 /STATUS
 /HISTORY
@@ -119,6 +122,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 18. `Comparison` requiere al menos dos Alternatives existentes y no crea Recommendation ni Decision.
 19. `Simulation` es append-only, no crea Recommendation ni Decision y no convierte Assumption en Fact.
 20. Los tipos admitidos son `DETERMINISTIC`, `MONTE_CARLO`, `SCENARIO` y `SENSITIVITY`; esta fase ejecuta únicamente métodos deterministas y de sensibilidad.
+21. `DesignPrinciple` es un catálogo read-only con fuente declarada; no crea Decision, Recommendation ni Evaluation automática.
 
 ## 6. Persistencia
 
@@ -127,6 +131,10 @@ SQLite es el adaptador aprobado del MVP. Se usan tablas de estado para Project y
 ### HTTP v1 — Evaluation y Comparison
 
 La superficie canónica expone `POST` y `GET` para `/v1/projects/{project_id}/evaluations` y `/v1/projects/{project_id}/comparisons`. Las respuestas usan el envelope v1 con `contract_version`, `status`, `code`, `message`, `project_id`, `observed_version` y `data`. Evaluation puede filtrarse por `alternative` y `objective`; Comparison recibe al menos dos alternativas. Recommendation continúa separada y Decision conserva autoridad humana.
+
+### HTTP v1 — Design Intelligence
+
+La superficie read-only expone `GET /v1/design/principles`, `GET /v1/design/principles?category=<CATEGORY>` y `GET /v1/design/principles/{principle_id}`. Solo se exponen principios con `source` declarada; no se cargan referentes reales en esta fase.
 
 ## 7. Respuestas y errores
 

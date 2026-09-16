@@ -26,6 +26,7 @@ from sicl.domain import Evidence, EvidenceType, KNOWLEDGE_STATES, Preference
 from sicl.repository import SQLiteRepository
 from sicl.site_intelligence import get_site_observation
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
+from sicl.design_principles import get_principle, list_principles
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -104,6 +105,19 @@ def methods() -> dict[str, Any]:
 @router.get("/simulations/methods", dependencies=[Depends(_auth)])
 def simulation_methods() -> dict[str, Any]:
     return {"contract_version": CONTRACT_VERSION, "status": "OK", "code": "OK", "message": "ok", "project_id": None, "observed_version": None, "data": {"methods": list_methods()}}
+
+
+@router.get("/design/principles", dependencies=[Depends(_auth)])
+def design_principles(category: str | None = None) -> dict[str, Any]:
+    return {"contract_version": CONTRACT_VERSION, "status": "OK", "code": "OK", "message": "ok", "project_id": None, "observed_version": None, "data": {"principles": list_principles(category)}}
+
+
+@router.get("/design/principles/{principle_id}", dependencies=[Depends(_auth)])
+def design_principle(principle_id: str) -> dict[str, Any]:
+    principle = get_principle(principle_id)
+    if principle is None:
+        raise HTTPException(status_code=404, detail={"contract_version": CONTRACT_VERSION, "status": "ERROR", "code": "PRINCIPLE_NOT_FOUND", "message": principle_id, "project_id": None, "observed_version": None, "data": {}})
+    return {"contract_version": CONTRACT_VERSION, "status": "OK", "code": "OK", "message": "ok", "project_id": None, "observed_version": None, "data": {"principle": principle}}
 
 
 @router.post("/projects/{project_id}/simulations", dependencies=[Depends(_auth)])
