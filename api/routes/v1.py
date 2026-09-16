@@ -19,11 +19,12 @@ from api.schemas import (
     EvidenceCreateRequest,
     EvaluationCreateRequest,
     MultiobjectiveRequest,
+    PlanningInstrumentLinkRequest,
     SimulationCreateRequest,
     V1Envelope,
 )
 from sicl.cli import CLI
-from sicl.domain import Evidence, EvidenceType, KNOWLEDGE_STATES, Preference
+from sicl.domain import Evidence, EvidenceType, KNOWLEDGE_STATES, PlanningInstrumentType, Preference
 from sicl.repository import SQLiteRepository
 from sicl.site_intelligence import get_site_observation
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
@@ -42,7 +43,7 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "OBJECTIVE_NOT_FOUND"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND"}:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
@@ -50,7 +51,7 @@ def _status_for(code: str) -> int:
         return 422
     if code == "PROJECT_NOT_FOUND":
         return 404
-    if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT"}:
+    if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT", "PLANNING_INSTRUMENT_ALREADY_LINKED"}:
         return 409
     if code in {"HUMAN_REVIEW_REQUIRED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED"}:
         return 422
@@ -119,6 +120,81 @@ def design_principle(principle_id: str) -> dict[str, Any]:
     if principle is None:
         raise HTTPException(status_code=404, detail={"contract_version": CONTRACT_VERSION, "status": "ERROR", "code": "PRINCIPLE_NOT_FOUND", "message": principle_id, "project_id": None, "observed_version": None, "data": {}})
     return {"contract_version": CONTRACT_VERSION, "status": "OK", "code": "OK", "message": "ok", "project_id": None, "observed_version": None, "data": {"principle": principle}}
+
+
+@router.get("/planning/instruments", dependencies=[Depends(_auth)])
+def planning_instruments(instrument_type: str | None = None, jurisdiction: str | None = None, scope_applicable: str | None = None, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if instrument_type:
+        try:
+            instrument_type = PlanningInstrumentType(instrument_type.upper()).value
+        except ValueError:
+            _error({"code": "INVALID_ARGUMENT", "message": "invalid instrument_type"})
+    values = []
+    for item in repo.list_planning_instruments(instrument_type, jurisdiction, scope_applicable):
+        value = asdict(item)
+        value["instrument_type"] = item.instrument_type.value
+        value["status"] = item.status.value
+        value["scope_applicable"] = [scope.value for scope in item.scope_applicable]
+        value["approval_date"] = item.approval_date.isoformat() if item.approval_date else None
+        values.append(value)
+    return _ok({"instruments": values})
+
+
+@router.get("/planning/instruments/{instrument_id}", dependencies=[Depends(_auth)])
+def planning_instrument(instrument_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    item = repo.get_planning_instrument(instrument_id)
+    if item is None:
+        _error({"code": "PLANNING_INSTRUMENT_NOT_FOUND", "message": instrument_id})
+    value = asdict(item)
+    value["instrument_type"] = item.instrument_type.value
+    value["status"] = item.status.value
+    value["scope_applicable"] = [scope.value for scope in item.scope_applicable]
+    value["approval_date"] = item.approval_date.isoformat() if item.approval_date else None
+    return _ok({"instrument": value})
+
+
+@router.get("/planning/types", dependencies=[Depends(_auth)])
+def planning_types() -> V1Envelope:
+    return _ok({"types": [item.value for item in PlanningInstrumentType]})
+
+
+@router.post("/projects/{project_id}/planning/instruments", dependencies=[Depends(_auth)])
+def link_planning_instrument(project_id: str, request: PlanningInstrumentLinkRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    instrument = repo.get_planning_instrument(request.instrument_id)
+    if instrument is None:
+        _error({"code": "PLANNING_INSTRUMENT_NOT_FOUND", "message": request.instrument_id}, project_id)
+    if any(item.instrument_id == request.instrument_id for item in repo.list_project_planning_instruments(project_id)):
+        _error({"code": "PLANNING_INSTRUMENT_ALREADY_LINKED", "message": request.instrument_id}, project_id)
+    project.version += 1
+    cli = CLI(repo, actor="api")
+    cli.current_project = project_id
+    event = cli._event(project_id, "PLANNING_INSTRUMENT_LINKED", {"instrument_id": instrument.instrument_id})
+    repo.link_planning_instrument_and_event(project, instrument.instrument_id, "api", event)
+    value = asdict(instrument)
+    value["instrument_type"] = instrument.instrument_type.value
+    value["status"] = instrument.status.value
+    value["scope_applicable"] = [scope.value for scope in instrument.scope_applicable]
+    value["approval_date"] = instrument.approval_date.isoformat() if instrument.approval_date else None
+    return _ok({"instrument": value, "linked": True, "constraint_created": False}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/planning/instruments", dependencies=[Depends(_auth)])
+def project_planning_instruments(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    values = []
+    for item in repo.list_project_planning_instruments(project_id):
+        value = asdict(item)
+        value["instrument_type"] = item.instrument_type.value
+        value["status"] = item.status.value
+        value["scope_applicable"] = [scope.value for scope in item.scope_applicable]
+        value["approval_date"] = item.approval_date.isoformat() if item.approval_date else None
+        values.append(value)
+    return _ok({"instruments": values}, project_id, project.version)
 
 
 @router.post("/projects/{project_id}/simulations", dependencies=[Depends(_auth)])

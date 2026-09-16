@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -83,6 +83,27 @@ class SourceType(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
+class PlanningInstrumentType(str, Enum):
+    PLAN_NACIONAL = "PLAN_NACIONAL"
+    PLAN_REGIONAL = "PLAN_REGIONAL"
+    PLAN_PROVINCIAL = "PLAN_PROVINCIAL"
+    PLAN_METROPOLITANO = "PLAN_METROPOLITANO"
+    PLAN_URBANO = "PLAN_URBANO"
+    PLAN_LOCAL = "PLAN_LOCAL"
+    PLAN_SECTORIAL = "PLAN_SECTORIAL"
+    POLITICA_NACIONAL = "POLITICA_NACIONAL"
+    INSTRUMENTO_TERRITORIAL = "INSTRUMENTO_TERRITORIAL"
+    OTRO = "OTRO"
+
+
+class PlanningInstrumentStatus(str, Enum):
+    DRAFT = "DRAFT"
+    ACTIVE = "ACTIVE"
+    SUPERSEDED = "SUPERSEDED"
+    REPEALED = "REPEALED"
+    UNKNOWN = "UNKNOWN"
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -109,6 +130,7 @@ class Project:
     sources: dict[str, "Source"] = field(default_factory=dict)
     simulations: dict[str, Simulation] = field(default_factory=dict)
     multiobjective_results: dict[str, "MultiobjectiveResult"] = field(default_factory=dict)
+    planning_instruments: dict[str, "PlanningInstrument"] = field(default_factory=dict)
     # spatial_scope remains optional: null means that no spatial scale is declared.
     spatial_scope: SpatialScope | None = None
     temporal_scope: TemporalScope = TemporalScope.PROYECTO
@@ -221,6 +243,25 @@ class MultiobjectiveResult:
     state: MultiobjectiveState
     inputs_hash: str
     created_at: datetime
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class PlanningInstrument:
+    instrument_id: str
+    project_id: str | None
+    instrument_type: PlanningInstrumentType
+    name: str
+    jurisdiction: str
+    authority: str | None
+    approval_date: date | None
+    validity_period: str | None
+    scope_applicable: list[SpatialScope]
+    status: PlanningInstrumentStatus
+    objectives: list[str]
+    url: str | None
+    summary: str | None
+    source: str
     version: int = 1
 
 

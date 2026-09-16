@@ -98,6 +98,10 @@ class MultiobjectiveRequest(BaseModel):
     objectives: list[str] = Field(min_length=2)
 
 
+class PlanningInstrumentLinkRequest(BaseModel):
+    instrument_id: str = Field(min_length=1)
+
+
 class ProjectResponse(BaseModel):
     project_id: str
     name: str

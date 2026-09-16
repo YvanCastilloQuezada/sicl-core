@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, Fact, HumanReview, MultiobjectiveResult, MultiobjectiveState, Objective, Preference, Project, Role, Source, SourceType, SpatialScope, TemporalScope
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, Fact, HumanReview, MultiobjectiveResult, MultiobjectiveState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Role, Source, SourceType, SpatialScope, TemporalScope
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 from .simulation import Simulation, SimulationState, SimulationType
@@ -139,6 +139,29 @@ class SQLiteRepository:
         CREATE TRIGGER IF NOT EXISTS multiobjective_results_no_delete
         BEFORE DELETE ON multiobjective_results
         BEGIN SELECT RAISE(ABORT, 'multiobjective results are append-only'); END;
+        CREATE TABLE IF NOT EXISTS planning_instruments (
+          instrument_id TEXT PRIMARY KEY, project_id TEXT NULL REFERENCES projects(project_id),
+          instrument_type TEXT NOT NULL, name TEXT NOT NULL, jurisdiction TEXT NOT NULL,
+          authority TEXT NULL, approval_date TEXT NULL, validity_period TEXT NULL,
+          scope_applicable_json TEXT NOT NULL, status TEXT NOT NULL, objectives_json TEXT NOT NULL,
+          url TEXT NULL, summary TEXT NULL, source TEXT NOT NULL, version INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS project_planning_instruments (
+          project_id TEXT NOT NULL REFERENCES projects(project_id), instrument_id TEXT NOT NULL REFERENCES planning_instruments(instrument_id),
+          linked_at TEXT NOT NULL, actor TEXT NOT NULL, PRIMARY KEY(project_id, instrument_id)
+        );
+        CREATE TRIGGER IF NOT EXISTS planning_instruments_no_update
+        BEFORE UPDATE ON planning_instruments
+        BEGIN SELECT RAISE(ABORT, 'planning instruments are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS planning_instruments_no_delete
+        BEFORE DELETE ON planning_instruments
+        BEGIN SELECT RAISE(ABORT, 'planning instruments are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS project_planning_no_update
+        BEFORE UPDATE ON project_planning_instruments
+        BEGIN SELECT RAISE(ABORT, 'planning links are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS project_planning_no_delete
+        BEFORE DELETE ON project_planning_instruments
+        BEGIN SELECT RAISE(ABORT, 'planning links are append-only'); END;
         CREATE TRIGGER IF NOT EXISTS evidence_no_update
         BEFORE UPDATE ON evidence
         BEGIN SELECT RAISE(ABORT, 'evidence is append-only'); END;
@@ -194,6 +217,18 @@ class SQLiteRepository:
             rows = self.conn.execute("SELECT * FROM events ORDER BY id").fetchall()
         return [Event(r["id"], r["timestamp"], r["project_id"], r["type"], json.loads(r["payload"]), r["actor"], r["source"]) for r in rows]
 
+    @staticmethod
+    def _planning_from_row(row: sqlite3.Row) -> PlanningInstrument:
+        from datetime import date
+        return PlanningInstrument(
+            row["instrument_id"], row["project_id"], PlanningInstrumentType(row["instrument_type"]),
+            row["name"], row["jurisdiction"], row["authority"],
+            date.fromisoformat(row["approval_date"]) if row["approval_date"] else None,
+            row["validity_period"], [SpatialScope(value) for value in json.loads(row["scope_applicable_json"])],
+            PlanningInstrumentStatus(row["status"]), json.loads(row["objectives_json"]), row["url"],
+            row["summary"], row["source"], row["version"],
+        )
+
     def get_project(self, project_id: str) -> Project | None:
         row = self.conn.execute("SELECT * FROM projects WHERE project_id=?", (project_id,)).fetchone()
         if not row:
@@ -217,6 +252,7 @@ class SQLiteRepository:
         p.evidence = {r["evidence_id"]: Evidence(r["evidence_id"], r["project_id"], r["source_id"], r["statement"], EvidenceType(r["evidence_type"]), datetime.fromisoformat(r["captured_at"]), r["method_version"], r["evidence_url"], r["evidence_hash"], r["state"], r["version"]) for r in self.conn.execute("SELECT * FROM evidence WHERE project_id=?", (project_id,))}
         p.simulations = {r["simulation_id"]: Simulation(r["simulation_id"], r["project_id"], SimulationType(r["simulation_type"]), r["method"], r["method_version"], json.loads(r["inputs_json"]), json.loads(r["outputs_json"]), SimulationState(r["state"]), datetime.fromisoformat(r["started_at"]), datetime.fromisoformat(r["finished_at"]) if r["finished_at"] else None, r["evidence_hash"], r["version"]) for r in self.conn.execute("SELECT * FROM simulations WHERE project_id=?", (project_id,))}
         p.multiobjective_results = {r["multiobjective_id"]: MultiobjectiveResult(r["multiobjective_id"], r["project_id"], r["method"], r["method_version"], json.loads(r["objectives_json"]), json.loads(r["alternatives_json"]), json.loads(r["pareto_front_json"]), json.loads(r["dominated_json"]), json.loads(r["incomplete_json"]), json.loads(r["tradeoffs_json"]), MultiobjectiveState(r["state"]), r["inputs_hash"], datetime.fromisoformat(r["created_at"]), r["version"]) for r in self.conn.execute("SELECT * FROM multiobjective_results WHERE project_id=?", (project_id,))}
+        p.planning_instruments = {item.instrument_id: item for item in self.list_project_planning_instruments(project_id)}
         return p
 
     def list_projects(self) -> list[Project]:
@@ -290,6 +326,55 @@ class SQLiteRepository:
     def get_multiobjective_result(self, project_id: str, result_id: str) -> MultiobjectiveResult | None:
         project = self.get_project(project_id)
         return project.multiobjective_results.get(result_id) if project else None
+
+    def insert_planning_instrument_and_event(self, instrument: PlanningInstrument, event: Event) -> None:
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO planning_instruments VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (instrument.instrument_id, instrument.project_id, instrument.instrument_type.value, instrument.name,
+                 instrument.jurisdiction, instrument.authority, instrument.approval_date.isoformat() if instrument.approval_date else None,
+                 instrument.validity_period, json.dumps([item.value for item in instrument.scope_applicable]),
+                 instrument.status.value, json.dumps(instrument.objectives, sort_keys=True), instrument.url,
+                 instrument.summary, instrument.source, instrument.version),
+            )
+            if event.project_id:
+                self.conn.execute("UPDATE projects SET version=version+1 WHERE project_id=?", (event.project_id,))
+            self.add_event(event)
+
+    def link_planning_instrument_and_event(self, project: Project, instrument_id: str, actor: str, event: Event) -> None:
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO project_planning_instruments(project_id, instrument_id, linked_at, actor) VALUES (?, ?, ?, ?)",
+                (project.project_id, instrument_id, event.timestamp, actor),
+            )
+            self.conn.execute("UPDATE projects SET version=? WHERE project_id=?", (project.version, project.project_id))
+            self.add_event(event)
+
+    def list_planning_instruments(self, instrument_type: str | None = None, jurisdiction: str | None = None, scope_applicable: str | None = None) -> list[PlanningInstrument]:
+        query = "SELECT * FROM planning_instruments WHERE 1=1"
+        params: list[str] = []
+        if instrument_type:
+            query += " AND instrument_type=?"
+            params.append(instrument_type)
+        if jurisdiction:
+            query += " AND jurisdiction=?"
+            params.append(jurisdiction)
+        rows = self.conn.execute(query + " ORDER BY instrument_id", params).fetchall()
+        values = [self._planning_from_row(row) for row in rows]
+        if scope_applicable:
+            values = [item for item in values if scope_applicable in {scope.value for scope in item.scope_applicable}]
+        return values
+
+    def get_planning_instrument(self, instrument_id: str) -> PlanningInstrument | None:
+        row = self.conn.execute("SELECT * FROM planning_instruments WHERE instrument_id=?", (instrument_id,)).fetchone()
+        return self._planning_from_row(row) if row else None
+
+    def list_project_planning_instruments(self, project_id: str) -> list[PlanningInstrument]:
+        rows = self.conn.execute(
+            "SELECT p.* FROM planning_instruments p JOIN project_planning_instruments l ON l.instrument_id=p.instrument_id WHERE l.project_id=? ORDER BY p.instrument_id",
+            (project_id,),
+        ).fetchall()
+        return [self._planning_from_row(row) for row in rows]
 
     def list_simulations(self, project_id: str) -> list[Simulation]:
         project = self.get_project(project_id)
