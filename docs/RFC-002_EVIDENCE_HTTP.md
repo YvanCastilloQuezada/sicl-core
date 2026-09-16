@@ -42,3 +42,15 @@ Evidence registra lo que se declara y no infiere contenido. No se convierte auto
 ## Persistencia
 
 SQLite usa tablas `evidence` y `sources`. La clave primaria compuesta `(project_id, evidence_id)` evita duplicados dentro de un proyecto. La persistencia se conserva tras reiniciar el repositorio.
+
+## Source HTTP
+
+Source es un registro de procedencia asociado explícitamente a un proyecto. La superficie HTTP canónica expone:
+
+| Método | Endpoint | Semántica |
+|---|---|---|
+| `POST` | `/v1/projects/{project_id}/sources` | Crea un Source append-only |
+| `GET` | `/v1/projects/{project_id}/sources` | Lista Sources del proyecto |
+| `GET` | `/v1/projects/{project_id}/sources/{source_id}` | Recupera un Source |
+
+El `source_id` es único dentro del proyecto. `source_type` admite únicamente `OFFICIAL`, `SECONDARY`, `USER_PROVIDED` y `UNKNOWN`. La creación produce `SOURCE_ADDED`; no crea Evidence, Fact, Recommendation ni Decision. La URL es opcional y las rutas no exponen operaciones de actualización o eliminación.

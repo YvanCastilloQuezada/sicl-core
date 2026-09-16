@@ -114,6 +114,13 @@ class EvidenceCreateRequest(BaseModel):
     state: str = "OBSERVED"
 
 
+class SourceCreateRequest(BaseModel):
+    source_id: str = Field(min_length=1)
+    source_type: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    url: str | None = None
+
+
 class EvaluationCreateRequest(BaseModel):
     alternative: str | None = None
     objective: str | None = None
