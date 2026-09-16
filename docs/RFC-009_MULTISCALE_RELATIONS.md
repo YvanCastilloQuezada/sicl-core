@@ -4,9 +4,9 @@
 
 ## Alcance
 
-RFC-009 implementa la capacidad estructural mínima para modelar relaciones entre proyectos SICL en las nueve escalas conceptuales de SiMS-DeI. El módulo no inventa datos territoriales, límites administrativos, normativa ni relaciones reales: solo registra relaciones explícitas proporcionadas por una autoridad o integración autorizada.
+RFC-009 implementa la capacidad estructural mínima para modelar relaciones entre proyectos SICL en las once escalas canónicas de SiMS-DeI. El módulo no inventa datos territoriales, límites administrativos, normativa ni relaciones reales: solo registra relaciones explícitas proporcionadas por una autoridad o integración autorizada.
 
-Las escalas reconocidas son `pais`, `region`, `provincia_metropoli`, `ciudad_distrito`, `barrio_sector`, `parcela_sitio`, `edificio`, `espacio` y `objeto`. La jerarquía es consultable como catálogo determinista. `CONTAINS` exige scopes espaciales explícitos y una relación ancestro→descendiente; `OVERLAPS`, `INFLUENCES` y `DEPENDS_ON` no se infieren automáticamente.
+Las escalas reconocidas son `pais`, `macro_region`, `region`, `provincia_metropoli`, `distrito_ciudad`, `zona_barrio_sector`, `parcela_sitio`, `edificacion`, `sistema`, `espacio` y `objeto`. La jerarquía es consultable como catálogo determinista. `CONTAINS` exige scopes espaciales explícitos y una relación ancestro→descendiente; `OVERLAPS`, `INFLUENCES` y `DEPENDS_ON` no se infieren automáticamente.
 
 ## Entidades
 
@@ -43,3 +43,10 @@ Las escalas reconocidas son `pais`, `region`, `provincia_metropoli`, `ciudad_dis
 ## Fuera de alcance
 
 Quedan fuera de RFC-009 la carga de un corpus geográfico real, GIS, geocodificación, inferencia de relaciones, sincronización territorial, propagación automática de restricciones, cascadas entre escalas, agentes y cualquier decisión automática.
+
+
+## RFC-019 — Ejemplos con las escalas refinadas
+
+La cadena canónica permite relaciones explícitas entre una `edificacion` y su `sistema`, y entre un `sistema` y un `espacio`. Por ejemplo, `BUILD-001` puede declarar `edificacion`, `SYSTEM-001` puede declarar `sistema` y `ROOM-001` puede declarar `espacio`. Las relaciones `CONTAINS` entre cada par solo son válidas cuando respetan la jerarquía inmediata o ancestral y han sido registradas explícitamente.
+
+`macro_region` se sitúa entre `pais` y `region`. `distrito_ciudad` sustituye a `ciudad_distrito`, `zona_barrio_sector` sustituye a `barrio_sector` y `edificacion` sustituye a `edificio`. Los valores anteriores no son aliases HTTP; las bases se actualizan mediante la migración RFC-019.
