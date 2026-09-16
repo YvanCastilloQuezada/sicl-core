@@ -14,7 +14,9 @@ from api.schemas import (
     CanonicalCommandRequest,
     CanonicalProjectCreateRequest,
     CanonicalWriteRequest,
+    ComparisonCreateRequest,
     EvidenceCreateRequest,
+    EvaluationCreateRequest,
     V1Envelope,
 )
 from sicl.cli import CLI
@@ -295,6 +297,82 @@ def create_evidence(project_id: str, request: EvidenceCreateRequest, repo: SQLit
         cli._event(project_id, "EVIDENCE_ADDED", {"evidence_id": evidence.evidence_id, "statement": evidence.statement, "evidence_type": evidence.evidence_type.value, "state": evidence.state}),
     )
     return _ok({"evidence": asdict(evidence)}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/evaluations", dependencies=[Depends(_auth)])
+def create_evaluation(project_id: str, request: EvaluationCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    if request.alternative is None or request.objective is None or request.value is None:
+        _error({"code": "INVALID_ARGUMENT", "message": "alternative, objective and value are required"}, project_id)
+    alternative = next((item for item in project.alternatives.values() if item.alternative_id == request.alternative or item.name == request.alternative.upper()), None)
+    if alternative is None:
+        raise HTTPException(status_code=404, detail={"contract_version": CONTRACT_VERSION, "status": "ERROR", "code": "ALTERNATIVE_NOT_FOUND", "message": request.alternative, "project_id": project_id, "observed_version": project.version, "data": {}})
+    objective = next((item for item in project.objectives.values() if item.objective_id == request.objective or item.key == request.objective), None)
+    if objective is None:
+        raise HTTPException(status_code=404, detail={"contract_version": CONTRACT_VERSION, "status": "ERROR", "code": "OBJECTIVE_NOT_FOUND", "message": request.objective, "project_id": project_id, "observed_version": project.version, "data": {}})
+    if any(item.alternative_id == alternative.alternative_id and item.objective_id == objective.objective_id for item in project.evaluations.values()):
+        _error({"code": "CONFLICT", "message": "evaluation already exists for alternative and objective"}, project_id)
+    try:
+        confidence = float(request.confidence)
+    except (TypeError, ValueError):
+        _error({"code": "INVALID_ARGUMENT", "message": "confidence must be numeric"}, project_id)
+    cli = CLI(repo, actor="api")
+    _error(cli.execute(f'/PROJECT OPEN "{project_id}"'), project_id)
+    result = cli.execute(f'/EVALUATE "{alternative.name}" "{objective.key}" {request.value} "{request.unit}" {confidence} "{request.source}"')
+    _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok({"evaluation": result.get("data", {})}, project_id, project.version if project else None)
+
+
+@router.get("/projects/{project_id}/evaluations", dependencies=[Depends(_auth)])
+def list_evaluations(project_id: str, alternative: str | None = None, objective: str | None = None, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    values = list(project.evaluations.values())
+    if alternative:
+        found = next((item for item in project.alternatives.values() if item.alternative_id == alternative or item.name == alternative.upper()), None)
+        values = [item for item in values if found and item.alternative_id == found.alternative_id]
+    if objective:
+        found = next((item for item in project.objectives.values() if item.objective_id == objective or item.key == objective), None)
+        values = [item for item in values if found and item.objective_id == found.objective_id]
+    return _ok({"evaluations": [asdict(item) for item in values]}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/comparisons", dependencies=[Depends(_auth)])
+def create_comparison(project_id: str, request: ComparisonCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    if request.alternatives is None or len(request.alternatives) < 2:
+        _error({"code": "INVALID_ARGUMENT", "message": "at least two alternatives are required"}, project_id)
+    selected = []
+    for name in request.alternatives:
+        alternative = next((item for item in project.alternatives.values() if item.alternative_id == name or item.name == name.upper()), None)
+        if alternative is None:
+            raise HTTPException(status_code=404, detail={"contract_version": CONTRACT_VERSION, "status": "ERROR", "code": "ALTERNATIVE_NOT_FOUND", "message": name, "project_id": project_id, "observed_version": project.version, "data": {}})
+        selected.append(alternative)
+    ids = [item.alternative_id for item in selected]
+    if len(set(ids)) < 2:
+        _error({"code": "INVALID_ARGUMENT", "message": "alternatives must be distinct"}, project_id)
+    if any(set(item.alternative_ids) == set(ids) for item in project.comparisons.values()):
+        _error({"code": "CONFLICT", "message": "comparison already exists for this alternative set"}, project_id)
+    cli = CLI(repo, actor="api")
+    _error(cli.execute(f'/PROJECT OPEN "{project_id}"'), project_id)
+    result = cli.execute("/COMPARE " + " ".join(f'"{item.name}"' for item in selected))
+    _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok({"comparison": result.get("data", {}), "objectives": request.objectives or []}, project_id, project.version if project else None)
+
+
+@router.get("/projects/{project_id}/comparisons", dependencies=[Depends(_auth)])
+def list_comparisons(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"comparisons": [asdict(item) for item in project.comparisons.values()]}, project_id, project.version)
 
 
 @router.get("/projects/{project_id}/evidence", dependencies=[Depends(_auth)])

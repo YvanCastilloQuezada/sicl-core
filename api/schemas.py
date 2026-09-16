@@ -73,6 +73,20 @@ class EvidenceCreateRequest(BaseModel):
     state: str = "OBSERVED"
 
 
+class EvaluationCreateRequest(BaseModel):
+    alternative: str | None = None
+    objective: str | None = None
+    value: float | None = None
+    unit: str = ""
+    confidence: str | float = "1.0"
+    source: str = "USER_INPUT"
+
+
+class ComparisonCreateRequest(BaseModel):
+    alternatives: list[str] | None = None
+    objectives: list[str] | None = None
+
+
 class ProjectResponse(BaseModel):
     project_id: str
     name: str
