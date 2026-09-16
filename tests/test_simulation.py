@@ -26,12 +26,12 @@ def configured_client(tmp_path, monkeypatch):
     return repo, TestClient(app)
 
 
-def test_methods_catalog_has_two_methods(tmp_path):
+def test_methods_catalog_has_all_implemented_methods(tmp_path):
     repo = SQLiteRepository(tmp_path / "catalog.sqlite")
     try:
         result = CLI(repo).execute("/SIMULATE METHODS")
         assert result["code"] == "OK"
-        assert {method["method_id"] for method in result["data"]["methods"]} == {"deterministic_basic_v1", "sensitivity_linear_v1"}
+        assert {method["method_id"] for method in result["data"]["methods"]} == {"deterministic_basic_v1", "sensitivity_linear_v1", "monte_carlo_v1"}
         assert all("inputs_required" in method and "outputs" in method for method in result["data"]["methods"])
     finally:
         repo.close()
@@ -112,7 +112,7 @@ def test_http_create_list_get_and_methods(tmp_path, monkeypatch):
         methods = client.get("/v1/simulations/methods")
         assert len(listed.json()["data"]["simulations"]) == 1
         assert individual.json()["data"]["simulation"]["simulation_id"] == simulation["simulation_id"]
-        assert len(methods.json()["data"]["methods"]) == 2
+        assert len(methods.json()["data"]["methods"]) == 3
     finally:
         app.dependency_overrides.clear()
         repo.close()
