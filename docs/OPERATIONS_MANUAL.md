@@ -10,6 +10,8 @@
 
 **Propósito.** Este documento explica cómo operar el Core mediante tareas concretas. Describe comandos CLI, endpoints HTTP, salidas esperadas y errores frecuentes. No concede autoridad al sistema: una recomendación sigue siendo distinta de una decisión, y una decisión requiere revisión humana, actor y autoridad.
 
+> Para la sintaxis exacta de cada comando, ver `COMMANDS_REFERENCE.md`. Esta referencia es la fuente canónica y se mantiene alineada con `src/sicl/cli.py`.
+
 ## Cómo leer este manual
 
 Cada tarea contiene cinco elementos: cuándo usarla, el comando SICL, el endpoint equivalente cuando existe, un resultado esperado y los errores que conviene revisar. Los ejemplos usan el proyecto `UPAO-001` y el actor `architect-yvan`.
@@ -213,7 +215,7 @@ Si el identificador ya existe, no repitas la creación. Usa `/PROJECT OPEN UPAO-
 **CLI.**
 
 ```text
-/SOURCE ADD CATASTRO OFFICIAL "Catastro municipal" https://example.org/catastro
+HTTP-only — no existe comando CLI `/SOURCE ADD`. Usar `POST /v1/projects/{project_id}/sources` con `source_id`, `source_type`, `title` y `url` opcional.
 ```
 
 **HTTP equivalente.** `POST /v1/projects/{project_id}/sources`.
@@ -277,7 +279,10 @@ Si el identificador ya existe, no repitas la creación. Usa `/PROJECT OPEN UPAO-
 **CLI.**
 
 ```text
-/ALTERNATIVE CREATE CONVENCIONAL_A "Estrategia convencional" "Mampostería y control solar" '{"FLOORS":4,"AREA":2000}'
+/ALTERNATIVE CREATE CONVENCIONAL_A
+/ALTERNATIVE SET CONVENCIONAL_A STRUCTURE "Mampostería"
+/ALTERNATIVE SET CONVENCIONAL_A FLOORS 4
+/ALTERNATIVE SET CONVENCIONAL_A AREA 2000
 ```
 
 **HTTP equivalente.** El endpoint de comandos o la ruta de generaciones cuando la alternativa procede de un generador.
@@ -345,7 +350,7 @@ Si el identificador ya existe, no repitas la creación. Usa `/PROJECT OPEN UPAO-
 **CLI.**
 
 ```text
-/HUMAN REVIEW "Revisé la recomendación y sus condiciones" architect-yvan "Architect with project authority" APPROVED
+/HUMAN REVIEW architect-yvan 2026-09-16T07:00:00Z "Revisé la recomendación y sus condiciones" "Validación de autoridad humana" "Architect"
 ```
 
 **HTTP equivalente.** `POST /v1/projects/{project_id}/human-reviews`.
@@ -425,7 +430,7 @@ Si el identificador ya existe, no repitas la creación. Usa `/PROJECT OPEN UPAO-
 **CLI.**
 
 ```text
-/SIMULATE MONTE_CARLO CONVENCIONAL_A CLIMATE AREA '{"distribution":"NORMAL","mean":2000,"std_dev":100}' 1000 20260916
+/SIMULATE MONTE_CARLO ALT-001 OBJ-001 AREA '{"type":"NORMAL","parameters":{"mean":2000,"std_dev":100}}' 1000
 ```
 
 **HTTP equivalente.** `POST /v1/projects/{project_id}/simulations` con `simulation_type=MONTE_CARLO` y `method=monte_carlo_v1`.
@@ -721,8 +726,14 @@ Si el identificador ya existe, no repitas la creación. Usa `/PROJECT OPEN UPAO-
 **Objetivo.** Comparar opciones y observar el frente Pareto sin crear una decisión.
 
 ```text
-/ALTERNATIVE CREATE CONVENCIONAL_A "Convencional" "Mampostería" '{"FLOORS":4,"AREA":2000}'
-/ALTERNATIVE CREATE BIOCLIMATIC_A "Bioclimática" "Protección solar" '{"FLOORS":4,"AREA":2000}'
+/ALTERNATIVE CREATE CONVENCIONAL_A
+/ALTERNATIVE SET CONVENCIONAL_A STRUCTURE "Mampostería"
+/ALTERNATIVE SET CONVENCIONAL_A FLOORS 4
+/ALTERNATIVE SET CONVENCIONAL_A AREA 2000
+/ALTERNATIVE CREATE BIOCLIMATIC_A
+/ALTERNATIVE SET BIOCLIMATIC_A STRATEGY "Protección solar"
+/ALTERNATIVE SET BIOCLIMATIC_A FLOORS 4
+/ALTERNATIVE SET BIOCLIMATIC_A AREA 2000
 /EVALUATE CONVENCIONAL_A CLIMATE 72 PERCENT 0.85 USER_INPUT
 /EVALUATE BIOCLIMATIC_A CLIMATE 88 PERCENT 0.85 USER_INPUT
 /MULTIOBJECTIVE PARETO CLIMATE CONSTRUCTION_COST
@@ -737,7 +748,7 @@ Si el identificador ya existe, no repitas la creación. Usa `/PROJECT OPEN UPAO-
 
 ```text
 /STATUS
-/HUMAN REVIEW "Revisé la recomendación y sus condiciones" architect-yvan "Architect with project authority" APPROVED
+/HUMAN REVIEW architect-yvan 2026-09-16T07:00:00Z "Revisé la recomendación y sus condiciones" "Validación de autoridad humana" "Architect"
 /DECISION RECORD "Adoptar BIOCLIMATIC_A sujeto a las condiciones revisadas" architect-yvan "Architect with project authority"
 /HISTORY
 ```
@@ -765,7 +776,7 @@ Si el identificador ya existe, no repitas la creación. Usa `/PROJECT OPEN UPAO-
 ```text
 /PROJECT OPEN UPAO-001
 /SIMULATE METHODS
-/SIMULATE MONTE_CARLO CONVENCIONAL_A CLIMATE AREA '{"distribution":"NORMAL","mean":2000,"std_dev":100}' 1000 20260916
+/SIMULATE MONTE_CARLO ALT-001 OBJ-001 AREA '{"type":"NORMAL","parameters":{"mean":2000,"std_dev":100}}' 1000
 /SIMULATE LIST
 /SIMULATE SHOW SIM-001
 ```

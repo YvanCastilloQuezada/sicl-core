@@ -5,8 +5,6 @@
 **Versión documental:** 2.2
 **Audiencia:** arquitectos, urbanistas, analistas y responsables de proyecto
 
-> Para una guía operativa paso a paso, ver [`OPERATIONS_MANUAL.md`](OPERATIONS_MANUAL.md).
-
 ## 1. Introducción
 
 ### 1.1 Qué es SiMS-DeI
@@ -22,6 +20,9 @@ SiMS-DeI está pensado para apoyar conversaciones profesionales. No sustituye el
 SICL es el lenguaje formal que permite operar sobre el Core de SiMS-DeI. Sus comandos representan operaciones como crear un proyecto, registrar un hecho, definir un objetivo, evaluar una alternativa o registrar una decisión humana.
 
 SICL puede utilizarse mediante el intérprete CLI o mediante la API REST canónica `/v1`. Ambas superficies deben respetar las mismas reglas del dominio.
+
+> Para la sintaxis exacta de cada comando, ver `COMMANDS_REFERENCE.md`. Esta referencia es la fuente canónica y se mantiene alineada con `src/sicl/cli.py`.
+
 
 ### 1.3 Qué hace el sistema
 
@@ -66,7 +67,7 @@ Para utilizar la API, ejecute FastAPI con el comando definido por el despliegue.
 ### 3.2 Crear un proyecto
 
 ```text
-/PROJECT CREATE UPAO-001 "UPAO Plaza Center" parcela_sitio proyecto
+/PROJECT CREATE UPAO-001 "UPAO Plaza Center"
 /PROJECT OPEN UPAO-001
 /PROJECT SHOW
 ```
@@ -159,7 +160,9 @@ Las preferencias pueden influir en una comparación, pero no sustituyen las cons
 ### 4.7 Alternativas
 
 ```text
-/ALTERNATIVE CREATE CONVENCIONAL_A "Esquema de referencia"
+/ALTERNATIVE CREATE CONVENCIONAL_A
+/ALTERNATIVE SET CONVENCIONAL_A FLOORS 4
+/ALTERNATIVE SET CONVENCIONAL_A AREA 2000
 /ALTERNATIVE SET CONVENCIONAL_A FLOORS 6
 /ALTERNATIVE SET CONVENCIONAL_A STRUCTURE "Mampostería"
 /ALTERNATIVE LIST
@@ -187,28 +190,30 @@ Una comparación reúne alternativas y sus evaluaciones para mostrar diferencias
 
 ### 4.10 Simulaciones
 
-Consulte primero los métodos disponibles. La forma general declara el tipo de simulación, el método y los parámetros de entrada.
+Consulte primero los métodos disponibles.
 
 ```text
 /SIMULATE METHODS
-/SIMULATE RUN <type> <method> [params]
-/SIMULATE MONTE_CARLO <alternative> <objective> <parameter> <distribution> [iterations] [seed]
+/SIMULATE RUN SENSITIVITY BASELINE
+/SIMULATE RUN MONTE_CARLO monte_carlo_v1 {"alternative_id":"ALT-...","objective_id":"OBJ-...","parameter_name":"height","parameter_distribution":{"type":"NORMAL","parameters":{"mean":10,"std_dev":1}},"iterations":1000,"seed":20260916}
 /SIMULATE LIST
 /SIMULATE SHOW <simulation_id>
 ```
 
-`monte_carlo_v1` acepta distribuciones `NORMAL`, `UNIFORM` y `TRIANGULAR`, conserva la semilla y limita las ejecuciones a 10 000 iteraciones. Repetir los mismos inputs y la misma semilla permite reproducir los resultados. Una simulación es descriptiva y no crea una Decision.
+Una simulación produce un resultado descriptivo. No crea una Decision. El método utilizado y sus parámetros deben quedar identificables. `monte_carlo_v1` acepta distribuciones `NORMAL`, `UNIFORM` y `TRIANGULAR`, conserva la semilla y limita las ejecuciones a 10 000 iteraciones. Repetir los mismos inputs y la misma semilla permite reproducir los resultados; cambiar la semilla produce otra ejecución.
 
 ### 4.11 Multiobjective
 
 ```text
+/PARETO ENERGY_SAVINGS CONSTRUCTION_COST
 /MULTIOBJECTIVE PARETO ENERGY_SAVINGS CONSTRUCTION_COST
 /MULTIOBJECTIVE TRADEOFFS ENERGY_SAVINGS CONSTRUCTION_COST
 /MULTIOBJECTIVE LIST
-/MULTIOBJECTIVE SHOW <multiobjective_id>
 ```
 
-El frente de Pareto muestra opciones no dominadas con respecto a objetivos declarados. Un trade-off hace visible que mejorar un objetivo puede empeorar otro. Los comandos legacy `/PARETO` y `/TRADEOFF_MATRIX` ya no son la superficie canónica; utilice `/MULTIOBJECTIVE PARETO` y `/MULTIOBJECTIVE TRADEOFFS`.
+El frente de Pareto muestra opciones no dominadas con respecto a objetivos declarados. Un trade-off hace visible que mejorar un objetivo puede empeorar otro.
+
+El resultado multiobjetivo es analítico. No indica por sí mismo qué alternativa debe escoger el arquitecto.
 
 ### 4.12 Recomendaciones
 
@@ -221,7 +226,7 @@ Una recomendación resume una salida analítica. Debe conservar la separación r
 ### 4.13 HumanReview
 
 ```text
-/HUMAN REVIEW "Revisé las evaluaciones y el trade-off" A-DEC BOARD
+/HUMAN REVIEW architect-yvan 2026-09-16T07:00:00Z "Revisé las evaluaciones y el trade-off" "Validación arquitectónica" BOARD
 ```
 
 La revisión humana declara que un actor examinó el material relevante. Debe incluir actor, autoridad y una razón suficiente.
@@ -245,14 +250,12 @@ Audit se obtiene de los eventos, snapshots y resultados trazables. El historial 
 
 ## 5. Comandos CLI
 
-Las formas siguientes son la referencia de comandos del intérprete actual. Los argumentos entre corchetes son opcionales cuando el comando los admite.
-
-### 5.1 Proyecto, alcance y estado
+### 5.1 Proyecto y estado
 
 ```text
 /PROJECT CREATE <project_id> <name> [spatial_scope] [temporal_scope]
 /PROJECT OPEN <project_id>
-/PROJECT SET SCOPE <scope> [horizon]
+/PROJECT SET SCOPE <spatial_scope> [temporal_scope]
 /PROJECT IMPORT OBJECTIVE <source_project_id> <objective_id>
 /PROJECT SHOW
 /PROJECT LIST
@@ -263,76 +266,56 @@ Las formas siguientes son la referencia de comandos del intérprete actual. Los 
 /EXIT
 ```
 
-`spatial_scope` declara la escala espacial y `temporal_scope` declara el horizonte del proyecto. No se infieren silenciosamente.
-
-### 5.2 Conocimiento, fuentes y evidencia
+### 5.2 Conocimiento y decisión
 
 ```text
-/OBJECTIVE SET <key> <direction> <value> [unit]
+/OBJECTIVE SET <key> <direction> <value>
 /CONSTRAINT SET <key> <operator> <value> [unit]
 /ROLE ADD <name> <actor>
 /FACT SET <statement> [source]
 /ASSUMPTION SET <statement> [basis]
-/SOURCE ADD <id> <type> <title> [url]
-/SOURCE LIST
-/SOURCE SHOW <id>
 /EVIDENCE ADD <id> <statement> <type> [source_id] [url]
 /EVIDENCE LIST
 /EVIDENCE SHOW <id>
-```
-
-Una `Source` identifica procedencia. Una `Evidence` registra una afirmación observada. Ninguna de las dos convierte automáticamente una Assumption en Fact.
-
-### 5.3 Alternativas, evaluación y decisión
-
-```text
-/ALTERNATIVE CREATE <name> [description]
-/ALTERNATIVE SET <alternative> <key> <value>
-/ALTERNATIVE LIST
-/ALTERNATIVE PROMOTE <generated_id> <candidate_index>
-/EVALUATE <alternative> <objective> <value> [unit] [confidence] [source]
-/COMPARE <alternative> <alternative> [...]
-/RECOMMEND
-/HUMAN REVIEW <statement> <actor> <authority> [status]
+/HUMAN REVIEW <actor> <timestamp_utc> "<review>" "<reason>" [authority]
 /DECISION RECORD <statement> <actor> <authority>
 ```
 
-Los agentes generan evaluaciones, no decisiones. `Decision` exige `HumanReview`, actor y autoridad explícitos.
-
-### 5.4 Inteligencia de sitio, agentes y multiobjetivo
+### 5.3 Alternativas y análisis
 
 ```text
-/SITE INTELLIGENCE <location>
+/ALTERNATIVE CREATE <name>
+/ALTERNATIVE SET <alternative> <key> <value>
+/ALTERNATIVE LIST
+/EVALUATE <alternative> <objective> <value> [unit] [confidence] [source]
+/COMPARE <alternative> <alternative> [...]
+/RECOMMEND
 /AGENT RUN <agent> <alternative>
 /DEBATE <alternative>
-/MULTIOBJECTIVE PARETO <objective_1> <objective_2>
-/MULTIOBJECTIVE TRADEOFFS <objective_1> <objective_2>
-/MULTIOBJECTIVE LIST
-/MULTIOBJECTIVE SHOW <multiobjective_id>
+/SITE INTELLIGENCE <location>
+/GENERATE <alternative> <objective_1> <objective_2>
+/PARETO <objective_1> <objective_2>
+/TRADEOFF_MATRIX <objective_1> <objective_2>
 ```
 
-### 5.5 Simulación y generación
+### 5.4 Simulation, diseño y multiescala
 
 ```text
-/SIMULATE RUN <type> <method> [params]
-/SIMULATE MONTE_CARLO <alternative> <objective> <parameter> <distribution> [iterations] [seed]
-/SIMULATE METHODS
+/SIMULATE RUN <simulation_type> <method> [params]
 /SIMULATE LIST
 /SIMULATE SHOW <simulation_id>
-/GENERATE DESIGN <method> [params]
-/GENERATE METHODS
-/GENERATE LIST
-/GENERATE SHOW <generation_id>
-/ALTERNATIVE PROMOTE <generated_id> <candidate_index>
+/SIMULATE METHODS
+/DESIGN PRINCIPLES
+/DESIGN PRINCIPLE <principle_id>
+/SCALE PARENT <scope>
+/SCALE CHILDREN <scope>
+/SCALE RELATE <parent_project_id> <child_project_id> <relation_type> [description]
+/SCALE RELATIONS <project_id>
 ```
 
-Los métodos de generación declarados son `parametric_grid_v1`, `pattern_variation_v1`, `evolutionary_v1` y `llm_assisted_v1` cuando el proveedor LLM está configurado.
-
-### 5.6 Diseño, planificación y regulación
+### 5.5 Planificación y regulación
 
 ```text
-/DESIGN PRINCIPLES
-/DESIGN PRINCIPLE <id>
 /PLANNING ADD <id> <type> <name> [jurisdiction] [url]
 /PLANNING LIST
 /PLANNING SHOW <id>
@@ -349,27 +332,7 @@ Los métodos de generación declarados son `parametric_grid_v1`, `pattern_variat
 /SNAPSHOT FREEZE <id> <reviewer>
 ```
 
-### 5.7 Escalas y objetivos entre proyectos
-
-```text
-/SCALE PARENT <scope>
-/SCALE CHILDREN <scope>
-/SCALE RELATE <parent_project_id> <child_project_id> <relation_type> [description]
-/SCALE RELATIONS <project_id>
-/PROJECT IMPORT OBJECTIVE <source_project_id> <objective_id>
-```
-
-### 5.8 Actores y posiciones
-
-```text
-/ACTOR ADD <actor_id> <role> <name> <authority_level>
-/ACTOR LIST
-/ACTOR SHOW <actor_id>
-/POSITION ADD <actor_id> <subject_type> <subject_id> <stance> <reason>
-/POSITION LIST
-```
-
-### 5.9 Ciclos, escenarios y evolución
+### 5.6 Ciclos y escenarios
 
 ```text
 /CYCLE CREATE <cycle_id> <horizon> <start_date>
@@ -378,41 +341,26 @@ Los métodos de generación declarados son `parametric_grid_v1`, `pattern_variat
 /SCENARIO CREATE <branch_id> <parent_cycle_id> <name>
 /SCENARIO LIST
 /SCENARIO SELECT <branch_id> <actor> <authority>
-/EVOLUTION CREATE <evolution_id> <scenario_id> <from_cycle_id> <to_cycle_id>
-/EVOLUTION ADD <evolution_id> <key> <value>
-/EVOLUTION APPLY <evolution_id> <actor> <authority>
-/EVOLUTION LIST
-/EVOLUTION SHOW <evolution_id>
 ```
 
-### 5.10 Memoria institucional
+Los horizontes de ciclo son `2030`, `2040`, `2050` o `CUSTOM`. La selección de escenario exige actor activo y HumanReview aprobado.
+
+
+### Sources: HTTP-only
+
+`/SOURCE ADD`, `/SOURCE LIST` y `/SOURCE SHOW` no son comandos del CLI local. Para operar Source use la API canónica:
 
 ```text
-/MEMORY LIST
-/MEMORY SHOW <memory_id>
-/MEMORY EXTRACT <project_id> <actor> <authority>
-/MEMORY REVOKE <memory_id> <actor> <authority>
-/MEMORY APPLY <memory_id> <actor>
-/MEMORY TYPES
-```
-
-### 5.11 Exportación y reportes
-
-```text
-/REPORT
-/DASHBOARD
-/TRADEOFFS
-/EXPORT PROJECT
-/EXPORT CSV
-/EXPORT REPORT
-/IMPORT CSV
+POST /v1/projects/{project_id}/sources
+GET  /v1/projects/{project_id}/sources
+GET  /v1/projects/{project_id}/sources/{source_id}
 ```
 
 ## 6. Endpoints REST
 
 ### 6.1 Envelope y autenticación
 
-Todas las respuestas `/v1` utilizan un envelope canónico con la versión del contrato, estado, código, mensaje, proyecto, versión observada y datos.
+Las respuestas `/v1` utilizan un envelope canónico que incluye versión de contrato, estado, código, mensaje, proyecto, versión observada y datos.
 
 ```json
 {
@@ -426,24 +374,24 @@ Todas las respuestas `/v1` utilizan un envelope canónico con la versión del co
 }
 ```
 
-Cuando el servicio lo requiera, el token se envía únicamente desde un servidor autorizado.
+Cuando el servicio lo requiera, envíe el token solamente desde un servidor autorizado.
 
-### 6.2 Salud, catálogos y generación
+```bash
+curl -H "Authorization: Bearer $SICL_CORE_SERVICE_TOKEN" \
+  https://core.example/v1/health
+```
+
+### 6.2 Salud, catálogos y escalas
 
 ```text
-GET  /v1/health
-GET  /v1/operations-research/methods
-GET  /v1/simulations/methods
-GET  /v1/generations/methods
-GET  /v1/design/principles
-GET  /v1/design/principles/{principle_id}
-GET  /v1/scales
-GET  /v1/scales/{scope}/parent
-GET  /v1/scales/{scope}/children
-POST /v1/projects/{project_id}/generations
-GET  /v1/projects/{project_id}/generations
-GET  /v1/projects/{project_id}/generations/{generation_id}
-POST /v1/projects/{project_id}/generations/{generation_id}/promote
+GET /v1/health
+GET /v1/operations-research/methods
+GET /v1/simulations/methods
+GET /v1/design/principles
+GET /v1/design/principles/{principle_id}
+GET /v1/scales
+GET /v1/scales/{scope}/parent
+GET /v1/scales/{scope}/children
 ```
 
 ### 6.3 Proyectos y operación
@@ -459,13 +407,17 @@ POST /v1/projects/{project_id}/human-reviews
 POST /v1/projects/{project_id}/decisions
 POST /v1/projects/{project_id}/recommendations
 GET  /v1/projects/{project_id}/council
-POST /v1/projects/{project_id}/site-observations
-POST /v1/projects/{project_id}/agents/{agent}/evaluations
-POST /v1/projects/{project_id}/pareto
-POST /v1/projects/{project_id}/debate
 ```
 
-### 6.4 Evidencia, fuentes, evaluaciones y comparaciones
+Ejemplo de creación:
+
+```bash
+curl -X POST https://core.example/v1/projects \
+  -H 'Content-Type: application/json' \
+  -d '{"project_id":"UPAO-001","name":"UPAO Plaza Center"}'
+```
+
+### 6.4 Evidencia, evaluación y comparación
 
 ```text
 POST /v1/projects/{project_id}/evidence
@@ -480,23 +432,27 @@ POST /v1/projects/{project_id}/comparisons
 GET  /v1/projects/{project_id}/comparisons
 ```
 
-### 6.5 Simulación y multiobjetivo
+### 6.5 Site Intelligence, agentes y multiobjetivo
 
 ```text
+POST /v1/projects/{project_id}/site-observations
+POST /v1/projects/{project_id}/agents/{agent}/evaluations
+POST /v1/projects/{project_id}/pareto
+POST /v1/projects/{project_id}/debate
 POST /v1/projects/{project_id}/simulations
 GET  /v1/projects/{project_id}/simulations
 GET  /v1/projects/{project_id}/simulations/{simulation_id}
 POST /v1/projects/{project_id}/multiobjective/pareto
 POST /v1/projects/{project_id}/multiobjective/tradeoffs
 GET  /v1/projects/{project_id}/multiobjective
-GET  /v1/projects/{project_id}/multiobjective/{multiobjective_id}
+GET  /v1/projects/{project_id}/multiobjective/{id}
 ```
 
-### 6.6 Planificación, regulación y escalas
+### 6.6 Planning, regulación y escalas
 
 ```text
 GET  /v1/planning/instruments
-GET  /v1/planning/instruments/{instrument_id}
+GET  /v1/planning/instruments/{id}
 GET  /v1/planning/types
 POST /v1/projects/{project_id}/planning/instruments
 GET  /v1/projects/{project_id}/planning/instruments
@@ -505,22 +461,35 @@ GET  /v1/projects/{project_id}/scale-relations
 POST /v1/projects/{project_id}/import-objective
 POST /v1/regulations
 GET  /v1/regulations
-GET  /v1/regulations/{regulation_id}
-POST /v1/regulations/{regulation_id}/status
-POST /v1/regulations/{regulation_id}/interpretations
-GET  /v1/regulations/{regulation_id}/interpretations
-POST /v1/interpretations/{interpretation_id}/review
+GET  /v1/regulations/{id}
+POST /v1/regulations/{id}/status
+POST /v1/regulations/{id}/interpretations
+GET  /v1/regulations/{id}/interpretations
+POST /v1/interpretations/{id}/review
 POST /v1/projects/{project_id}/normative-snapshots
 GET  /v1/projects/{project_id}/normative-snapshots
-POST /v1/normative-snapshots/{snapshot_id}/freeze
+POST /v1/normative-snapshots/{id}/freeze
 ```
 
-### 6.7 Memoria, actores, posiciones y ciclos
+### 6.7 Ciclos y escenarios
+
+```text
+POST /v1/projects/{project_id}/cycles
+GET  /v1/projects/{project_id}/cycles
+GET  /v1/projects/{project_id}/cycles/{cycle_id}
+POST /v1/projects/{project_id}/scenarios
+GET  /v1/projects/{project_id}/scenarios
+POST /v1/projects/{project_id}/scenarios/{branch_id}/select
+```
+
+### 6.8 Memoria institucional, actores y copilot
+
+La memoria institucional se extrae de proyectos cerrados y se conserva como una proyección anonimizada. Su aplicación requiere actor y autoridad. Los actores y sus posiciones hacen explícitos los niveles de autoridad y no sustituyen `HumanReview` ni `Decision`.
 
 ```text
 GET  /v1/memory
-GET  /v1/memory/types
 GET  /v1/memory/{memory_id}
+GET  /v1/memory/types
 POST /v1/memory/extract
 POST /v1/memory/{memory_id}/revoke
 POST /v1/projects/{project_id}/memory/apply
@@ -530,19 +499,9 @@ GET  /v1/projects/{project_id}/actors/{actor_id}
 POST /v1/projects/{project_id}/positions
 GET  /v1/projects/{project_id}/positions
 GET  /v1/projects/{project_id}/positions/{position_id}
-POST /v1/projects/{project_id}/cycles
-GET  /v1/projects/{project_id}/cycles
-GET  /v1/projects/{project_id}/cycles/{cycle_id}
-POST /v1/projects/{project_id}/scenarios
-GET  /v1/projects/{project_id}/scenarios
-POST /v1/projects/{project_id}/scenarios/{branch_id}/select
-POST /v1/projects/{project_id}/scenario-evolutions
-GET  /v1/projects/{project_id}/scenario-evolutions
-GET  /v1/projects/{project_id}/scenario-evolutions/{evolution_id}
-POST /v1/scenario-evolutions/{evolution_id}/apply
 ```
 
-El User Copilot es asistencia y no autoridad. Puede explicar o proponer comandos, pero no ejecuta decisiones ni sustituye `HumanReview`.
+El User Copilot es una capacidad de asistencia, no una autoridad. Puede explicar, traducir lenguaje natural a comandos propuestos y señalar datos faltantes. No ejecuta comandos sin confirmación, no afirma sin fuente, no crea decisiones y no convierte recomendaciones en decisiones. La integración LLM de RFC-014 permanece definida como contrato y no debe interpretarse como una autorización para usar un modelo no configurado.
 
 ## 7. Capacidades incorporadas en SiMS-DeI 2.1 y 2.2
 
@@ -651,8 +610,12 @@ UPAO-001 es un caso sintético para demostrar el flujo completo. Puede represent
 ### Paso 4 — Crear alternativas y evaluar
 
 ```text
-/ALTERNATIVE CREATE CONVENCIONAL_A "Esquema de referencia"
-/ALTERNATIVE CREATE BIOCLIMATICA_B "Esquema bioclimático"
+/ALTERNATIVE CREATE CONVENCIONAL_A
+/ALTERNATIVE SET CONVENCIONAL_A FLOORS 4
+/ALTERNATIVE SET CONVENCIONAL_A AREA 2000
+/ALTERNATIVE CREATE BIOCLIMATICA_B
+/ALTERNATIVE SET BIOCLIMATICA_B FLOORS 4
+/ALTERNATIVE SET BIOCLIMATICA_B AREA 2000
 /EVALUATE CONVENCIONAL_A ENERGY_SAVINGS 60 PERCENT HIGH EXPERT_SYSTEM
 /EVALUATE BIOCLIMATICA_B ENERGY_SAVINGS 78 PERCENT HIGH EXPERT_SYSTEM
 /COMPARE CONVENCIONAL_A BIOCLIMATICA_B
@@ -662,7 +625,7 @@ UPAO-001 es un caso sintético para demostrar el flujo completo. Puede represent
 ### Paso 5 — Revisar y decidir
 
 ```text
-/HUMAN REVIEW "Revisé la comparación y la recomendación" A-DEC BOARD
+/HUMAN REVIEW architect-yvan 2026-09-16T07:00:00Z "Revisé la comparación y la recomendación" "Validación arquitectónica" BOARD
 /DECISION RECORD "Seleccionar BIOCLIMATICA_B" A-DEC BOARD
 /HISTORY
 ```
@@ -774,6 +737,3 @@ Cualquier persona que necesite comprender el sistema, pero las operaciones decis
 [13]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-014_USER_COPILOT.md "RFC-014 User Copilot"
 [14]: https://github.com/YvanCastilloQuezada/sicl-web/blob/main/docs/RFC-015_FRONTEND_V2.md "RFC-015 Frontend v2"
 [15]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-002_EVIDENCE_HTTP.md#source-http "RFC-016 Source HTTP"
-[16]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/OPERATIONS_MANUAL.md "SiMS-DeI Operations Manual"
-[17]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-017_CORE_CONTRACT_VERSIONING.md "RFC-017 Core Contract Versioning"
-[18]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-018_RFC_PROCESS.md "RFC-018 RFC Process"
