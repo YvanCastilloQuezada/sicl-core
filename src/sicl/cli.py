@@ -17,6 +17,7 @@ from .site_intelligence import get_site_observation
 from .agents import BioclimaticAgent, EconomicAgent, StructuralAgent
 from .optimization import GenerativeOptimizer, pareto_front, tradeoff_matrix
 from .simulation import METHODS, Simulation, SimulationState, SimulationType, canonical_hash, execute_method, list_methods, now_utc, simulation_to_dict
+from .design_principles import get_principle, list_principles
 
 
 class CLI:
@@ -111,6 +112,15 @@ class CLI:
                 return self.simulate_show(parts[2:])
             if head == ("/SIMULATE", "METHODS"):
                 return self._ok({"methods": list_methods()})
+            if head == ("/DESIGN", "PRINCIPLES"):
+                return self._ok({"principles": list_principles()})
+            if head == ("/DESIGN", "PRINCIPLE"):
+                if len(parts) != 3:
+                    raise SICLError("INVALID_ARGUMENT", "principle_id required")
+                principle = get_principle(parts[2])
+                if principle is None:
+                    raise SICLError("PRINCIPLE_NOT_FOUND", parts[2])
+                return self._ok({"principle": principle})
             if parts[0].upper() == "/REPORT":
                 return self._text_response(report_text(self.repo, self._project()))
             if parts[0].upper() == "/TRADEOFFS":
