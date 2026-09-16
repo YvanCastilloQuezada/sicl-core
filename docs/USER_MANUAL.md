@@ -21,6 +21,9 @@ SICL es el lenguaje formal que permite operar sobre el Core de SiMS-DeI. Sus com
 
 SICL puede utilizarse mediante el intérprete CLI o mediante la API REST canónica `/v1`. Ambas superficies deben respetar las mismas reglas del dominio.
 
+> Para la sintaxis exacta de cada comando, ver `COMMANDS_REFERENCE.md`. Esta referencia es la fuente canónica y se mantiene alineada con `src/sicl/cli.py`.
+
+
 ### 1.3 Qué hace el sistema
 
 El sistema registra proyectos y entidades, conecta información entre escalas, conserva evidencia, calcula evaluaciones, compara alternativas, ejecuta simulaciones declaradas, obtiene resultados multiobjetivo y prepara información para revisión humana.
@@ -157,7 +160,9 @@ Las preferencias pueden influir en una comparación, pero no sustituyen las cons
 ### 4.7 Alternativas
 
 ```text
-/ALTERNATIVE CREATE CONVENCIONAL_A "Esquema de referencia"
+/ALTERNATIVE CREATE CONVENCIONAL_A
+/ALTERNATIVE SET CONVENCIONAL_A FLOORS 4
+/ALTERNATIVE SET CONVENCIONAL_A AREA 2000
 /ALTERNATIVE SET CONVENCIONAL_A FLOORS 6
 /ALTERNATIVE SET CONVENCIONAL_A STRUCTURE "Mampostería"
 /ALTERNATIVE LIST
@@ -221,7 +226,7 @@ Una recomendación resume una salida analítica. Debe conservar la separación r
 ### 4.13 HumanReview
 
 ```text
-/HUMAN REVIEW "Revisé las evaluaciones y el trade-off" A-DEC BOARD
+/HUMAN REVIEW architect-yvan 2026-09-16T07:00:00Z "Revisé las evaluaciones y el trade-off" "Validación arquitectónica" BOARD
 ```
 
 La revisión humana declara que un actor examinó el material relevante. Debe incluir actor, autoridad y una razón suficiente.
@@ -272,14 +277,14 @@ Audit se obtiene de los eventos, snapshots y resultados trazables. El historial 
 /EVIDENCE ADD <id> <statement> <type> [source_id] [url]
 /EVIDENCE LIST
 /EVIDENCE SHOW <id>
-/HUMAN REVIEW <review> <actor> <authority> [reason]
+/HUMAN REVIEW <actor> <timestamp_utc> "<review>" "<reason>" [authority]
 /DECISION RECORD <statement> <actor> <authority>
 ```
 
 ### 5.3 Alternativas y análisis
 
 ```text
-/ALTERNATIVE CREATE <name> [description]
+/ALTERNATIVE CREATE <name>
 /ALTERNATIVE SET <alternative> <key> <value>
 /ALTERNATIVE LIST
 /EVALUATE <alternative> <objective> <value> [unit] [confidence] [source]
@@ -339,6 +344,17 @@ Audit se obtiene de los eventos, snapshots y resultados trazables. El historial 
 ```
 
 Los horizontes de ciclo son `2030`, `2040`, `2050` o `CUSTOM`. La selección de escenario exige actor activo y HumanReview aprobado.
+
+
+### Sources: HTTP-only
+
+`/SOURCE ADD`, `/SOURCE LIST` y `/SOURCE SHOW` no son comandos del CLI local. Para operar Source use la API canónica:
+
+```text
+POST /v1/projects/{project_id}/sources
+GET  /v1/projects/{project_id}/sources
+GET  /v1/projects/{project_id}/sources/{source_id}
+```
 
 ## 6. Endpoints REST
 
@@ -594,8 +610,12 @@ UPAO-001 es un caso sintético para demostrar el flujo completo. Puede represent
 ### Paso 4 — Crear alternativas y evaluar
 
 ```text
-/ALTERNATIVE CREATE CONVENCIONAL_A "Esquema de referencia"
-/ALTERNATIVE CREATE BIOCLIMATICA_B "Esquema bioclimático"
+/ALTERNATIVE CREATE CONVENCIONAL_A
+/ALTERNATIVE SET CONVENCIONAL_A FLOORS 4
+/ALTERNATIVE SET CONVENCIONAL_A AREA 2000
+/ALTERNATIVE CREATE BIOCLIMATICA_B
+/ALTERNATIVE SET BIOCLIMATICA_B FLOORS 4
+/ALTERNATIVE SET BIOCLIMATICA_B AREA 2000
 /EVALUATE CONVENCIONAL_A ENERGY_SAVINGS 60 PERCENT HIGH EXPERT_SYSTEM
 /EVALUATE BIOCLIMATICA_B ENERGY_SAVINGS 78 PERCENT HIGH EXPERT_SYSTEM
 /COMPARE CONVENCIONAL_A BIOCLIMATICA_B
@@ -605,7 +625,7 @@ UPAO-001 es un caso sintético para demostrar el flujo completo. Puede represent
 ### Paso 5 — Revisar y decidir
 
 ```text
-/HUMAN REVIEW "Revisé la comparación y la recomendación" A-DEC BOARD
+/HUMAN REVIEW architect-yvan 2026-09-16T07:00:00Z "Revisé la comparación y la recomendación" "Validación arquitectónica" BOARD
 /DECISION RECORD "Seleccionar BIOCLIMATICA_B" A-DEC BOARD
 /HISTORY
 ```
