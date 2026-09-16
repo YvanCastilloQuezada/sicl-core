@@ -40,7 +40,12 @@ def main() -> None:
         "status": "LOCAL_ANALYTICAL_DEMO",
         "project_id": "P-RFC025",
         "site_observation": {"location": observation.location, "source": observation.source, "simulated": observation.simulated, "temperature_mean_c": observation.temperature_mean_c, "wind_speed_kmh": observation.wind_speed_kmh, "radiation_kwh_m2_day": observation.radiation_kwh_m2_day, "evidence_url": observation.evidence_url, "evidence_hash": observation.evidence_hash},
-        "normative_fixture": {"regulation": fixture["regulations"][0]["code"], "status": fixture["regulations"][0]["status"], "fixture_hash": fixture["fixture_hash"]},
+        "normative_fixture": {
+            "regulations": [{"code": item["code"], "status": item["status"], "source_id": item["source_id"]} for item in fixture["regulations"]],
+            "evidence_count": len(fixture["evidence"]),
+            "fixture_hash": fixture["fixture_hash"],
+            "promotion_review": fixture.get("promotion_review", {"status": "NOT_REVIEWED"}),
+        },
         "pareto_front": pareto.non_dominated,
         "feasibility": [item.to_dict() for item in feasibility],
         "feasible_pareto_front": feasible_front,

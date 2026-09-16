@@ -160,7 +160,7 @@ Open-Meteo
   → feasible_pareto_front
 ```
 
-La observación de Trujillo se solicita a Open-Meteo. Las alternativas son sintéticas y sus evaluaciones se identifican como analíticas. El fixture A.010 se adjunta como referencia normativa no verificada, pero no se transforma automáticamente en una restricción.
+La observación de Trujillo se solicita a Open-Meteo. Las alternativas son sintéticas y sus evaluaciones se identifican como analíticas. El fixture RNE se adjunta como referencia normativa no verificada, pero no se transforma automáticamente en una restricción. En esta ampliación, el Camino A incluye A.010, E.030, E.060, IS.010 y EM.010.
 
 El script informa explícitamente que no crea `Recommendation`, `HumanReview` ni `Decision`. Esto conserva la autoridad humana y evita presentar una optimización como aprobación normativa.
 
@@ -200,6 +200,8 @@ La revisión ejecutada sobre el fixture comprobó que cada evidencia tiene una f
 
 El informe generado por `evidence_traceability_report` contiene una fila por evidencia y el campo `traceable`. El lote actual contiene siete evidencias y todas resultaron trazables. La validación no promueve ninguna evidencia a `REVIEWED` ni ninguna regulación a `VIGENTE`; esos cambios requieren revisión humana posterior.
 
+La revisión `PROMOTION-REVIEW-RFC025-2026-09-16` comprobó que las seis URLs del lote responden correctamente, pero bloqueó la promoción automática. La disponibilidad HTTP no prueba vigencia jurídica. Además, se localizaron avisos oficiales posteriores para E.030 e IS.010, por lo que sus versiones del fixture deben reconciliarse antes de cualquier promoción. Las cinco normas permanecen en `NO_VERIFICADA`.
+
 ## 17. Revisión lingüística y semántica
 
 Las normas peruanas pueden contener términos jurídicos, técnicos y regionales. La ingesta debe conservar el texto original cuando esté autorizada, pero los resúmenes deben marcarse como derivados. Cualquier traducción o normalización debe registrar método y responsable.
@@ -234,7 +236,7 @@ El resultado de Open-Meteo depende de la disponibilidad de la red y de la respue
 
 **Manus AI:** implementación de Fases 1 y 2, ampliación del fixture, validación de evidencias y simulación.
 **Product Owner / arquitecto:** revisión requerida para ampliar corpus y promover estados regulatorios.  
-**Estado:** `IMPLEMENTED — SAMPLE ONLY; HUMAN REVIEW REQUIRED`.
+**Estado:** `IMPLEMENTED — SAMPLE CORPUS; PROMOTION BLOCKED; HUMAN REVIEW REQUIRED`.
 
 ## References
 

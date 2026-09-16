@@ -34,6 +34,9 @@ def validate_corpus_fixture(payload: dict[str, Any]) -> None:
         raise ValueError("unsupported regulatory corpus fixture schema")
     if payload.get("corpus_status") != "SAMPLE_UNVERIFIED":
         raise ValueError("fixture must remain SAMPLE_UNVERIFIED until human review")
+    promotion_review = payload.get("promotion_review")
+    if promotion_review is not None and promotion_review.get("status") == "BLOCKED" and promotion_review.get("decision") != "NO_AUTOMATIC_PROMOTION":
+        raise ValueError("blocked promotion review must use NO_AUTOMATIC_PROMOTION")
     sources = payload.get("sources")
     regulations = payload.get("regulations")
     evidence = payload.get("evidence")

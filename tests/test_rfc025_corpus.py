@@ -17,6 +17,8 @@ def test_rne_fixture_is_traceable_and_unverified() -> None:
     assert len(payload["sources"]) == 6
     assert len(payload["evidence"]) == 7
     assert all(item["status"] == "NO_VERIFICADA" for item in payload["regulations"])
+    assert payload["promotion_review"]["status"] == "BLOCKED"
+    assert payload["promotion_review"]["decision"] == "NO_AUTOMATIC_PROMOTION"
     assert len(payload["fixture_hash"]) == 64
 
 
