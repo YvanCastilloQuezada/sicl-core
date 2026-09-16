@@ -833,3 +833,10 @@ Este documento representa el estado documental propuesto para SiMS-DeI 2.2 en el
 **Criterio de cierre:** documento de al menos 600 líneas, diff limpio, rama publicada y posterior fusión autorizada a `main`.
 
 > SiMS-DeI puede asistir al diseño espacial, hacer explícitas sus fuentes y mostrar sus trade-offs. La decisión final permanece en la autoridad humana competente.
+
+
+## Addendum — RFC-019, RFC-020 y RFC-021 consolidados
+
+El baseline posterior a SiMS-DeI 2.2 incorpora RFC-019 Multiscale Refinement, RFC-020 Feasibility Filtering y RFC-021 Decision Variables by Scale en `main@faff4f8e`. RFC-019 establece once escalas espaciales canónicas; RFC-021 registra variables explícitas con actor y autoridad; RFC-020 evalúa factibilidad y filtra el frente Pareto sin producir Recommendation, HumanReview ni Decision.
+
+Este addendum no altera las invariantes constitucionales: Fact continúa separado de Assumption y Preference; Recommendation continúa separado de Decision; y toda Decision requiere HumanReview, actor y authority.

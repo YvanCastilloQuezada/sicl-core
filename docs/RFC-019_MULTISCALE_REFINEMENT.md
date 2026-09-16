@@ -25,3 +25,8 @@ El catálogo no infiere relaciones territoriales. Cada scope tiene un único pad
 ## Verificación
 
 La rama fue verificada con la suite completa del Core, 214 casos recolectados y todos pasando, además de `compileall` y `git diff --check`.
+
+
+## Baseline consolidado
+
+RFC-019 quedó consolidado en `main@faff4f8e` junto con RFC-020 y RFC-021. La migración de las once escalas espaciales, el contrato HTTP, los tests multiescala y la documentación asociada forman parte del baseline verificable.

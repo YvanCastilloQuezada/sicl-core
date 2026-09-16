@@ -66,6 +66,9 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | ScaleRelation | `relation_id`, `parent_project_id`, `child_project_id`, `relation_type`, `description?`, `created_by`, `created_at`, `version` |
 | ScenarioEvolution | `evolution_id`, `scenario_id`, `from_cycle_id`, `to_cycle_id`, `changes`, `triggers`, `state`, `applied_by?`, `applied_at?`, `version` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
+| ProjectVariable | `variable_id`, `project_id`, `normalized_key`, `variable_type`, `value`, `actor_id`, `authority`, `unit?`, `spatial_scope?`, `version` |
+| SuggestedVariable | `key`, `variable_type`, `suggested_value`, `spatial_scope?`, `source` |
+| FeasibilityResult | `alternative_id`, `state`, `checks`, `failed_constraint_ids`, `unknown_constraint_ids`, `insufficient_constraint_ids`, `evaluated_by` |
 
 ### Multiscale Model
 
@@ -260,3 +263,12 @@ Los agentes, Pareto, generación, debate y Site Intelligence son analíticos y n
 ### HTTP v1 — Source
 
 La superficie canónica expone `POST /v1/projects/{project_id}/sources`, `GET /v1/projects/{project_id}/sources` y `GET /v1/projects/{project_id}/sources/{source_id}`. Source es un registro de procedencia project-scoped, con tipos `OFFICIAL`, `SECONDARY`, `USER_PROVIDED` y `UNKNOWN`; su creación es append-only, produce `SOURCE_ADDED` y no crea Evidence, Fact, Recommendation ni Decision. No existen endpoints HTTP de actualización o eliminación.
+
+
+## RFC-020 y RFC-021 — extensiones implementadas
+
+El baseline `main@faff4f8e` expone el registro explícito de variables y el filtro de factibilidad sin crear autoridad implícita. Los estados de factibilidad son `FEASIBLE`, `INFEASIBLE`, `INSUFFICIENT_DATA` y `UNKNOWN`. Solo las alternativas `FEASIBLE` pueden integrar `feasible_pareto_front`; las demás permanecen visibles para auditoría.
+
+Comandos CLI: `/VARIABLE ADD <variable_id> <key> <type> <value> <actor_id> <authority> [unit] [spatial_scope]`, `/VARIABLE LIST`, `/FEASIBILITY CHECK <alternative_id> '<values_json>'` y `/MULTIOBJECTIVE FEASIBLE_PARETO '<pareto_ids_json>'`.
+
+Endpoints HTTP: `POST /v1/projects/{project_id}/variables`, `GET /v1/projects/{project_id}/variables`, `POST /v1/projects/{project_id}/feasibility` y `POST /v1/projects/{project_id}/multiobjective/feasible-pareto`.

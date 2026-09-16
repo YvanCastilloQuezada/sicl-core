@@ -1,6 +1,6 @@
 # RFC-020 — Feasibility Filtering
 
-**Estado:** IMPLEMENTED ON BRANCH — pendiente de merge de RFC-019 a `main`.
+**Estado:** IMPLEMENTED ON MAIN — incluido en `main@faff4f8e`.
 
 ## Purpose
 
@@ -27,3 +27,8 @@ HTTP: `POST /v1/projects/{project_id}/feasibility` and `POST /v1/projects/{proje
 ## Verification
 
 The directed CLI test demonstrates a hard investment limit of 100: value 90 is `FEASIBLE`, value 120 is `INFEASIBLE`, and the feasible front retains only the first alternative.
+
+
+## Baseline consolidado
+
+RFC-020 quedó consolidado en `main` junto con RFC-019 y RFC-021 mediante el commit `faff4f8e9ce416fa1f9523b4396b85fdd9b342f8`. La suite completa del Core y la compilación de `src`, `api` y `tests` pasan sobre este baseline.

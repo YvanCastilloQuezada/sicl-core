@@ -1,6 +1,6 @@
 # RFC-021 — Decision Variables by Scale
 
-**Estado:** IMPLEMENTED ON BRANCH — pendiente de merge de RFC-019 a `main`.
+**Estado:** IMPLEMENTED ON MAIN — incluido en `main@faff4f8e`.
 
 ## ProjectVariable
 
@@ -23,3 +23,8 @@ HTTP: `POST /v1/projects/{project_id}/variables` and `GET /v1/projects/{project_
 ## Boundary
 
 Registering a variable does not authorize a decision. It only records explicit project information for later evaluation.
+
+
+## Baseline consolidado
+
+RFC-021 quedó consolidado en `main` junto con RFC-019 y RFC-020 mediante el commit `faff4f8e9ce416fa1f9523b4396b85fdd9b342f8`. La persistencia append-only, la validación de autoridad y las rutas HTTP fueron verificadas en la suite completa del Core.
