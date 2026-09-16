@@ -58,6 +58,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | Simulation | `simulation_id`, `project_id`, `simulation_type`, `method`, `method_version`, `inputs`, `outputs`, `state`, `started_at`, `finished_at?`, `evidence_hash`, `version` |
 | DesignPrinciple | `principle_id`, `name`, `category`, `description`, `applicable_scopes`, `source` |
 | MultiobjectiveResult | `multiobjective_id`, `project_id`, `method`, `method_version`, `objectives`, `alternatives`, `pareto_front`, `dominated`, `incomplete`, `tradeoffs`, `state`, `inputs_hash`, `created_at`, `version` |
+| PlanningInstrument | `instrument_id`, `project_id?`, `instrument_type`, `name`, `jurisdiction`, `authority?`, `approval_date?`, `validity_period?`, `scope_applicable`, `status`, `objectives`, `url?`, `summary?`, `source`, `version` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
 
 ### Multiscale Model
@@ -98,6 +99,10 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 /MULTIOBJECTIVE TRADEOFFS <obj_1> <obj_2>
 /MULTIOBJECTIVE LIST
 /MULTIOBJECTIVE SHOW <multiobjective_id>
+/PLANNING ADD <instrument_id> <instrument_type> <name> [jurisdiction] [url]
+/PLANNING LIST
+/PLANNING SHOW <instrument_id>
+/PLANNING TYPES
 /DECISION RECORD <statement> <actor> <authority>
 /STATUS
 /HISTORY
@@ -132,6 +137,11 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 23. Cada objetivo multiobjetivo requiere dirección explícita `MAXIMIZE` o `MINIMIZE`; la ausencia produce `OBJECTIVE_DIRECTION_REQUIRED`.
 24. Si falta una evaluación requerida, la alternativa aparece en `incomplete` y el estado del resultado es `INSUFFICIENT`.
 25. `MultiobjectiveResult` es append-only y conserva el hash SHA-256 de sus entradas.
+26. `PlanningInstrument` no es normativa obligatoria, `DesignPrinciple`, `Reference` ni `Preference`.
+27. Si falta una fuente verificable, `PlanningInstrument.status=UNKNOWN`.
+28. Un `PlanningInstrument` no crea automáticamente Constraint, Recommendation, Preference ni Decision.
+29. El vínculo a un Project es explícito, admite 0..N instrumentos y registra `PLANNING_INSTRUMENT_LINKED` con actor y timestamp.
+30. Planning Instruments y sus vínculos son append-only; una modificación requiere una nueva versión.
 
 ## 6. Persistencia
 
@@ -148,6 +158,10 @@ La superficie read-only expone `GET /v1/design/principles`, `GET /v1/design/prin
 ### HTTP v1 — Multiobjective
 
 La superficie canónica expone `POST /v1/projects/{project_id}/multiobjective/pareto`, `POST /v1/projects/{project_id}/multiobjective/tradeoffs`, `GET /v1/projects/{project_id}/multiobjective` y `GET /v1/projects/{project_id}/multiobjective/{multiobjective_id}`. Todas las respuestas usan el envelope v1 y conservan `contract_version`, `project_id` y `observed_version`.
+
+### HTTP v1 — Planning Instruments
+
+La superficie canónica expone `GET /v1/planning/instruments`, `GET /v1/planning/instruments/{instrument_id}`, `GET /v1/planning/types`, `POST /v1/projects/{project_id}/planning/instruments` y `GET /v1/projects/{project_id}/planning/instruments`. La carga de instrumentos reales no pertenece a esta fase.
 
 ## 7. Respuestas y errores
 

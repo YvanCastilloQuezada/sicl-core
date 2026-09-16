@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from dataclasses import asdict
 from typing import Any
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, HumanReview, Fact, MultiobjectiveResult, MultiobjectiveState, Objective, Project, Role, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, HumanReview, Fact, MultiobjectiveResult, MultiobjectiveState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Role, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
@@ -43,7 +43,7 @@ class CLI:
         try:
             parts = shlex.split(command)
             if not parts or parts[0] == "/HELP":
-                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
+                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
             head = tuple(p.upper() for p in parts[:2])
             if head == ("/EXIT",):
                 self.closed = True
@@ -129,6 +129,14 @@ class CLI:
                 if principle is None:
                     raise SICLError("PRINCIPLE_NOT_FOUND", parts[2])
                 return self._ok({"principle": principle})
+            if head == ("/PLANNING", "ADD"):
+                return self.planning_add(parts[2:])
+            if head == ("/PLANNING", "LIST"):
+                return self.planning_list()
+            if head == ("/PLANNING", "SHOW"):
+                return self.planning_show(parts[2:])
+            if head == ("/PLANNING", "TYPES"):
+                return self._ok({"types": [item.value for item in PlanningInstrumentType]})
             if parts[0].upper() == "/REPORT":
                 return self._text_response(report_text(self.repo, self._project()))
             if parts[0].upper() == "/TRADEOFFS":
@@ -162,6 +170,44 @@ class CLI:
         if p.stage == "CLOSED":
             raise SICLError("INVALID_STATE", "Project is CLOSED")
         return p
+
+    @staticmethod
+    def _planning_dict(instrument: PlanningInstrument) -> dict:
+        value = asdict(instrument)
+        value["instrument_type"] = instrument.instrument_type.value
+        value["status"] = instrument.status.value
+        value["scope_applicable"] = [scope.value for scope in instrument.scope_applicable]
+        value["approval_date"] = instrument.approval_date.isoformat() if instrument.approval_date else None
+        return value
+
+    def planning_add(self, args: list[str]) -> dict:
+        if len(args) < 3 or len(args) > 5:
+            raise SICLError("INVALID_ARGUMENT", "instrument_id instrument_type name [jurisdiction] [url] required")
+        project = self._project()
+        try:
+            instrument_type = PlanningInstrumentType(args[1].upper())
+        except ValueError:
+            raise SICLError("INVALID_ARGUMENT", "invalid instrument_type")
+        instrument_id, name = args[0], args[2]
+        if self.repo.get_planning_instrument(instrument_id) is not None:
+            raise SICLError("CONFLICT", f"planning instrument already exists: {instrument_id}")
+        jurisdiction = args[3] if len(args) >= 4 else "GLOBAL"
+        url = args[4] if len(args) >= 5 else None
+        instrument = PlanningInstrument(instrument_id, None, instrument_type, name, jurisdiction, None, None, None, [], PlanningInstrumentStatus.ACTIVE if url else PlanningInstrumentStatus.UNKNOWN, [], url, None, url or "PENDING_REFERENCE")
+        project.version += 1
+        self.repo.insert_planning_instrument_and_event(instrument, self._event(project.project_id, "PLANNING_INSTRUMENT_REGISTERED", self._planning_dict(instrument)))
+        return self._ok({"instrument": self._planning_dict(instrument)})
+
+    def planning_list(self) -> dict:
+        return self._ok({"instruments": [self._planning_dict(item) for item in self.repo.list_planning_instruments()]})
+
+    def planning_show(self, args: list[str]) -> dict:
+        if len(args) != 1:
+            raise SICLError("INVALID_ARGUMENT", "instrument_id required")
+        instrument = self.repo.get_planning_instrument(args[0])
+        if instrument is None:
+            raise SICLError("PLANNING_INSTRUMENT_NOT_FOUND", args[0])
+        return self._ok({"instrument": self._planning_dict(instrument)})
 
     def project_create(self, args: list[str]) -> dict:
         if len(args) < 2: raise SICLError("INVALID_ARGUMENT", "project_id and name required")
