@@ -184,6 +184,8 @@ class CLI:
                 return self.multiobjective_show(parts[2:])
             if head == ("/SIMULATE", "RUN"):
                 return self.simulate_run(parts[2:])
+            if head == ("/SIMULATE", "MONTE_CARLO"):
+                return self.simulate_monte_carlo(parts[2:])
             if head == ("/SIMULATE", "LIST"):
                 return self.simulate_list()
             if head == ("/SIMULATE", "SHOW"):
@@ -1187,13 +1189,39 @@ class CLI:
         except ValueError as exc:
             if str(exc) == "METHOD_TYPE_MISMATCH":
                 raise SICLError("METHOD_TYPE_MISMATCH", method)
+            if str(exc) == "PARAMETER_NOT_FOUND":
+                raise SICLError("PARAMETER_NOT_FOUND", str(inputs.get("parameter_name", "")))
+            if str(exc) == "INVALID_DISTRIBUTION":
+                raise SICLError("INVALID_DISTRIBUTION", "supported distributions: NORMAL, UNIFORM, TRIANGULAR")
+            if str(exc) == "INVALID_INPUTS":
+                raise SICLError("INVALID_INPUTS", "iterations must be between 1 and 10000 and parameters must be numeric")
             state, outputs = SimulationState.FAILED, {"error": str(exc)}
         finished = now_utc()
-        simulation = Simulation(f"SIM-{uuid.uuid4().hex[:10]}", p.project_id, simulation_type, method, METHODS.get(method, {}).get("method_version", "unknown"), inputs, outputs, state, started, finished, canonical_hash(inputs, outputs))
+        simulation = Simulation(f"SIM-{uuid.uuid4().hex[:10]}", p.project_id, simulation_type, method, METHODS.get(method, {}).get("method_version", "unknown"), inputs, outputs, state, started, finished, canonical_hash(inputs, outputs, outputs.get("seed")))
         p.simulations[simulation.simulation_id] = simulation
         p.version += 1
         self.repo.insert_simulation_and_event(simulation, p, self._event(p.project_id, "SIMULATION_RECORDED", simulation_to_dict(simulation), "SIMULATION"))
         return self._ok({"simulation": simulation_to_dict(simulation), "decision_created": False, "recommendation_created": False})
+
+    def simulate_monte_carlo(self, args: list[str]) -> dict:
+        if len(args) not in {4, 5}:
+            raise SICLError("INVALID_ARGUMENT", "alternative_id objective_id parameter_name distribution_json [iterations] required")
+        try:
+            distribution = json.loads(args[3])
+            if not isinstance(distribution, dict):
+                raise ValueError
+            iterations = int(args[4]) if len(args) == 5 else 1000
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise SICLError("INVALID_INPUTS", "distribution must be JSON and iterations numeric") from exc
+        inputs = {
+            "alternative_id": args[0],
+            "objective_id": args[1],
+            "parameter_name": args[2],
+            "parameter_distribution": distribution,
+            "iterations": iterations,
+            "seed": 20260916,
+        }
+        return self.simulate_run(["MONTE_CARLO", "monte_carlo_v1", json.dumps(inputs, sort_keys=True)])
 
     def simulate_list(self) -> dict:
         return self._ok({"simulations": [simulation_to_dict(item) for item in self.repo.list_simulations(self._project().project_id)]})

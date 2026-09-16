@@ -25,7 +25,7 @@ Definir `Simulation` como capacidad analítica canónica para ejecuciones determ
 - `evidence_hash`
 - `version`
 
-Los tipos admitidos son `DETERMINISTIC`, `MONTE_CARLO`, `SCENARIO` y `SENSITIVITY`. En esta fase únicamente se ejecutan métodos deterministas y de sensibilidad; Monte Carlo queda definido como tipo, pero no implementado.
+Los tipos admitidos son `DETERMINISTIC`, `MONTE_CARLO`, `SCENARIO` y `SENSITIVITY`. Los métodos deterministas y de sensibilidad están implementados en RFC-006; `monte_carlo_v1` está implementado en RFC-006.1. `SCENARIO` permanece definido como tipo, pero sin método ejecutable en esta fase.
 
 Los estados son `PLANNED`, `EXECUTED`, `FAILED` e `INSUFFICIENT`. Si falta un input requerido, se registra una Simulation `INSUFFICIENT`. El hash SHA-256 se calcula sobre la representación JSON canónica de `inputs` y `outputs`.
 

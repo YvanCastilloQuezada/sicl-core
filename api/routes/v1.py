@@ -73,7 +73,7 @@ def _status_for(code: str) -> int:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
-    if code == "INSUFFICIENT_INPUTS":
+    if code in {"INSUFFICIENT_INPUTS", "INVALID_INPUTS", "INVALID_DISTRIBUTION", "PARAMETER_NOT_FOUND"}:
         return 422
     if code == "PROJECT_NOT_FOUND":
         return 404
