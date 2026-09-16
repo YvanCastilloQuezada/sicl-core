@@ -103,6 +103,13 @@ class ScenarioState(str, Enum):
     SELECTED = "SELECTED"
     DISCARDED = "DISCARDED"
 
+
+class EvolutionState(str, Enum):
+    PROPOSED = "PROPOSED"
+    EVALUATED = "EVALUATED"
+    APPLIED = "APPLIED"
+    REJECTED = "REJECTED"
+
 STAGES = {"DRAFT", "ACTIVE", "PRELIMINARY_DESIGN", "CLOSED"}
 DIRECTIONS = {"MAXIMIZE", "MINIMIZE"}
 KNOWLEDGE_STATES = {"UNKNOWN", "CONFLICTING", "INSUFFICIENT", "OBSERVED"}
@@ -245,6 +252,7 @@ class Project:
     positions: dict[str, "ActorPosition"] = field(default_factory=dict)
     temporal_cycles: dict[str, "TemporalCycle"] = field(default_factory=dict)
     scenario_branches: dict[str, "ScenarioBranch"] = field(default_factory=dict)
+    scenario_evolutions: dict[str, "ScenarioEvolution"] = field(default_factory=dict)
     facts: dict[str, "Fact"] = field(default_factory=dict)
     assumptions: dict[str, "Assumption"] = field(default_factory=dict)
     preferences: dict[str, "Preference"] = field(default_factory=dict)
@@ -356,6 +364,20 @@ class ScenarioBranch:
     selected_by: str | None = None
     selected_at: datetime | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class ScenarioEvolution:
+    evolution_id: str
+    scenario_id: str
+    from_cycle_id: str
+    to_cycle_id: str
+    changes: list[dict[str, Any]] = field(default_factory=list)
+    triggers: list[str] = field(default_factory=list)
+    state: EvolutionState = EvolutionState.PROPOSED
+    applied_by: str | None = None
+    applied_at: datetime | None = None
     version: int = 1
 
 

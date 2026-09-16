@@ -21,6 +21,8 @@ from api.schemas import (
     CycleCreateRequest,
     ScenarioCreateRequest,
     ScenarioSelectRequest,
+    ScenarioEvolutionCreateRequest,
+    ScenarioEvolutionApplyRequest,
     ComparisonCreateRequest,
     EvidenceCreateRequest,
     SourceCreateRequest,
@@ -46,7 +48,7 @@ from api.schemas import (
 from sicl.cli import CLI
 from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, Source, SourceType
 from sicl.actors import actor_to_dict, position_to_dict
-from sicl.temporal import cycle_to_dict, scenario_to_dict
+from sicl.temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
 from sicl.memory import memory_to_dict, memory_types
 from sicl.repository import SQLiteRepository
@@ -339,6 +341,43 @@ def select_scenario(project_id: str, branch_id: str, request: ScenarioSelectRequ
     cli = CLI(repo, actor=request.actor)
     _error(cli.execute(f"/PROJECT OPEN {shlex.quote(project_id)}"), project_id)
     result = cli.execute(f"/SCENARIO SELECT {shlex.quote(branch_id)} {shlex.quote(request.actor)} {shlex.quote(request.authority)}"); _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok(result["data"], project_id, project.version if project else None)
+
+
+@router.post("/projects/{project_id}/scenario-evolutions", dependencies=[Depends(_auth)])
+def create_scenario_evolution(project_id: str, request: ScenarioEvolutionCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None: _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    cli = CLI(repo, actor="api")
+    _error(cli.execute(f"/PROJECT OPEN {shlex.quote(project_id)}"), project_id)
+    result = cli.execute(f"/EVOLUTION CREATE {shlex.quote(request.evolution_id)} {shlex.quote(request.scenario_id)} {shlex.quote(request.from_cycle_id)} {shlex.quote(request.to_cycle_id)}")
+    _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok(result["data"], project_id, project.version if project else None)
+
+
+@router.get("/projects/{project_id}/scenario-evolutions", dependencies=[Depends(_auth)])
+def list_scenario_evolutions(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None: _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"evolutions": [evolution_to_dict(item) for item in repo.list_scenario_evolutions(project_id)]}, project_id, repo.get_project(project_id).version)
+
+
+@router.get("/projects/{project_id}/scenario-evolutions/{evolution_id}", dependencies=[Depends(_auth)])
+def get_scenario_evolution(project_id: str, evolution_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    evolution = repo.get_scenario_evolution(project_id, evolution_id)
+    if evolution is None: _error({"code": "EVOLUTION_NOT_FOUND", "message": evolution_id}, project_id)
+    return _ok({"evolution": evolution_to_dict(evolution)}, project_id, repo.get_project(project_id).version)
+
+
+@router.post("/scenario-evolutions/{evolution_id}/apply", dependencies=[Depends(_auth)])
+def apply_scenario_evolution(evolution_id: str, request: ScenarioEvolutionApplyRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    match = next(((project.project_id, item) for project in repo.list_projects() for item in repo.list_scenario_evolutions(project.project_id) if item.evolution_id == evolution_id), None)
+    if match is None: _error({"code": "EVOLUTION_NOT_FOUND", "message": evolution_id}, None)
+    project_id, evolution = match
+    cli = CLI(repo, actor=request.actor)
+    _error(cli.execute(f"/PROJECT OPEN {shlex.quote(project_id)}"), project_id)
+    result = cli.execute(f"/EVOLUTION APPLY {shlex.quote(evolution_id)} {shlex.quote(request.actor)} {shlex.quote(request.authority)}")
+    _error(result, project_id)
     project = repo.get_project(project_id)
     return _ok(result["data"], project_id, project.version if project else None)
 
