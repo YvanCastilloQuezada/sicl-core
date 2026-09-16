@@ -5,7 +5,7 @@ import uuid
 import hashlib
 import json
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -20,15 +20,22 @@ from api.schemas import (
     EvaluationCreateRequest,
     MultiobjectiveRequest,
     PlanningInstrumentLinkRequest,
+    RegulationCreateRequest,
+    RegulationStatusRequest,
+    InterpretationCreateRequest,
+    InterpretationReviewRequest,
+    SnapshotCreateRequest,
+    SnapshotFreezeRequest,
     SimulationCreateRequest,
     V1Envelope,
 )
 from sicl.cli import CLI
-from sicl.domain import Evidence, EvidenceType, KNOWLEDGE_STATES, PlanningInstrumentType, Preference
+from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, SourceType
 from sicl.repository import SQLiteRepository
 from sicl.site_intelligence import get_site_observation
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
 from sicl.design_principles import get_principle, list_principles
+from sicl.regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_dict, snapshot_to_dict
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -43,7 +50,7 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND"}:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
@@ -156,6 +163,125 @@ def planning_instrument(instrument_id: str, repo: SQLiteRepository = Depends(get
 @router.get("/planning/types", dependencies=[Depends(_auth)])
 def planning_types() -> V1Envelope:
     return _ok({"types": [item.value for item in PlanningInstrumentType]})
+
+
+def _regulatory_project(repo: SQLiteRepository) -> str:
+    projects = repo.list_projects()
+    if not projects:
+        raise HTTPException(status_code=409, detail={"code": "PROJECT_REQUIRED", "message": "a project is required for the append-only event log"})
+    return projects[0].project_id
+
+
+@router.post("/regulations", dependencies=[Depends(_auth)])
+def create_regulation(request: RegulationCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project_id = request.project_id or _regulatory_project(repo)
+    if repo.get_project(project_id) is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id})
+    if repo.get_regulation(request.regulation_id):
+        _error({"code": "CONFLICT", "message": request.regulation_id}, project_id)
+    item = Regulation(request.regulation_id, request.jurisdiction, request.authority, request.code, request.title, request.version, None, None, RegulationStatus.NO_VERIFICADA, request.source_url, SourceType.OFFICIAL if request.source_url else SourceType.UNKNOWN, None, [], None, None)
+    cli = CLI(repo, actor="api")
+    repo.insert_regulation_and_event(item, cli._event(project_id, "REGULATION_REGISTERED", regulation_to_dict(item)))
+    return _ok({"regulation": regulation_to_dict(item)}, project_id, repo.get_project(project_id).version)
+
+
+@router.get("/regulations", dependencies=[Depends(_auth)])
+def list_regulations(repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    return _ok({"regulations": [regulation_to_dict(item) for item in repo.list_regulations()]})
+
+
+@router.get("/regulations/{regulation_id}", dependencies=[Depends(_auth)])
+def get_regulation(regulation_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    item = repo.get_regulation(regulation_id)
+    if item is None:
+        _error({"code": "REGULATION_NOT_FOUND", "message": regulation_id})
+    return _ok({"regulation": regulation_to_dict(item)})
+
+
+@router.post("/regulations/{regulation_id}/status", dependencies=[Depends(_auth)])
+def set_regulation_status(regulation_id: str, request: RegulationStatusRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    current = repo.get_regulation(regulation_id)
+    if current is None:
+        _error({"code": "REGULATION_NOT_FOUND", "message": regulation_id})
+    try:
+        status = RegulationStatus(request.status.upper())
+    except ValueError:
+        _error({"code": "INVALID_ARGUMENT", "message": "invalid regulation status"})
+    project_id = _regulatory_project(repo)
+    item = Regulation(current.regulation_id, current.jurisdiction, current.authority, current.code, current.title, current.version, current.publication_date, current.effective_date, status, current.source_url, current.source_type, current.evidence_hash, current.scope_applicable, current.parent_regulation_id, current.summary, current.version_field + 1)
+    cli = CLI(repo, actor="api")
+    repo.insert_regulation_and_event(item, cli._event(project_id, "REGULATION_STATUS_CHANGED", regulation_to_dict(item)))
+    return _ok({"regulation": regulation_to_dict(item)}, project_id, repo.get_project(project_id).version)
+
+
+@router.post("/regulations/{regulation_id}/interpretations", dependencies=[Depends(_auth)])
+def create_interpretation(regulation_id: str, request: InterpretationCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_regulation(regulation_id) is None:
+        _error({"code": "REGULATION_NOT_FOUND", "message": regulation_id})
+    project_id = request.applied_to_project_id or _regulatory_project(repo)
+    if repo.get_interpretation(request.interpretation_id):
+        _error({"code": "CONFLICT", "message": request.interpretation_id}, project_id)
+    item = NormativeInterpretation(request.interpretation_id, regulation_id, request.article_reference, request.interpretation_text, request.applied_to_project_id, "api", date.today(), InterpretationConfidence.UNKNOWN, InterpretationState.DRAFT, LEGAL_DISCLAIMER)
+    cli = CLI(repo, actor="api")
+    repo.insert_interpretation_and_event(item, cli._event(project_id, "NORMATIVE_INTERPRETATION_REGISTERED", interpretation_to_dict(item)))
+    return _ok({"interpretation": interpretation_to_dict(item)}, project_id, repo.get_project(project_id).version)
+
+
+@router.get("/regulations/{regulation_id}/interpretations", dependencies=[Depends(_auth)])
+def list_interpretations(regulation_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_regulation(regulation_id) is None:
+        _error({"code": "REGULATION_NOT_FOUND", "message": regulation_id})
+    return _ok({"interpretations": [interpretation_to_dict(item) for item in repo.list_interpretations(regulation_id)]})
+
+
+@router.post("/interpretations/{interpretation_id}/review", dependencies=[Depends(_auth)])
+def review_interpretation(interpretation_id: str, request: InterpretationReviewRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    current = repo.get_interpretation(interpretation_id)
+    if current is None:
+        _error({"code": "INTERPRETATION_NOT_FOUND", "message": interpretation_id})
+    if not request.actor or not request.authority:
+        _error({"code": "INVALID_ARGUMENT", "message": "actor and authority required"})
+    project_id = current.applied_to_project_id or _regulatory_project(repo)
+    item = NormativeInterpretation(current.interpretation_id, current.regulation_id, current.article_reference, current.interpretation_text, current.applied_to_project_id, request.actor, current.interpretation_date, current.confidence, InterpretationState.REVIEWED, LEGAL_DISCLAIMER, current.version + 1)
+    cli = CLI(repo, actor=request.actor)
+    repo.insert_interpretation_and_event(item, cli._event(project_id, "NORMATIVE_INTERPRETATION_REVIEWED", {**interpretation_to_dict(item), "authority": request.authority}))
+    return _ok({"interpretation": interpretation_to_dict(item), "authority": request.authority, "applicable": True}, project_id, repo.get_project(project_id).version)
+
+
+@router.post("/projects/{project_id}/normative-snapshots", dependencies=[Depends(_auth)])
+def create_normative_snapshot(project_id: str, request: SnapshotCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    if repo.get_normative_snapshot(request.snapshot_id):
+        _error({"code": "CONFLICT", "message": request.snapshot_id}, project_id)
+    try:
+        cut_date = date.fromisoformat(request.cut_date)
+    except ValueError:
+        _error({"code": "INVALID_ARGUMENT", "message": "cut_date must be YYYY-MM-DD"}, project_id)
+    item = NormativeSnapshot(request.snapshot_id, project_id, cut_date, request.jurisdiction, [r.regulation_id for r in repo.list_regulations()], [i.interpretation_id for i in repo.list_interpretations()], NormativeSnapshotState.DRAFT, None, datetime.now(timezone.utc))
+    cli = CLI(repo, actor="api")
+    repo.insert_snapshot_and_event(item, cli._event(project_id, "NORMATIVE_SNAPSHOT_CREATED", snapshot_to_dict(item)))
+    return _ok({"snapshot": snapshot_to_dict(item)}, project_id, repo.get_project(project_id).version)
+
+
+@router.get("/projects/{project_id}/normative-snapshots", dependencies=[Depends(_auth)])
+def list_normative_snapshots(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"snapshots": [snapshot_to_dict(item) for item in repo.list_normative_snapshots(project_id)]}, project_id, repo.get_project(project_id).version)
+
+
+@router.post("/normative-snapshots/{snapshot_id}/freeze", dependencies=[Depends(_auth)])
+def freeze_normative_snapshot(snapshot_id: str, request: SnapshotFreezeRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    current = repo.get_normative_snapshot(snapshot_id)
+    if current is None:
+        _error({"code": "SNAPSHOT_NOT_FOUND", "message": snapshot_id})
+    if current.state == NormativeSnapshotState.FROZEN:
+        _error({"code": "INVALID_STATE", "message": "FROZEN snapshot is immutable"}, current.project_id)
+    item = NormativeSnapshot(current.snapshot_id, current.project_id, current.cut_date, current.jurisdiction, current.regulations_included, current.interpretations_included, NormativeSnapshotState.FROZEN, request.reviewer, current.created_at, current.version + 1)
+    cli = CLI(repo, actor=request.reviewer)
+    repo.insert_snapshot_and_event(item, cli._event(current.project_id, "NORMATIVE_SNAPSHOT_FROZEN", snapshot_to_dict(item)))
+    return _ok({"snapshot": snapshot_to_dict(item)}, current.project_id, repo.get_project(current.project_id).version)
 
 
 @router.post("/projects/{project_id}/planning/instruments", dependencies=[Depends(_auth)])

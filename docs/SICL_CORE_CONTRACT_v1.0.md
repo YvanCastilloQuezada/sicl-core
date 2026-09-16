@@ -59,6 +59,9 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | DesignPrinciple | `principle_id`, `name`, `category`, `description`, `applicable_scopes`, `source` |
 | MultiobjectiveResult | `multiobjective_id`, `project_id`, `method`, `method_version`, `objectives`, `alternatives`, `pareto_front`, `dominated`, `incomplete`, `tradeoffs`, `state`, `inputs_hash`, `created_at`, `version` |
 | PlanningInstrument | `instrument_id`, `project_id?`, `instrument_type`, `name`, `jurisdiction`, `authority?`, `approval_date?`, `validity_period?`, `scope_applicable`, `status`, `objectives`, `url?`, `summary?`, `source`, `version` |
+| Regulation | `regulation_id`, `jurisdiction`, `authority`, `code`, `title`, `version`, `publication_date?`, `effective_date?`, `status`, `source_url?`, `source_type`, `evidence_hash?`, `scope_applicable`, `parent_regulation_id?`, `summary?`, `version_field` |
+| NormativeInterpretation | `interpretation_id`, `regulation_id`, `article_reference`, `interpretation_text`, `applied_to_project_id?`, `interpreted_by`, `interpretation_date`, `confidence`, `state`, `disclaimer`, `version` |
+| NormativeSnapshot | `snapshot_id`, `project_id`, `cut_date`, `jurisdiction`, `regulations_included`, `interpretations_included`, `state`, `reviewer?`, `created_at`, `version` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
 
 ### Multiscale Model
@@ -103,6 +106,16 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 /PLANNING LIST
 /PLANNING SHOW <instrument_id>
 /PLANNING TYPES
+/REGULATION ADD <regulation_id> <code> <title> [jurisdiction] [source_url]
+/REGULATION LIST
+/REGULATION SHOW <regulation_id>
+/REGULATION STATUS <regulation_id> <status>
+/INTERPRET ADD <interpretation_id> <regulation_id> <article_reference> <interpretation_text>
+/INTERPRET LIST [regulation_id]
+/INTERPRET REVIEW <interpretation_id> <actor> <authority>
+/SNAPSHOT CREATE <snapshot_id> <project_id> <cut_date>
+/SNAPSHOT LIST <project_id>
+/SNAPSHOT FREEZE <snapshot_id> <reviewer>
 /DECISION RECORD <statement> <actor> <authority>
 /STATUS
 /HISTORY
@@ -142,6 +155,12 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 28. Un `PlanningInstrument` no crea automáticamente Constraint, Recommendation, Preference ni Decision.
 29. El vínculo a un Project es explícito, admite 0..N instrumentos y registra `PLANNING_INSTRUMENT_LINKED` con actor y timestamp.
 30. Planning Instruments y sus vínculos son append-only; una modificación requiere una nueva versión.
+31. `Regulation` no es `PlanningInstrument`, `DesignPrinciple`, `Reference` ni `Preference`.
+32. Sin fuente oficial o sin vigencia verificada, una Regulation no se presenta como vigente y su estado inicial es `NO_VERIFICADA`.
+33. `NormativeInterpretation` siempre contiene el disclaimer: `No constituye certificación legal ni reemplaza revisión profesional.`
+34. Una Interpretation requiere revisión humana con actor y authority para estar en estado `REVIEWED`; no crea Constraint automáticamente.
+35. Un `NormativeSnapshot` en estado `FROZEN` es inmutable; los cambios normativos requieren un snapshot nuevo.
+36. Regulatory Intelligence no decide, recomienda ni certifica cumplimiento.
 
 ## 6. Persistencia
 
@@ -162,6 +181,10 @@ La superficie canónica expone `POST /v1/projects/{project_id}/multiobjective/pa
 ### HTTP v1 — Planning Instruments
 
 La superficie canónica expone `GET /v1/planning/instruments`, `GET /v1/planning/instruments/{instrument_id}`, `GET /v1/planning/types`, `POST /v1/projects/{project_id}/planning/instruments` y `GET /v1/projects/{project_id}/planning/instruments`. La carga de instrumentos reales no pertenece a esta fase.
+
+### HTTP v1 — Regulatory Corpus
+
+La superficie canónica expone los diez endpoints de RFC-003 para Regulations, NormativeInterpretations y NormativeSnapshots. El corpus real, la interpretación jurídica y la certificación de vigencia están fuera de esta fase.
 
 ## 7. Respuestas y errores
 
