@@ -203,6 +203,34 @@ class DesignKnowledgeQueryRequest(BaseModel):
     preferences: list[str] = Field(default_factory=list)
 
 
+class BIMElementRequest(BaseModel):
+    global_id: str = Field(min_length=1)
+    entity: str = Field(min_length=1)
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    provenance: dict[str, Any] = Field(default_factory=dict)
+
+
+class BIMSnapshotCreateRequest(BaseModel):
+    exchange_id: str = Field(min_length=1)
+    format: str = Field(min_length=1)
+    source_application: str = Field(min_length=1)
+    source_version: str = Field(min_length=1)
+    spatial_scope: str = Field(min_length=1)
+    coordinate_reference_system: str = Field(min_length=1)
+    units: str = Field(min_length=1)
+    model_hash: str = Field(min_length=1)
+    elements: list[BIMElementRequest] = Field(default_factory=list)
+    review_state: str = "HUMAN_REVIEW_REQUIRED"
+
+
+class BIMChangeSetCreateRequest(BaseModel):
+    change_set_id: str = Field(min_length=1)
+    snapshot_id: str = Field(min_length=1)
+    changes: list[dict[str, Any]] = Field(default_factory=list)
+    requested_by: str = Field(min_length=1)
+    mode: str = "PREVIEW"
+
+
 class MemoryExtractRequest(BaseModel):
     project_id: str = Field(min_length=1)
     actor: str = Field(min_length=1)

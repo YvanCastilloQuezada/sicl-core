@@ -12,6 +12,7 @@ from .domain import Actor, ActorPosition, ActorRole, ActorState, Assumption, Aut
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 from .simulation import Simulation, SimulationState, SimulationType
+from .bim import BIMChangeSet, BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelSnapshot, BIMReviewState
 
 
 class SQLiteRepository:
@@ -308,6 +309,36 @@ class SQLiteRepository:
         CREATE TRIGGER IF NOT EXISTS evidence_no_delete
         BEFORE DELETE ON evidence
         BEGIN SELECT RAISE(ABORT, 'evidence is append-only'); END;
+        CREATE TABLE IF NOT EXISTS bim_model_snapshots (
+          exchange_id TEXT NOT NULL, version INTEGER NOT NULL,
+          project_id TEXT NOT NULL REFERENCES projects(project_id),
+          format TEXT NOT NULL, source_application TEXT NOT NULL,
+          source_version TEXT NOT NULL, spatial_scope TEXT NOT NULL,
+          coordinate_reference_system TEXT NOT NULL, units TEXT NOT NULL,
+          model_hash TEXT NOT NULL, elements_json TEXT NOT NULL,
+          review_state TEXT NOT NULL, created_at TEXT NOT NULL,
+          PRIMARY KEY(exchange_id, version)
+        );
+        CREATE TABLE IF NOT EXISTS bim_change_sets (
+          change_set_id TEXT NOT NULL, version INTEGER NOT NULL,
+          project_id TEXT NOT NULL REFERENCES projects(project_id),
+          snapshot_id TEXT NOT NULL, changes_json TEXT NOT NULL,
+          requested_by TEXT NOT NULL, mode TEXT NOT NULL,
+          review_state TEXT NOT NULL, created_at TEXT NOT NULL,
+          PRIMARY KEY(change_set_id, version)
+        );
+        CREATE TRIGGER IF NOT EXISTS bim_snapshots_no_update
+        BEFORE UPDATE ON bim_model_snapshots
+        BEGIN SELECT RAISE(ABORT, 'BIM snapshots are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS bim_snapshots_no_delete
+        BEFORE DELETE ON bim_model_snapshots
+        BEGIN SELECT RAISE(ABORT, 'BIM snapshots are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS bim_change_sets_no_update
+        BEFORE UPDATE ON bim_change_sets
+        BEGIN SELECT RAISE(ABORT, 'BIM change sets are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS bim_change_sets_no_delete
+        BEFORE DELETE ON bim_change_sets
+        BEGIN SELECT RAISE(ABORT, 'BIM change sets are append-only'); END;
         CREATE TABLE IF NOT EXISTS events (
           id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL,
           project_id TEXT NOT NULL, type TEXT NOT NULL, payload TEXT NOT NULL,
@@ -345,6 +376,65 @@ class SQLiteRepository:
         except Exception:
             self.conn.rollback()
             raise
+
+    def insert_bim_snapshot(self, snapshot: BIMModelSnapshot, created_at: str) -> BIMModelSnapshot:
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO bim_model_snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (snapshot.exchange_id, snapshot.version, snapshot.project_id, snapshot.format.value,
+                 snapshot.source_application, snapshot.source_version, snapshot.spatial_scope.value,
+                 snapshot.coordinate_reference_system, snapshot.units, snapshot.model_hash,
+                 json.dumps([asdict(item) for item in snapshot.elements], sort_keys=True),
+                 snapshot.review_state.value, created_at),
+            )
+        return snapshot
+
+    @staticmethod
+    def _bim_snapshot_from_row(row: sqlite3.Row) -> BIMModelSnapshot:
+        return BIMModelSnapshot(
+            row["exchange_id"], BIMFormat(row["format"]), row["source_application"], row["source_version"],
+            row["project_id"], SpatialScope(row["spatial_scope"]), row["coordinate_reference_system"],
+            row["units"], row["model_hash"],
+            [BIMElementReference(item["global_id"], item["entity"], item.get("parameters", {}), item.get("provenance", {})) for item in json.loads(row["elements_json"])],
+            BIMReviewState(row["review_state"]), row["version"],
+        )
+
+    def get_bim_snapshot(self, project_id: str, exchange_id: str) -> BIMModelSnapshot | None:
+        row = self.conn.execute(
+            "SELECT s.* FROM bim_model_snapshots s WHERE s.project_id=? AND s.exchange_id=? AND NOT EXISTS (SELECT 1 FROM bim_model_snapshots newer WHERE newer.exchange_id=s.exchange_id AND newer.version>s.version)",
+            (project_id, exchange_id),
+        ).fetchone()
+        return self._bim_snapshot_from_row(row) if row else None
+
+    def list_bim_snapshots(self, project_id: str) -> list[BIMModelSnapshot]:
+        rows = self.conn.execute(
+            "SELECT s.* FROM bim_model_snapshots s JOIN (SELECT exchange_id, MAX(version) AS version FROM bim_model_snapshots WHERE project_id=? GROUP BY exchange_id) latest ON latest.exchange_id=s.exchange_id AND latest.version=s.version WHERE s.project_id=? ORDER BY s.exchange_id",
+            (project_id, project_id),
+        ).fetchall()
+        return [self._bim_snapshot_from_row(row) for row in rows]
+
+    def insert_bim_change_set(self, item: BIMChangeSet, created_at: str) -> BIMChangeSet:
+        with self.transaction():
+            if self.get_bim_snapshot(item.project_id, item.snapshot_id) is None:
+                raise ValueError("BIM snapshot not found")
+            self.conn.execute(
+                "INSERT INTO bim_change_sets VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (item.change_set_id, item.version, item.project_id, item.snapshot_id,
+                 json.dumps(item.changes, sort_keys=True), item.requested_by,
+                 item.mode.value, item.review_state.value, created_at),
+            )
+        return item
+
+    @staticmethod
+    def _bim_change_set_from_row(row: sqlite3.Row) -> BIMChangeSet:
+        return BIMChangeSet(row["change_set_id"], row["project_id"], row["snapshot_id"], json.loads(row["changes_json"]), row["requested_by"], BIMChangeSetMode(row["mode"]), BIMReviewState(row["review_state"]), row["version"])
+
+    def list_bim_change_sets(self, project_id: str) -> list[BIMChangeSet]:
+        rows = self.conn.execute(
+            "SELECT c.* FROM bim_change_sets c JOIN (SELECT change_set_id, MAX(version) AS version FROM bim_change_sets WHERE project_id=? GROUP BY change_set_id) latest ON latest.change_set_id=c.change_set_id AND latest.version=c.version WHERE c.project_id=? ORDER BY c.change_set_id",
+            (project_id, project_id),
+        ).fetchall()
+        return [self._bim_change_set_from_row(row) for row in rows]
 
     def add_event(self, event: Event) -> Event:
         cur = self.conn.execute(
