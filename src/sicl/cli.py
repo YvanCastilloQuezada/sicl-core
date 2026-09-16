@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from dataclasses import asdict
 from typing import Any
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, HumanReview, Fact, Objective, Project, Role, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, HumanReview, Fact, MultiobjectiveResult, MultiobjectiveState, Objective, Project, Role, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
@@ -104,6 +104,14 @@ class CLI:
                 return self.generate(parts[1:])
             if parts[0].upper() == "/TRADEOFF_MATRIX":
                 return self.tradeoff_matrix_command(parts[1:])
+            if head == ("/MULTIOBJECTIVE", "PARETO"):
+                return self.multiobjective_pareto(parts[2:])
+            if head == ("/MULTIOBJECTIVE", "TRADEOFFS"):
+                return self.multiobjective_tradeoffs(parts[2:])
+            if head == ("/MULTIOBJECTIVE", "LIST"):
+                return self.multiobjective_list()
+            if head == ("/MULTIOBJECTIVE", "SHOW"):
+                return self.multiobjective_show(parts[2:])
             if head == ("/SIMULATE", "RUN"):
                 return self.simulate_run(parts[2:])
             if head == ("/SIMULATE", "LIST"):
@@ -408,6 +416,87 @@ class CLI:
             raise SICLError("INVALID_STATE", "both objectives with evaluations are required")
         result = pareto_front(p.alternatives.values(), p.evaluations.values(), objectives)
         return self._ok({"non_dominated": result.non_dominated, "dominated": result.dominated, "incomplete": result.incomplete, "decision_created": False})
+
+    def _multiobjective_result(self, method: str, objective_keys: list[str]) -> dict:
+        if len(objective_keys) < 2:
+            raise SICLError("INVALID_ARGUMENT", "at least two objective keys required")
+        p = self._project()
+        objectives = []
+        for key in objective_keys:
+            objective = next((item for item in p.objectives.values() if item.key == key), None)
+            if objective is None:
+                raise SICLError("OBJECTIVE_NOT_FOUND", key)
+            if objective.direction not in DIRECTIONS:
+                raise SICLError("OBJECTIVE_DIRECTION_REQUIRED", key)
+            objectives.append(objective)
+        alternatives = list(p.alternatives.values())
+        evaluations = list(p.evaluations.values())
+        result = pareto_front(alternatives, evaluations, objectives)
+        values = {(item.alternative_id, item.objective_id): item.value for item in evaluations}
+        matrix = {
+            alternative.alternative_id: {
+                objective.key: values.get((alternative.alternative_id, objective.objective_id))
+                for objective in objectives
+            }
+            for alternative in alternatives
+        }
+        inputs = {
+            "method": method,
+            "objectives": objective_keys,
+            "alternatives": [item.alternative_id for item in alternatives],
+            "evaluations": [asdict(item) for item in evaluations],
+        }
+        inputs_hash = hashlib.sha256(json.dumps(inputs, sort_keys=True, separators=(",", ":"), default=str).encode()).hexdigest()
+        result_id = f"MOBJ-{uuid.uuid4().hex[:10]}"
+        record = MultiobjectiveResult(
+            result_id,
+            p.project_id,
+            method,
+            "1.0",
+            objective_keys,
+            [item.alternative_id for item in alternatives],
+            result.non_dominated if method == "pareto_front_v1" else [],
+            list(result.dominated),
+            result.incomplete,
+            {"matrix": matrix},
+            MultiobjectiveState.EXECUTED if not result.incomplete else MultiobjectiveState.INSUFFICIENT,
+            inputs_hash,
+            datetime.now(timezone.utc),
+            1,
+        )
+        p.multiobjective_results[record.multiobjective_id] = record
+        p.version += 1
+        data = asdict(record)
+        data["state"] = record.state.value
+        data["created_at"] = record.created_at.isoformat()
+        self.repo.insert_multiobjective_and_event(record, p, self._event(p.project_id, "MULTIOBJECTIVE_RESULT_RECORDED", data, "SYSTEM_CALCULATION"))
+        return self._ok({"multiobjective": data, "decision_created": False, "recommendation_created": False})
+
+    def multiobjective_pareto(self, args: list[str]) -> dict:
+        return self._multiobjective_result("pareto_front_v1", args)
+
+    def multiobjective_tradeoffs(self, args: list[str]) -> dict:
+        if len(args) != 2:
+            raise SICLError("INVALID_ARGUMENT", "exactly two objective keys required")
+        return self._multiobjective_result("tradeoff_matrix_v1", args)
+
+    def multiobjective_list(self) -> dict:
+        values = []
+        for item in self._project().multiobjective_results.values():
+            value = asdict(item)
+            value["state"] = item.state.value
+            values.append(value)
+        return self._ok({"multiobjectives": values})
+
+    def multiobjective_show(self, args: list[str]) -> dict:
+        if len(args) != 1:
+            raise SICLError("INVALID_ARGUMENT", "multiobjective_id required")
+        item = self._project().multiobjective_results.get(args[0])
+        if item is None:
+            raise SICLError("MULTIOBJECTIVE_NOT_FOUND", args[0])
+        value = asdict(item)
+        value["state"] = item.state.value
+        return self._ok({"multiobjective": value})
 
     def generate(self, args: list[str]) -> dict:
         if len(args) != 2:

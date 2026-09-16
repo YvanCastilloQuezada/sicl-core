@@ -94,6 +94,10 @@ class SimulationCreateRequest(BaseModel):
     method_version: str = "1.0"
 
 
+class MultiobjectiveRequest(BaseModel):
+    objectives: list[str] = Field(min_length=2)
+
+
 class ProjectResponse(BaseModel):
     project_id: str
     name: str

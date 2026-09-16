@@ -57,6 +57,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | Comparison | `comparison_id`, `project_id`, `alternative_ids`, `evaluations`, `tradeoffs`, `version` |
 | Simulation | `simulation_id`, `project_id`, `simulation_type`, `method`, `method_version`, `inputs`, `outputs`, `state`, `started_at`, `finished_at?`, `evidence_hash`, `version` |
 | DesignPrinciple | `principle_id`, `name`, `category`, `description`, `applicable_scopes`, `source` |
+| MultiobjectiveResult | `multiobjective_id`, `project_id`, `method`, `method_version`, `objectives`, `alternatives`, `pareto_front`, `dominated`, `incomplete`, `tradeoffs`, `state`, `inputs_hash`, `created_at`, `version` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
 
 ### Multiscale Model
@@ -93,6 +94,10 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 /SIMULATE METHODS
 /DESIGN PRINCIPLES
 /DESIGN PRINCIPLE <principle_id>
+/MULTIOBJECTIVE PARETO <obj_1> <obj_2> [...]
+/MULTIOBJECTIVE TRADEOFFS <obj_1> <obj_2>
+/MULTIOBJECTIVE LIST
+/MULTIOBJECTIVE SHOW <multiobjective_id>
 /DECISION RECORD <statement> <actor> <authority>
 /STATUS
 /HISTORY
@@ -123,6 +128,10 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 19. `Simulation` es append-only, no crea Recommendation ni Decision y no convierte Assumption en Fact.
 20. Los tipos admitidos son `DETERMINISTIC`, `MONTE_CARLO`, `SCENARIO` y `SENSITIVITY`; esta fase ejecuta únicamente métodos deterministas y de sensibilidad.
 21. `DesignPrinciple` es un catálogo read-only con fuente declarada; no crea Decision, Recommendation ni Evaluation automática.
+22. `MultiobjectiveResult` es descriptivo: no crea Recommendation, Decision, Alternative ni Evaluation.
+23. Cada objetivo multiobjetivo requiere dirección explícita `MAXIMIZE` o `MINIMIZE`; la ausencia produce `OBJECTIVE_DIRECTION_REQUIRED`.
+24. Si falta una evaluación requerida, la alternativa aparece en `incomplete` y el estado del resultado es `INSUFFICIENT`.
+25. `MultiobjectiveResult` es append-only y conserva el hash SHA-256 de sus entradas.
 
 ## 6. Persistencia
 
@@ -135,6 +144,10 @@ La superficie canónica expone `POST` y `GET` para `/v1/projects/{project_id}/ev
 ### HTTP v1 — Design Intelligence
 
 La superficie read-only expone `GET /v1/design/principles`, `GET /v1/design/principles?category=<CATEGORY>` y `GET /v1/design/principles/{principle_id}`. Solo se exponen principios con `source` declarada; no se cargan referentes reales en esta fase.
+
+### HTTP v1 — Multiobjective
+
+La superficie canónica expone `POST /v1/projects/{project_id}/multiobjective/pareto`, `POST /v1/projects/{project_id}/multiobjective/tradeoffs`, `GET /v1/projects/{project_id}/multiobjective` y `GET /v1/projects/{project_id}/multiobjective/{multiobjective_id}`. Todas las respuestas usan el envelope v1 y conservan `contract_version`, `project_id` y `observed_version`.
 
 ## 7. Respuestas y errores
 
