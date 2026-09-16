@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 from dataclasses import asdict
 from typing import Any
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, GeneratedAlternative, GenerationMethod, GenerationState, HumanReview, Fact, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, GeneratedAlternative, GenerationMethod, GenerationState, HumanReview, Fact, InterpretationConfidence, InterpretationState, MemoryState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
@@ -21,6 +21,7 @@ from .design_principles import get_principle, list_principles
 from .regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_dict, snapshot_to_dict
 from .multiscale import SCALE_ORDER, children_scopes, is_ancestor, parent_scope
 from .generation import generate_candidates, generation_to_dict, list_generation_methods
+from .memory import extract_memory, memory_to_dict, memory_types
 
 
 class CLI:
@@ -46,7 +47,7 @@ class CLI:
         try:
             parts = shlex.split(command)
             if not parts or parts[0] == "/HELP":
-                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT IMPORT OBJECTIVE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE DESIGN", "/GENERATE LIST", "/GENERATE SHOW", "/GENERATE METHODS", "/ALTERNATIVE PROMOTE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/SCALE PARENT", "/SCALE CHILDREN", "/SCALE RELATE", "/SCALE RELATIONS", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/REGULATION ADD", "/REGULATION LIST", "/REGULATION SHOW", "/REGULATION STATUS", "/INTERPRET ADD", "/INTERPRET LIST", "/INTERPRET REVIEW", "/SNAPSHOT CREATE", "/SNAPSHOT LIST", "/SNAPSHOT FREEZE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
+                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT IMPORT OBJECTIVE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE DESIGN", "/GENERATE LIST", "/GENERATE SHOW", "/GENERATE METHODS", "/ALTERNATIVE PROMOTE", "/MEMORY LIST", "/MEMORY SHOW", "/MEMORY EXTRACT", "/MEMORY REVOKE", "/MEMORY APPLY", "/MEMORY TYPES", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/SCALE PARENT", "/SCALE CHILDREN", "/SCALE RELATE", "/SCALE RELATIONS", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/REGULATION ADD", "/REGULATION LIST", "/REGULATION SHOW", "/REGULATION STATUS", "/INTERPRET ADD", "/INTERPRET LIST", "/INTERPRET REVIEW", "/SNAPSHOT CREATE", "/SNAPSHOT LIST", "/SNAPSHOT FREEZE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
             head = tuple(p.upper() for p in parts[:2])
             if head == ("/EXIT",):
                 self.closed = True
@@ -115,6 +116,18 @@ class CLI:
                 return self.alternative_list()
             if head == ("/ALTERNATIVE", "PROMOTE"):
                 return self.alternative_promote(parts[2:])
+            if head == ("/MEMORY", "LIST"):
+                return self.memory_list()
+            if head == ("/MEMORY", "SHOW"):
+                return self.memory_show(parts[2:])
+            if head == ("/MEMORY", "EXTRACT"):
+                return self.memory_extract(parts[2:])
+            if head == ("/MEMORY", "REVOKE"):
+                return self.memory_revoke(parts[2:])
+            if head == ("/MEMORY", "APPLY"):
+                return self.memory_apply(parts[2:])
+            if head == ("/MEMORY", "TYPES"):
+                return self._ok({"types": memory_types()})
             if parts[0].upper() == "/EVALUATE":
                 return self.evaluate(parts[1:])
             if parts[0].upper() == "/COMPARE":
@@ -699,6 +712,63 @@ class CLI:
         p.version += 1
         self.repo.insert_entity_and_event("INSERT INTO alternatives VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (alternative_id, p.project_id, alternative.name, alternative.description, json.dumps(alternative.parameters, sort_keys=True), alternative.status, alternative.version, alternative.source), p, self._event(p.project_id, "GENERATED_ALTERNATIVE_PROMOTED", {"generation_id": generation.generation_id, "candidate_index": index, "alternative": asdict(alternative), "actor": actor, "authority": authority}))
         return self._ok({"alternative": asdict(alternative), "generation_id": generation.generation_id, "candidate_index": index, "decision_created": False, "recommendation_created": False})
+
+    def memory_list(self) -> dict:
+        return self._ok({"memories": [memory_to_dict(item) for item in self.repo.list_memory()]})
+
+    def memory_show(self, args: list[str]) -> dict:
+        if len(args) != 1:
+            raise SICLError("INVALID_ARGUMENT", "memory_id required")
+        memory = self.repo.get_memory(args[0])
+        if memory is None:
+            raise SICLError("MEMORY_NOT_FOUND", args[0])
+        return self._ok({"memory": memory_to_dict(memory)})
+
+    def memory_extract(self, args: list[str]) -> dict:
+        if len(args) < 3:
+            raise SICLError("HUMAN_AUTHORITY_REQUIRED", "project_id actor authority required")
+        project_id, actor, authority = args[0], args[1], " ".join(args[2:])
+        if not actor.strip() or not authority.strip():
+            raise SICLError("HUMAN_AUTHORITY_REQUIRED", "actor and authority are required")
+        project = self.repo.get_project(project_id)
+        if project is None:
+            raise SICLError("PROJECT_NOT_FOUND", project_id)
+        memory = extract_memory(project)
+        self.repo.insert_memory_and_event(memory, self._event(project_id, "INSTITUTIONAL_MEMORY_EXTRACTED", {"memory_id": memory.memory_id, "actor": actor, "authority": authority}))
+        return self._ok({"memory": memory_to_dict(memory), "decision_created": False})
+
+    def memory_revoke(self, args: list[str]) -> dict:
+        if len(args) < 3:
+            raise SICLError("HUMAN_AUTHORITY_REQUIRED", "memory_id actor authority required")
+        memory_id, actor, authority = args[0], args[1], " ".join(args[2:])
+        if not actor.strip() or not authority.strip():
+            raise SICLError("HUMAN_AUTHORITY_REQUIRED", "actor and authority are required")
+        memory = self.repo.get_memory(memory_id)
+        if memory is None:
+            raise SICLError("MEMORY_NOT_FOUND", memory_id)
+        if memory.state is MemoryState.REVOKED:
+            return self._ok({"memory": memory_to_dict(memory), "already_revoked": True})
+        event_project = memory.project_id_source or "INSTITUTIONAL_MEMORY"
+        revoked = self.repo.revoke_memory_and_event(memory, self._event(event_project, "INSTITUTIONAL_MEMORY_REVOKED", {"memory_id": memory_id, "actor": actor, "authority": authority}))
+        return self._ok({"memory": memory_to_dict(revoked)})
+
+    def memory_apply(self, args: list[str]) -> dict:
+        if len(args) != 2:
+            raise SICLError("INVALID_ARGUMENT", "memory_id and project_id required")
+        memory_id, project_id = args
+        memory = self.repo.get_memory(memory_id)
+        if memory is None:
+            raise SICLError("MEMORY_NOT_FOUND", memory_id)
+        if memory.state is MemoryState.REVOKED:
+            raise SICLError("MEMORY_REVOKED", memory_id)
+        project = self.repo.get_project(project_id)
+        if project is None:
+            raise SICLError("PROJECT_NOT_FOUND", project_id)
+        if project.stage == "CLOSED":
+            raise SICLError("INVALID_STATE", "closed project cannot apply memory")
+        project.version += 1
+        self.repo.update_project_and_event(project, self._event(project_id, "INSTITUTIONAL_MEMORY_APPLIED", {"memory_id": memory_id, "actor": self.actor}), "UPDATE projects SET version=? WHERE project_id=?", (project.version, project_id))
+        return self._ok({"memory_id": memory_id, "project_id": project_id, "applied": True, "canonical_state_changed": False})
 
     def agent_run(self, args: list[str]) -> dict:
         if len(args) != 2 or args[0].upper() not in {"BIOCLIMATIC", "STRUCTURAL", "ECONOMIC"}:

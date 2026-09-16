@@ -216,6 +216,14 @@ La superficie canónica expone `GET /v1/scales`, `GET /v1/scales/{scope}/parent`
 
 La superficie canónica expone `POST /v1/projects/{project_id}/generations`, `GET /v1/projects/{project_id}/generations`, `GET /v1/projects/{project_id}/generations/{generation_id}`, `POST /v1/projects/{project_id}/generations/{generation_id}/promote` y `GET /v1/generations/methods`. La generación no decide ni recomienda; la promoción exige actor y authority y crea únicamente una Alternative formal.
 
+### Institutional Memory — RFC-011
+
+`InstitutionalMemory` es una proyección global derivada de proyectos cerrados; no pertenece al estado canónico de `Project` y no reescribe hechos, decisiones ni eventos previos. Sus registros son versionados y append-only, con tipos `DECISION_PATTERN`, `PREFERENCE_PATTERN`, `EVALUATION_PATTERN`, `GENERATION_PATTERN` y `LESSON_LEARNED`, estados `ACTIVE`, `SUPERSEDED` y `REVOKED`, y confianza `HIGH`, `MEDIUM`, `LOW` o `UNKNOWN`.
+
+La extracción requiere `actor` y `authority` humanos y aplica anonimización por defecto. La memoria no decide, no recomienda y no se auto-aplica. Aplicarla requiere acción humana explícita; únicamente registra un evento de aplicación y no modifica hechos, preferencias, alternativas, evaluaciones, recomendaciones ni decisiones del proyecto destino. Una memoria revocada no puede aplicarse.
+
+La superficie HTTP canónica expone `GET /v1/memory`, `GET /v1/memory/{memory_id}`, `GET /v1/memory/types`, `POST /v1/memory/extract`, `POST /v1/memory/{memory_id}/revoke` y `POST /v1/projects/{project_id}/memory/apply`.
+
 ## 7. Respuestas y errores
 
 La CLI devuelve objetos `Response` con `status`, `code`, `message` y `data`. Códigos mínimos: `OK`, `INVALID_COMMAND`, `INVALID_ARGUMENT`, `PROJECT_NOT_FOUND`, `PROJECT_ALREADY_EXISTS`, `INVALID_STATE`, `PERSISTENCE_ERROR`, `UNKNOWN_COMMAND`.
