@@ -39,7 +39,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 
 | Entidad | Atributos mínimos |
 |---|---|
-| Project | `project_id`, `name`, `stage`, `version` |
+| Project | `project_id`, `name`, `stage`, `version`, `spatial_scope?`, `temporal_scope` |
 | Stage | valor controlado: `DRAFT`, `ACTIVE`, `CLOSED` |
 | Objective | `objective_id`, `project_id`, `key`, `direction`, `value`, `version` |
 | Constraint | `constraint_id`, `project_id`, `key`, `operator`, `value`, `unit`, `hard=true`, `version` |
@@ -51,11 +51,21 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | SiteObservation | `location`, valores con unidad, `source`, `state`, `captured_at`, `method`, `evidence` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
 
+### Multiscale Model
+
+`SpatialScope` admite exactamente nueve valores: `pais`, `region`, `provincia_metropoli`, `ciudad_distrito`, `barrio_sector`, `parcela_sitio`, `edificio`, `espacio` y `objeto`. Sus etiquetas de presentación son, respectivamente, País, Región, Provincia / Metrópoli, Ciudad / Distrito, Barrio / Sector, Parcela / Sitio, Edificio, Espacio y Objeto.
+
+`TemporalScope` admite `proyecto`, `corto_plazo`, `mediano_plazo`, `largo_plazo`, `escenario_2030`, `escenario_2040` y `escenario_2050`. El valor por defecto es `proyecto`.
+
+`Project.spatial_scope` es opcional y por defecto es `null`. `null` significa que no se ha declarado una escala; no se infiere escala desde ningún dato del proyecto. `Project.temporal_scope` siempre contiene un valor válido. Los comandos `/PROJECT CREATE <id> <name> [spatial_scope] [temporal_scope]` y `/PROJECT SET SCOPE <spatial_scope> [temporal_scope]` validan estos valores; el segundo registra `SCOPE_CHANGED` como evento append-only.
+
 ## 4. Comandos aprobados
 
 ```text
 /PROJECT CREATE <project_id> <name>
+/PROJECT CREATE <project_id> <name> [spatial_scope] [temporal_scope]
 /PROJECT OPEN <project_id>
+/PROJECT SET SCOPE <spatial_scope> [temporal_scope]
 /PROJECT SHOW
 /PROJECT LIST
 /STAGE SET <stage>

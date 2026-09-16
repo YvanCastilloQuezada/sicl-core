@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Any
 
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
@@ -9,6 +10,54 @@ from .v11 import Alternative, Comparison, Evaluation, Recommendation
 STAGES = {"DRAFT", "ACTIVE", "PRELIMINARY_DESIGN", "CLOSED"}
 DIRECTIONS = {"MAXIMIZE", "MINIMIZE"}
 KNOWLEDGE_STATES = {"UNKNOWN", "CONFLICTING", "INSUFFICIENT", "OBSERVED"}
+
+
+class SpatialScope(str, Enum):
+    PAIS = "pais"
+    REGION = "region"
+    PROVINCIA_METROPOLI = "provincia_metropoli"
+    CIUDAD_DISTRITO = "ciudad_distrito"
+    BARRIO_SECTOR = "barrio_sector"
+    PARCELA_SITIO = "parcela_sitio"
+    EDIFICIO = "edificio"
+    ESPACIO = "espacio"
+    OBJETO = "objeto"
+
+    @property
+    def label(self) -> str:
+        return {
+            SpatialScope.PAIS: "País",
+            SpatialScope.REGION: "Región",
+            SpatialScope.PROVINCIA_METROPOLI: "Provincia / Metrópoli",
+            SpatialScope.CIUDAD_DISTRITO: "Ciudad / Distrito",
+            SpatialScope.BARRIO_SECTOR: "Barrio / Sector",
+            SpatialScope.PARCELA_SITIO: "Parcela / Sitio",
+            SpatialScope.EDIFICIO: "Edificio",
+            SpatialScope.ESPACIO: "Espacio",
+            SpatialScope.OBJETO: "Objeto",
+        }[self]
+
+
+class TemporalScope(str, Enum):
+    PROYECTO = "proyecto"
+    CORTO_PLAZO = "corto_plazo"
+    MEDIANO_PLAZO = "mediano_plazo"
+    LARGO_PLAZO = "largo_plazo"
+    ESCENARIO_2030 = "escenario_2030"
+    ESCENARIO_2040 = "escenario_2040"
+    ESCENARIO_2050 = "escenario_2050"
+
+    @property
+    def label(self) -> str:
+        return {
+            TemporalScope.PROYECTO: "Proyecto",
+            TemporalScope.CORTO_PLAZO: "Corto plazo",
+            TemporalScope.MEDIANO_PLAZO: "Mediano plazo",
+            TemporalScope.LARGO_PLAZO: "Largo plazo",
+            TemporalScope.ESCENARIO_2030: "Escenario 2030",
+            TemporalScope.ESCENARIO_2040: "Escenario 2040",
+            TemporalScope.ESCENARIO_2050: "Escenario 2050",
+        }[self]
 
 
 def now_iso() -> str:
@@ -32,6 +81,9 @@ class Project:
     evaluations: dict[str, Evaluation] = field(default_factory=dict)
     comparisons: dict[str, Comparison] = field(default_factory=dict)
     recommendations: dict[str, Recommendation] = field(default_factory=dict)
+    # spatial_scope remains optional: null means that no spatial scale is declared.
+    spatial_scope: SpatialScope | None = None
+    temporal_scope: TemporalScope = TemporalScope.PROYECTO
 
 
 @dataclass(frozen=True)

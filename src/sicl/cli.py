@@ -6,7 +6,7 @@ import json
 import csv
 from dataclasses import asdict
 
-from .domain import Assumption, Constraint, Decision, Event, Fact, HumanReview, Objective, Project, Role, DIRECTIONS, STAGES, now_iso
+from .domain import Assumption, Constraint, Decision, Event, HumanReview, Fact, Objective, Project, Role, SpatialScope, TemporalScope, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
@@ -38,13 +38,15 @@ class CLI:
         try:
             parts = shlex.split(command)
             if not parts or parts[0] == "/HELP":
-                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
+                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
             head = tuple(p.upper() for p in parts[:2])
             if head == ("/EXIT",):
                 self.closed = True
                 return self._ok({"closed": True})
             if head == ("/PROJECT", "CREATE"):
                 return self.project_create(parts[2:])
+            if head == ("/PROJECT", "SET") and len(parts) > 2 and parts[2].upper() == "SCOPE":
+                return self.project_set_scope(parts[3:])
             if head == ("/PROJECT", "OPEN"):
                 return self.project_open(parts[2:])
             if head == ("/PROJECT", "SHOW"):
@@ -127,11 +129,46 @@ class CLI:
 
     def project_create(self, args: list[str]) -> dict:
         if len(args) < 2: raise SICLError("INVALID_ARGUMENT", "project_id and name required")
-        project_id, name = args[0], " ".join(args[1:])
+        if len(args) > 4: raise SICLError("INVALID_ARGUMENT", "project_id name [spatial_scope] [temporal_scope]")
+        project_id, name = args[0], " ".join(args[1:2])
+        spatial_scope = self._parse_spatial(args[2]) if len(args) >= 3 else None
+        temporal_scope = self._parse_temporal(args[3]) if len(args) == 4 else TemporalScope.PROYECTO
         if self.repo.get_project(project_id): raise SICLError("PROJECT_ALREADY_EXISTS", project_id)
-        p = Project(project_id, name)
-        self.repo.insert_project(p, self._event(project_id, "PROJECT_CREATED", {"name": name}))
+        p = Project(project_id, name, spatial_scope=spatial_scope, temporal_scope=temporal_scope)
+        self.repo.insert_project(p, self._event(project_id, "PROJECT_CREATED", {"name": name, "spatial_scope": spatial_scope.value if spatial_scope else None, "temporal_scope": temporal_scope.value}))
         self.current_project = project_id
+        return self._ok(asdict(p))
+
+    @staticmethod
+    def _parse_spatial(value: str) -> SpatialScope:
+        try:
+            return SpatialScope(value.lower())
+        except ValueError as exc:
+            raise SICLError("INVALID_SCOPE", f"invalid spatial_scope: {value}") from exc
+
+    @staticmethod
+    def _parse_temporal(value: str) -> TemporalScope:
+        try:
+            return TemporalScope(value.lower())
+        except ValueError as exc:
+            raise SICLError("INVALID_SCOPE", f"invalid temporal_scope: {value}") from exc
+
+    def project_set_scope(self, args: list[str]) -> dict:
+        if len(args) not in (1, 2):
+            raise SICLError("INVALID_ARGUMENT", "spatial_scope [temporal_scope] required")
+        p = self._require_open()
+        spatial_scope = self._parse_spatial(args[0])
+        temporal_scope = self._parse_temporal(args[1]) if len(args) == 2 else p.temporal_scope
+        p.spatial_scope = spatial_scope
+        p.temporal_scope = temporal_scope
+        p.version += 1
+        event = self._event(p.project_id, "SCOPE_CHANGED", {"spatial_scope": spatial_scope.value, "temporal_scope": temporal_scope.value})
+        self.repo.update_project_and_event(
+            p,
+            event,
+            "UPDATE projects SET spatial_scope=?, temporal_scope=? WHERE project_id=?",
+            (spatial_scope.value, temporal_scope.value, p.project_id),
+        )
         return self._ok(asdict(p))
 
     def project_open(self, args: list[str]) -> dict:

@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 class ProjectCreateRequest(BaseModel):
     project_id: str = Field(min_length=1)
     name: str = Field(min_length=1)
+    spatial_scope: str | None = None
+    temporal_scope: str = "proyecto"
     actor: str = Field(default="api", min_length=1)
 
 
@@ -32,6 +34,8 @@ class ProjectResponse(BaseModel):
     name: str
     stage: str
     version: int
+    spatial_scope: str | None = None
+    temporal_scope: str = "proyecto"
     objectives: dict[str, Any] = Field(default_factory=dict)
     constraints: dict[str, Any] = Field(default_factory=dict)
     roles: dict[str, Any] = Field(default_factory=dict)

@@ -7,7 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Iterator
 
-from .domain import Assumption, Constraint, Decision, Event, Fact, HumanReview, Objective, Project, Role
+from .domain import Assumption, Constraint, Decision, Event, Fact, HumanReview, Objective, Project, Role, SpatialScope, TemporalScope
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 
@@ -27,7 +27,9 @@ class SQLiteRepository:
         PRAGMA foreign_keys = ON;
         CREATE TABLE IF NOT EXISTS projects (
           project_id TEXT PRIMARY KEY, name TEXT NOT NULL,
-          stage TEXT NOT NULL, version INTEGER NOT NULL
+          stage TEXT NOT NULL, version INTEGER NOT NULL,
+          spatial_scope TEXT NULL,
+          temporal_scope TEXT NOT NULL DEFAULT 'proyecto'
         );
         CREATE TABLE IF NOT EXISTS objectives (
           objective_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
@@ -99,6 +101,11 @@ class SQLiteRepository:
         alternative_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(alternatives)")}
         if "source" not in alternative_columns:
             self.conn.execute("ALTER TABLE alternatives ADD COLUMN source TEXT NOT NULL DEFAULT 'USER_COMMAND'")
+        project_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(projects)")}
+        if "spatial_scope" not in project_columns:
+            self.conn.execute("ALTER TABLE projects ADD COLUMN spatial_scope TEXT NULL")
+        if "temporal_scope" not in project_columns:
+            self.conn.execute("ALTER TABLE projects ADD COLUMN temporal_scope TEXT NOT NULL DEFAULT 'proyecto'")
         self.conn.commit()
 
     @contextmanager
@@ -129,7 +136,9 @@ class SQLiteRepository:
         row = self.conn.execute("SELECT * FROM projects WHERE project_id=?", (project_id,)).fetchone()
         if not row:
             return None
-        p = Project(row["project_id"], row["name"], row["stage"], row["version"])
+        spatial_scope = SpatialScope(row["spatial_scope"]) if row["spatial_scope"] else None
+        temporal_scope = TemporalScope(row["temporal_scope"] or TemporalScope.PROYECTO.value)
+        p = Project(row["project_id"], row["name"], row["stage"], row["version"], spatial_scope=spatial_scope, temporal_scope=temporal_scope)
         p.objectives = {r["objective_id"]: Objective(**dict(r)) for r in self.conn.execute("SELECT * FROM objectives WHERE project_id=?", (project_id,))}
         p.constraints = {r["constraint_id"]: Constraint(r["constraint_id"], r["project_id"], r["key"], r["operator"], r["value"], r["unit"], bool(r["hard"]), r["version"]) for r in self.conn.execute("SELECT * FROM constraints_ WHERE project_id=?", (project_id,))}
         p.roles = {r["role_id"]: Role(**dict(r)) for r in self.conn.execute("SELECT * FROM roles WHERE project_id=?", (project_id,))}
@@ -148,7 +157,10 @@ class SQLiteRepository:
 
     def insert_project(self, project: Project, event: Event) -> None:
         with self.transaction():
-            self.conn.execute("INSERT INTO projects VALUES (?, ?, ?, ?)", (project.project_id, project.name, project.stage, project.version))
+            self.conn.execute(
+                "INSERT INTO projects(project_id, name, stage, version, spatial_scope, temporal_scope) VALUES (?, ?, ?, ?, ?, ?)",
+                (project.project_id, project.name, project.stage, project.version, project.spatial_scope.value if project.spatial_scope else None, project.temporal_scope.value),
+            )
             self.add_event(event)
 
     def update_project_and_event(self, project: Project, event: Event, sql: str, params: tuple) -> None:
@@ -167,6 +179,6 @@ class SQLiteRepository:
         """Persist current state only; events are never replaced or deleted."""
         with self.transaction():
             self.conn.execute(
-                "UPDATE projects SET name=?, stage=?, version=? WHERE project_id=?",
-                (project.name, project.stage, project.version, project.project_id),
+                "UPDATE projects SET name=?, stage=?, version=?, spatial_scope=?, temporal_scope=? WHERE project_id=?",
+                (project.name, project.stage, project.version, project.spatial_scope.value if project.spatial_scope else None, project.temporal_scope.value, project.project_id),
             )

@@ -26,7 +26,10 @@ def list_projects(repo: SQLiteRepository = Depends(get_repository)) -> APIRespon
 
 @router.post("", response_model=APIResponse, status_code=201)
 def create_project(request: ProjectCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> APIResponse:
-    result = CLI(repo, actor=request.actor).execute(f'/PROJECT CREATE "{request.project_id}" "{request.name}"')
+    command = f'/PROJECT CREATE "{request.project_id}" "{request.name}"'
+    if request.spatial_scope is not None:
+        command += f' {request.spatial_scope} {request.temporal_scope}'
+    result = CLI(repo, actor=request.actor).execute(command)
     _error(result)
     return APIResponse(**result)
 
