@@ -74,7 +74,7 @@ def test_generation_missing_inputs_is_insufficient(tmp_path: Path):
 def test_unknown_generation_method_is_rejected(tmp_path: Path):
     cli, repo = cli_for(tmp_path)
     result = cli.execute(f"/GENERATE DESIGN llm_assisted_v1 {shlex.quote(json.dumps({'parameters': {'X': [1]}}))}")
-    assert result["code"] == "METHOD_NOT_FOUND"
+    assert result["code"] == "LLM_NOT_CONFIGURED"
     repo.close()
 
 

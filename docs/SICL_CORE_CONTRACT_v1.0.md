@@ -179,10 +179,11 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 40. La importación de un Objective requiere una relación `CONTAINS` explícita y conserva `source_parent_objective_id`; no copia autoridad ni crea decisiones.
 41. `GeneratedAlternative` es una propuesta de candidatos y no es `Alternative`; su generación no crea Recommendation ni Decision.
 42. `parametric_grid_v1` y `pattern_variation_v1` operan únicamente sobre inputs declarados y no aplican filtros ocultos.
-43. Los métodos `llm_assisted_v1` y `evolutionary_v1` están catalogados pero inactivos; no se ejecutan sin contrato adicional.
-44. Una generación con inputs críticos ausentes conserva `state=INSUFFICIENT`; un método desconocido produce `METHOD_NOT_FOUND`.
-45. La promoción de un candidato a `Alternative` requiere `actor` y `authority` humanos explícitos y no crea Recommendation ni Decision.
-46. `GeneratedAlternative` y su tabla de persistencia son append-only y conservan `generation_hash`.
+43. `evolutionary_v1` es un generador determinista con semilla declarada, límites de población y generaciones, y solo propone candidatos; no crea Recommendation ni Decision.
+44. `llm_assisted_v1` conserva un contrato mínimo, no ejecuta comandos ni afirma datos y devuelve `LLM_NOT_CONFIGURED` mientras no exista un proveedor configurado y autorizado.
+45. Una generación con inputs críticos ausentes conserva `state=INSUFFICIENT`; un método desconocido produce `METHOD_NOT_FOUND`.
+46. La promoción de un candidato a `Alternative` requiere `actor` y `authority` humanos explícitos y no crea Recommendation ni Decision.
+47. `GeneratedAlternative` y su tabla de persistencia son append-only y conservan `generation_hash`.
 
 ## 6. Persistencia
 
