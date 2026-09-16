@@ -26,6 +26,27 @@ class GenerationState(str, Enum):
     INSUFFICIENT = "INSUFFICIENT"
     FAILED = "FAILED"
 
+
+class MemoryType(str, Enum):
+    DECISION_PATTERN = "DECISION_PATTERN"
+    PREFERENCE_PATTERN = "PREFERENCE_PATTERN"
+    EVALUATION_PATTERN = "EVALUATION_PATTERN"
+    GENERATION_PATTERN = "GENERATION_PATTERN"
+    LESSON_LEARNED = "LESSON_LEARNED"
+
+
+class MemoryState(str, Enum):
+    ACTIVE = "ACTIVE"
+    SUPERSEDED = "SUPERSEDED"
+    REVOKED = "REVOKED"
+
+
+class MemoryConfidence(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    UNKNOWN = "UNKNOWN"
+
 STAGES = {"DRAFT", "ACTIVE", "PRELIMINARY_DESIGN", "CLOSED"}
 DIRECTIONS = {"MAXIMIZE", "MINIMIZE"}
 KNOWLEDGE_STATES = {"UNKNOWN", "CONFLICTING", "INSUFFICIENT", "OBSERVED"}
@@ -333,6 +354,24 @@ class PlanningInstrument:
     url: str | None
     summary: str | None
     source: str
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class InstitutionalMemory:
+    """Versioned projection of prior project knowledge, never canonical state."""
+
+    memory_id: str
+    memory_type: MemoryType
+    scope: list[SpatialScope]
+    project_id_source: str | None
+    summary: str
+    evidence: list[str]
+    decisions_referenced: list[str]
+    state: MemoryState
+    confidence: MemoryConfidence
+    anonymized: bool
+    created_at: datetime
     version: int = 1
 
 

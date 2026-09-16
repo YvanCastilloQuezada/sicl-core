@@ -21,6 +21,9 @@ from api.schemas import (
     EvaluationCreateRequest,
     GenerationCreateRequest,
     GenerationPromoteRequest,
+    MemoryApplyRequest,
+    MemoryAuthorityRequest,
+    MemoryExtractRequest,
     MultiobjectiveRequest,
     PlanningInstrumentLinkRequest,
     RegulationCreateRequest,
@@ -37,6 +40,7 @@ from api.schemas import (
 from sicl.cli import CLI
 from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, SourceType
 from sicl.generation import generation_to_dict, list_generation_methods
+from sicl.memory import memory_to_dict, memory_types
 from sicl.repository import SQLiteRepository
 from sicl.site_intelligence import get_site_observation
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
@@ -57,7 +61,7 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED"}:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
@@ -67,7 +71,7 @@ def _status_for(code: str) -> int:
         return 404
     if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT", "PLANNING_INSTRUMENT_ALREADY_LINKED", "INVALID_SCOPE_RELATION"}:
         return 409
-    if code in {"HUMAN_REVIEW_REQUIRED", "HUMAN_AUTHORITY_REQUIRED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED"}:
+    if code in {"HUMAN_REVIEW_REQUIRED", "HUMAN_AUTHORITY_REQUIRED", "MEMORY_REVOKED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED"}:
         return 422
     return 400
 
@@ -168,6 +172,54 @@ def promote_generation(project_id: str, generation_id: str, request: GenerationP
     cli = CLI(repo, actor=request.actor)
     _error(cli.execute(f"/PROJECT OPEN {shlex.quote(project_id)}"), project_id)
     command = f"/ALTERNATIVE PROMOTE {shlex.quote(generation_id)} {request.candidate_index} {shlex.quote(request.actor)} {shlex.quote(request.authority)}"
+    result = cli.execute(command)
+    _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok(result["data"], project_id, project.version if project else None)
+
+
+@router.get("/memory", dependencies=[Depends(_auth)])
+def list_memory(repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    return _ok({"memories": [memory_to_dict(item) for item in repo.list_memory()]})
+
+
+@router.get("/memory/types", dependencies=[Depends(_auth)])
+def memory_catalog() -> V1Envelope:
+    return _ok({"types": memory_types()})
+
+
+@router.get("/memory/{memory_id}", dependencies=[Depends(_auth)])
+def get_memory(memory_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    memory = repo.get_memory(memory_id)
+    if memory is None:
+        _error({"code": "MEMORY_NOT_FOUND", "message": memory_id})
+    return _ok({"memory": memory_to_dict(memory)})
+
+
+@router.post("/memory/extract", dependencies=[Depends(_auth)])
+def extract_memory_http(request: MemoryExtractRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(request.project_id) is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": request.project_id}, request.project_id)
+    cli = CLI(repo, actor=request.actor)
+    command = f"/MEMORY EXTRACT {shlex.quote(request.project_id)} {shlex.quote(request.actor)} {shlex.quote(request.authority)}"
+    result = cli.execute(command)
+    _error(result, request.project_id)
+    return _ok(result["data"], request.project_id)
+
+
+@router.post("/memory/{memory_id}/revoke", dependencies=[Depends(_auth)])
+def revoke_memory_http(memory_id: str, request: MemoryAuthorityRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    cli = CLI(repo, actor=request.actor)
+    command = f"/MEMORY REVOKE {shlex.quote(memory_id)} {shlex.quote(request.actor)} {shlex.quote(request.authority)}"
+    result = cli.execute(command)
+    _error(result)
+    return _ok(result["data"])
+
+
+@router.post("/projects/{project_id}/memory/apply", dependencies=[Depends(_auth)])
+def apply_memory_http(project_id: str, request: MemoryApplyRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    cli = CLI(repo, actor=request.actor)
+    command = f"/MEMORY APPLY {shlex.quote(request.memory_id)} {shlex.quote(project_id)}"
     result = cli.execute(command)
     _error(result, project_id)
     project = repo.get_project(project_id)

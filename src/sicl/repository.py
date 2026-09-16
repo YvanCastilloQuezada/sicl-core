@@ -8,7 +8,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Iterator
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, Fact, GeneratedAlternative, GenerationMethod, GenerationState, HumanReview, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, Source, SourceType, SpatialScope, TemporalScope
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, GeneratedAlternative, GenerationMethod, GenerationState, InstitutionalMemory, MemoryConfidence, MemoryState, MemoryType, Fact, HumanReview, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, Source, SourceType, SpatialScope, TemporalScope
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 from .simulation import Simulation, SimulationState, SimulationType
@@ -152,6 +152,19 @@ class SQLiteRepository:
         CREATE TRIGGER IF NOT EXISTS generated_alternatives_no_delete
         BEFORE DELETE ON generated_alternatives
         BEGIN SELECT RAISE(ABORT, 'generated alternatives are append-only'); END;
+        CREATE TABLE IF NOT EXISTS institutional_memory (
+          memory_id TEXT NOT NULL, version INTEGER NOT NULL,
+          memory_type TEXT NOT NULL, scope_json TEXT NOT NULL, project_id_source TEXT NULL,
+          summary TEXT NOT NULL, evidence_json TEXT NOT NULL, decisions_json TEXT NOT NULL,
+          state TEXT NOT NULL, confidence TEXT NOT NULL, anonymized INTEGER NOT NULL,
+          created_at TEXT NOT NULL, PRIMARY KEY(memory_id, version)
+        );
+        CREATE TRIGGER IF NOT EXISTS institutional_memory_no_update
+        BEFORE UPDATE ON institutional_memory
+        BEGIN SELECT RAISE(ABORT, 'institutional memory is append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS institutional_memory_no_delete
+        BEFORE DELETE ON institutional_memory
+        BEGIN SELECT RAISE(ABORT, 'institutional memory is append-only'); END;
         CREATE TABLE IF NOT EXISTS planning_instruments (
           instrument_id TEXT PRIMARY KEY, project_id TEXT NULL REFERENCES projects(project_id),
           instrument_type TEXT NOT NULL, name TEXT NOT NULL, jurisdiction TEXT NOT NULL,
@@ -430,6 +443,38 @@ class SQLiteRepository:
     def get_generation(self, project_id: str, generation_id: str) -> GeneratedAlternative | None:
         project = self.get_project(project_id)
         return project.generated_alternatives.get(generation_id) if project else None
+
+    def insert_memory_and_event(self, memory: InstitutionalMemory, event: Event) -> None:
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO institutional_memory VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (memory.memory_id, memory.version, memory.memory_type.value, json.dumps([item.value for item in memory.scope]),
+                 memory.project_id_source, memory.summary, json.dumps(memory.evidence), json.dumps(memory.decisions_referenced),
+                 memory.state.value, memory.confidence.value, int(memory.anonymized), memory.created_at.isoformat()),
+            )
+            self.add_event(event)
+
+    def list_memory(self) -> list[InstitutionalMemory]:
+        rows = self.conn.execute("SELECT m.* FROM institutional_memory m JOIN (SELECT memory_id, MAX(version) version FROM institutional_memory GROUP BY memory_id) latest ON latest.memory_id=m.memory_id AND latest.version=m.version ORDER BY m.created_at, m.memory_id").fetchall()
+        return [self._memory_from_row(row) for row in rows]
+
+    def get_memory(self, memory_id: str) -> InstitutionalMemory | None:
+        row = self.conn.execute("SELECT * FROM institutional_memory WHERE memory_id=? ORDER BY version DESC LIMIT 1", (memory_id,)).fetchone()
+        return self._memory_from_row(row) if row else None
+
+    def revoke_memory_and_event(self, memory: InstitutionalMemory, event: Event) -> InstitutionalMemory:
+        revoked = InstitutionalMemory(memory.memory_id, memory.memory_type, memory.scope, memory.project_id_source, memory.summary, memory.evidence, memory.decisions_referenced, MemoryState.REVOKED, memory.confidence, memory.anonymized, datetime.now(), memory.version + 1)
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO institutional_memory VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (revoked.memory_id, revoked.version, revoked.memory_type.value, json.dumps([item.value for item in revoked.scope]), revoked.project_id_source, revoked.summary, json.dumps(revoked.evidence), json.dumps(revoked.decisions_referenced), revoked.state.value, revoked.confidence.value, int(revoked.anonymized), revoked.created_at.isoformat()),
+            )
+            self.add_event(event)
+        return revoked
+
+    @staticmethod
+    def _memory_from_row(row: sqlite3.Row) -> InstitutionalMemory:
+        return InstitutionalMemory(row["memory_id"], MemoryType(row["memory_type"]), [SpatialScope(item) for item in json.loads(row["scope_json"])], row["project_id_source"], row["summary"], json.loads(row["evidence_json"]), json.loads(row["decisions_json"]), MemoryState(row["state"]), MemoryConfidence(row["confidence"]), bool(row["anonymized"]), datetime.fromisoformat(row["created_at"]), row["version"])
 
     def insert_planning_instrument_and_event(self, instrument: PlanningInstrument, event: Event) -> None:
         with self.transaction():

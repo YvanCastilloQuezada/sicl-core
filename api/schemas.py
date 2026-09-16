@@ -109,6 +109,22 @@ class GenerationPromoteRequest(BaseModel):
     authority: str = Field(min_length=1)
 
 
+class MemoryExtractRequest(BaseModel):
+    project_id: str = Field(min_length=1)
+    actor: str = Field(min_length=1)
+    authority: str = Field(min_length=1)
+
+
+class MemoryAuthorityRequest(BaseModel):
+    actor: str = Field(min_length=1)
+    authority: str = Field(min_length=1)
+
+
+class MemoryApplyRequest(BaseModel):
+    memory_id: str = Field(min_length=1)
+    actor: str = Field(min_length=1)
+
+
 class PlanningInstrumentLinkRequest(BaseModel):
     instrument_id: str = Field(min_length=1)
 
