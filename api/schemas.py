@@ -87,6 +87,13 @@ class ComparisonCreateRequest(BaseModel):
     objectives: list[str] | None = None
 
 
+class SimulationCreateRequest(BaseModel):
+    simulation_type: str = Field(min_length=1)
+    method: str = Field(min_length=1)
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    method_version: str = "1.0"
+
+
 class ProjectResponse(BaseModel):
     project_id: str
     name: str

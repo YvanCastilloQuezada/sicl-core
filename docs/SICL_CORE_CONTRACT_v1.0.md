@@ -55,6 +55,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | Alternative | `alternative_id`, `project_id`, `name`, `description`, `parameters`, `status`, `version`, `source` |
 | Evaluation | `evaluation_id`, `alternative_id`, `objective_id`, `value`, `unit`, `confidence`, `source`, `version` |
 | Comparison | `comparison_id`, `project_id`, `alternative_ids`, `evaluations`, `tradeoffs`, `version` |
+| Simulation | `simulation_id`, `project_id`, `simulation_type`, `method`, `method_version`, `inputs`, `outputs`, `state`, `started_at`, `finished_at?`, `evidence_hash`, `version` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
 
 ### Multiscale Model
@@ -85,6 +86,10 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 /EVIDENCE SHOW <evidence_id>
 /EVALUATE <alternative> <objective> <value> [unit] [confidence] [source]
 /COMPARE <alternative> <alternative> [...]
+/SIMULATE RUN <simulation_type> <method> [params]
+/SIMULATE LIST
+/SIMULATE SHOW <simulation_id>
+/SIMULATE METHODS
 /DECISION RECORD <statement> <actor> <authority>
 /STATUS
 /HISTORY
@@ -112,6 +117,8 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 16. `Evidence` acepta únicamente los tipos y estados canónicos, calcula SHA-256 desde `statement` cuando falta hash y es append-only.
 17. `Evaluation` requiere una Alternative y un Objective existentes; no crea Recommendation ni Decision.
 18. `Comparison` requiere al menos dos Alternatives existentes y no crea Recommendation ni Decision.
+19. `Simulation` es append-only, no crea Recommendation ni Decision y no convierte Assumption en Fact.
+20. Los tipos admitidos son `DETERMINISTIC`, `MONTE_CARLO`, `SCENARIO` y `SENSITIVITY`; esta fase ejecuta únicamente métodos deterministas y de sensibilidad.
 
 ## 6. Persistencia
 
