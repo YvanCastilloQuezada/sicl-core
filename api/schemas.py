@@ -102,6 +102,18 @@ class ScenarioSelectRequest(BaseModel):
     authority: str = Field(min_length=1)
 
 
+class ScenarioEvolutionCreateRequest(BaseModel):
+    evolution_id: str = Field(min_length=1)
+    scenario_id: str = Field(min_length=1)
+    from_cycle_id: str = Field(min_length=1)
+    to_cycle_id: str = Field(min_length=1)
+
+
+class ScenarioEvolutionApplyRequest(BaseModel):
+    actor: str = Field(min_length=1)
+    authority: str = Field(min_length=1)
+
+
 class EvidenceCreateRequest(BaseModel):
     evidence_id: str = Field(min_length=1)
     statement: str = Field(min_length=1)

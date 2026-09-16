@@ -64,6 +64,7 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | NormativeInterpretation | `interpretation_id`, `regulation_id`, `article_reference`, `interpretation_text`, `applied_to_project_id?`, `interpreted_by`, `interpretation_date`, `confidence`, `state`, `disclaimer`, `version` |
 | NormativeSnapshot | `snapshot_id`, `project_id`, `cut_date`, `jurisdiction`, `regulations_included`, `interpretations_included`, `state`, `reviewer?`, `created_at`, `version` |
 | ScaleRelation | `relation_id`, `parent_project_id`, `child_project_id`, `relation_type`, `description?`, `created_by`, `created_at`, `version` |
+| ScenarioEvolution | `evolution_id`, `scenario_id`, `from_cycle_id`, `to_cycle_id`, `changes`, `triggers`, `state`, `applied_by?`, `applied_at?`, `version` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
 
 ### Multiscale Model
@@ -184,6 +185,9 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 45. Una generación con inputs críticos ausentes conserva `state=INSUFFICIENT`; un método desconocido produce `METHOD_NOT_FOUND`.
 46. La promoción de un candidato a `Alternative` requiere `actor` y `authority` humanos explícitos y no crea Recommendation ni Decision.
 47. `GeneratedAlternative` y su tabla de persistencia son append-only y conservan `generation_hash`.
+48. `ScenarioEvolution` solo registra una transición explícita entre ciclos y no reescribe ciclos, escenarios, recomendaciones ni decisiones previas.
+49. `ScenarioEvolution` es append-only; crear, enriquecer y aplicar una evolución insertan versiones nuevas.
+50. Aplicar una `ScenarioEvolution` requiere `actor` y `authority` humanos explícitos y no crea Recommendation ni Decision.
 
 ## 6. Persistencia
 
@@ -235,11 +239,13 @@ La superficie HTTP canónica expone `POST`, `GET` colección y `GET` individual 
 
 ### Temporal Cycles — RFC-013
 
-`TemporalCycle` representa un horizonte operativo `2030`, `2040`, `2050` o `CUSTOM`, con fechas, supuestos, objetivos a horizonte y actores involucrados. `ScenarioBranch` representa una rama de escenario asociada opcionalmente a un ciclo, con condiciones, objetivos y estado explícito.
+`TemporalCycle` representa un horizonte operativo `2030`, `2040`, `2050` o `CUSTOM`, con fechas, supuestos, objetivos a horizonte y actores involucrados. `ScenarioBranch` representa una rama de escenario asociada opcionalmente a un ciclo, con condiciones, objetivos y estado explícito. `ScenarioEvolution` registra una transición propuesta entre dos ciclos para un escenario, con cambios, triggers y estado `PROPOSED`, `EVALUATED`, `APPLIED` o `REJECTED`.
 
 Los ciclos no modifican decisiones pasadas. Las ramas no sobrescriben otras ramas: toda evolución se conserva como una nueva versión append-only. La selección de escenario requiere un actor activo y un `HumanReview` aprobado con actor y authority coincidentes. No existe selección automática ni supuesto de corrección del escenario.
 
-La superficie HTTP canónica expone `POST`, `GET` colección y `GET` individual para `/v1/projects/{project_id}/cycles`, `POST` y `GET` colección para `/v1/projects/{project_id}/scenarios`, y `POST /v1/projects/{project_id}/scenarios/{branch_id}/select`. Los comandos equivalentes son `/CYCLE CREATE`, `/CYCLE LIST`, `/CYCLE SHOW`, `/SCENARIO CREATE`, `/SCENARIO LIST` y `/SCENARIO SELECT`.
+La superficie HTTP canónica expone `POST`, `GET` colección y `GET` individual para `/v1/projects/{project_id}/cycles`, `POST` y `GET` colección para `/v1/projects/{project_id}/scenarios`, y `POST /v1/projects/{project_id}/scenarios/{branch_id}/select`. RFC-013.1 añade `POST`, `GET` colección y `GET` individual para `/v1/projects/{project_id}/scenario-evolutions`, además de `POST /v1/scenario-evolutions/{evolution_id}/apply`. Los comandos equivalentes son `/CYCLE CREATE`, `/CYCLE LIST`, `/CYCLE SHOW`, `/SCENARIO CREATE`, `/SCENARIO LIST`, `/SCENARIO SELECT`, `/EVOLUTION CREATE`, `/EVOLUTION ADD CHANGE`, `/EVOLUTION ADD TRIGGER`, `/EVOLUTION APPLY`, `/EVOLUTION LIST` y `/EVOLUTION SHOW`.
+
+Una evolución nunca reescribe ciclos, escenarios, recomendaciones o decisiones previas. Su aplicación requiere actor y authority humanos explícitos y no crea Recommendation ni Decision.
 
 ## 7. Respuestas y errores
 

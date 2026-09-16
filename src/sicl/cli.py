@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 from dataclasses import asdict
 from typing import Any
 
-from .domain import Actor, ActorPosition, ActorRole, ActorState, Assumption, AuthorityLevel, Constraint, CycleHorizon, CycleState, Decision, Evidence, EvidenceType, Event, GeneratedAlternative, GenerationMethod, GenerationState, HumanReview, Fact, InterpretationConfidence, InterpretationState, MemoryState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, ScenarioBranch, ScenarioState, SpatialScope, SourceType, Stance, SubjectType, TemporalCycle, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
+from .domain import Actor, ActorPosition, ActorRole, ActorState, Assumption, AuthorityLevel, Constraint, CycleHorizon, CycleState, Decision, Evidence, EvidenceType, Event, EvolutionState, GeneratedAlternative, GenerationMethod, GenerationState, HumanReview, Fact, InterpretationConfidence, InterpretationState, MemoryState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, ScaleRelation, ScaleRelationType, ScenarioBranch, ScenarioEvolution, ScenarioState, SpatialScope, SourceType, Stance, SubjectType, TemporalCycle, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
@@ -23,7 +23,7 @@ from .multiscale import SCALE_ORDER, children_scopes, is_ancestor, parent_scope
 from .generation import generate_candidates, generation_to_dict, list_generation_methods
 from .memory import extract_memory, memory_to_dict, memory_types
 from .actors import actor_to_dict, position_to_dict
-from .temporal import cycle_to_dict, scenario_to_dict
+from .temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 
 
 class CLI:
@@ -114,6 +114,16 @@ class CLI:
                 return self.scenario_list()
             if head == ("/SCENARIO", "SELECT"):
                 return self.scenario_select(parts[2:])
+            if head == ("/EVOLUTION", "CREATE"):
+                return self.evolution_create(parts[2:])
+            if head == ("/EVOLUTION", "ADD"):
+                return self.evolution_add(parts[2:])
+            if head == ("/EVOLUTION", "APPLY"):
+                return self.evolution_apply(parts[2:])
+            if head == ("/EVOLUTION", "LIST"):
+                return self.evolution_list()
+            if head == ("/EVOLUTION", "SHOW"):
+                return self.evolution_show(parts[2:])
             if head == ("/FACT", "SET"):
                 return self.fact_set(parts[2:])
             if head == ("/ASSUMPTION", "SET"):
@@ -678,6 +688,60 @@ class CLI:
         p.scenario_branches[branch_id] = selected; p.version += 1
         self.repo.insert_entity_and_event("INSERT INTO scenario_branches VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (selected.branch_id, selected.project_id, selected.parent_cycle_id, selected.scenario_name, json.dumps(selected.conditions), json.dumps(selected.objectives), selected.state.value, selected.selected_by, selected.selected_at.isoformat(), selected.created_at.isoformat(), selected.version), p, self._event(p.project_id, "SCENARIO_SELECTED", scenario_to_dict(selected)))
         return self._ok({"scenario": scenario_to_dict(selected)})
+
+    def evolution_create(self, args: list[str]) -> dict:
+        if len(args) != 4:
+            raise SICLError("INVALID_ARGUMENT", "evolution_id scenario_id from_cycle_id to_cycle_id required")
+        p = self._require_open(); evolution_id, scenario_id, from_cycle_id, to_cycle_id = args
+        if evolution_id in p.scenario_evolutions:
+            raise SICLError("CONFLICT", f"evolution already exists: {evolution_id}")
+        if scenario_id not in p.scenario_branches:
+            raise SICLError("SCENARIO_NOT_FOUND", scenario_id)
+        if from_cycle_id not in p.temporal_cycles or to_cycle_id not in p.temporal_cycles:
+            raise SICLError("CYCLE_NOT_FOUND", "from_cycle_id and to_cycle_id must exist")
+        evolution = ScenarioEvolution(evolution_id, scenario_id, from_cycle_id, to_cycle_id)
+        p.scenario_evolutions[evolution_id] = evolution; p.version += 1
+        self.repo.insert_entity_and_event("INSERT INTO scenario_evolutions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (evolution_id, p.project_id, scenario_id, from_cycle_id, to_cycle_id, "[]", "[]", evolution.state.value, None, None, 1), p, self._event(p.project_id, "SCENARIO_EVOLUTION_CREATED", evolution_to_dict(evolution)))
+        return self._ok({"evolution": evolution_to_dict(evolution)})
+
+    def evolution_add(self, args: list[str]) -> dict:
+        if len(args) < 3 or args[0].upper() not in {"CHANGE", "TRIGGER"}:
+            raise SICLError("INVALID_ARGUMENT", "CHANGE evolution_id key value or TRIGGER evolution_id trigger required")
+        p = self._require_open(); kind, evolution_id = args[0].upper(), args[1]
+        evolution = p.scenario_evolutions.get(evolution_id)
+        if evolution is None: raise SICLError("EVOLUTION_NOT_FOUND", evolution_id)
+        if evolution.state is not EvolutionState.PROPOSED: raise SICLError("INVALID_STATE", "only PROPOSED evolution can be edited")
+        changes = list(evolution.changes); triggers = list(evolution.triggers)
+        if kind == "CHANGE":
+            if len(args) < 4: raise SICLError("INVALID_ARGUMENT", "key and value required")
+            changes.append({"key": args[2], "value": " ".join(args[3:])})
+        else:
+            triggers.append(" ".join(args[2:]))
+        updated = ScenarioEvolution(evolution.evolution_id, evolution.scenario_id, evolution.from_cycle_id, evolution.to_cycle_id, changes, triggers, evolution.state, evolution.applied_by, evolution.applied_at, evolution.version + 1)
+        p.scenario_evolutions[evolution_id] = updated; p.version += 1
+        self.repo.insert_entity_and_event("INSERT INTO scenario_evolutions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (updated.evolution_id, p.project_id, updated.scenario_id, updated.from_cycle_id, updated.to_cycle_id, json.dumps(updated.changes), json.dumps(updated.triggers), updated.state.value, None, None, updated.version), p, self._event(p.project_id, "SCENARIO_EVOLUTION_UPDATED", evolution_to_dict(updated)))
+        return self._ok({"evolution": evolution_to_dict(updated)})
+
+    def evolution_apply(self, args: list[str]) -> dict:
+        if len(args) < 3: raise SICLError("HUMAN_AUTHORITY_REQUIRED", "evolution_id actor authority required")
+        p = self._require_open(); evolution_id, actor, authority = args[0], args[1], " ".join(args[2:])
+        if not actor.strip() or not authority.strip(): raise SICLError("HUMAN_AUTHORITY_REQUIRED", "actor and authority required")
+        evolution = p.scenario_evolutions.get(evolution_id)
+        if evolution is None: raise SICLError("EVOLUTION_NOT_FOUND", evolution_id)
+        if evolution.state is EvolutionState.APPLIED: raise SICLError("CONFLICT", "evolution already applied")
+        applied = ScenarioEvolution(evolution.evolution_id, evolution.scenario_id, evolution.from_cycle_id, evolution.to_cycle_id, evolution.changes, evolution.triggers, EvolutionState.APPLIED, actor, datetime.now(timezone.utc), evolution.version + 1)
+        p.scenario_evolutions[evolution_id] = applied; p.version += 1
+        self.repo.insert_entity_and_event("INSERT INTO scenario_evolutions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (applied.evolution_id, p.project_id, applied.scenario_id, applied.from_cycle_id, applied.to_cycle_id, json.dumps(applied.changes), json.dumps(applied.triggers), applied.state.value, applied.applied_by, applied.applied_at.isoformat(), applied.version), p, self._event(p.project_id, "SCENARIO_EVOLUTION_APPLIED", {**evolution_to_dict(applied), "authority": authority}))
+        return self._ok({"evolution": evolution_to_dict(applied), "decision_created": False, "recommendation_created": False})
+
+    def evolution_list(self) -> dict:
+        return self._ok({"evolutions": [evolution_to_dict(item) for item in self.repo.list_scenario_evolutions(self._project().project_id)]})
+
+    def evolution_show(self, args: list[str]) -> dict:
+        if len(args) != 1: raise SICLError("INVALID_ARGUMENT", "evolution_id required")
+        evolution = self.repo.get_scenario_evolution(self._project().project_id, args[0])
+        if evolution is None: raise SICLError("EVOLUTION_NOT_FOUND", args[0])
+        return self._ok({"evolution": evolution_to_dict(evolution)})
 
     def fact_set(self, args: list[str], *, event_source: str = "USER_COMMAND") -> dict:
         if not args: raise SICLError("INVALID_ARGUMENT", "statement required")

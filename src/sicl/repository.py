@@ -8,7 +8,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Iterator
 
-from .domain import Actor, ActorPosition, ActorRole, ActorState, Assumption, AuthorityLevel, Constraint, CycleHorizon, CycleState, Decision, Evidence, EvidenceType, Event, GeneratedAlternative, GenerationMethod, GenerationState, InstitutionalMemory, MemoryConfidence, MemoryState, MemoryType, Fact, HumanReview, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Regulation, RegulationStatus, Role, ScenarioBranch, ScenarioState, ScaleRelation, ScaleRelationType, Source, SourceType, SpatialScope, Stance, SubjectType, TemporalCycle, TemporalScope
+from .domain import Actor, ActorPosition, ActorRole, ActorState, Assumption, AuthorityLevel, Constraint, CycleHorizon, CycleState, Decision, Evidence, EvidenceType, Event, EvolutionState, GeneratedAlternative, GenerationMethod, GenerationState, InstitutionalMemory, MemoryConfidence, MemoryState, MemoryType, Fact, HumanReview, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Regulation, RegulationStatus, Role, ScenarioBranch, ScenarioEvolution, ScenarioState, ScaleRelation, ScaleRelationType, Source, SourceType, SpatialScope, Stance, SubjectType, TemporalCycle, TemporalScope
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 from .simulation import Simulation, SimulationState, SimulationType
@@ -96,6 +96,19 @@ class SQLiteRepository:
         CREATE TRIGGER IF NOT EXISTS scenario_branches_no_delete
         BEFORE DELETE ON scenario_branches
         BEGIN SELECT RAISE(ABORT, 'scenario branches are append-only'); END;
+        CREATE TABLE IF NOT EXISTS scenario_evolutions (
+          evolution_id TEXT NOT NULL, project_id TEXT NOT NULL REFERENCES projects(project_id),
+          scenario_id TEXT NOT NULL, from_cycle_id TEXT NOT NULL, to_cycle_id TEXT NOT NULL,
+          changes_json TEXT NOT NULL, triggers_json TEXT NOT NULL, state TEXT NOT NULL,
+          applied_by TEXT NULL, applied_at TEXT NULL, version INTEGER NOT NULL,
+          PRIMARY KEY(evolution_id, version)
+        );
+        CREATE TRIGGER IF NOT EXISTS scenario_evolutions_no_update
+        BEFORE UPDATE ON scenario_evolutions
+        BEGIN SELECT RAISE(ABORT, 'scenario evolutions are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS scenario_evolutions_no_delete
+        BEFORE DELETE ON scenario_evolutions
+        BEGIN SELECT RAISE(ABORT, 'scenario evolutions are append-only'); END;
         CREATE TABLE IF NOT EXISTS facts (
           fact_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
           statement TEXT NOT NULL, source TEXT NOT NULL, version INTEGER NOT NULL
@@ -387,6 +400,7 @@ class SQLiteRepository:
         p.positions = {r["position_id"]: ActorPosition(r["position_id"], r["project_id"], r["actor_id"], SubjectType(r["subject_type"]), r["subject_id"], Stance(r["stance"]), r["reason"], json.loads(r["conditions_json"]), datetime.fromisoformat(r["created_at"]), r["version"]) for r in self.conn.execute("SELECT * FROM actor_positions WHERE project_id=?", (project_id,))}
         p.temporal_cycles = {r["cycle_id"]: TemporalCycle(r["cycle_id"], r["project_id"], CycleHorizon(r["horizon"]), date.fromisoformat(r["start_date"]), date.fromisoformat(r["end_date"]) if r["end_date"] else None, json.loads(r["assumptions_json"]), json.loads(r["objectives_json"]), json.loads(r["actors_json"]), CycleState(r["state"]), datetime.fromisoformat(r["created_at"]), r["version"]) for r in self.conn.execute("SELECT * FROM temporal_cycles WHERE project_id=?", (project_id,))}
         p.scenario_branches = {r["branch_id"]: ScenarioBranch(r["branch_id"], r["project_id"], r["parent_cycle_id"], r["scenario_name"], json.loads(r["conditions_json"]), json.loads(r["objectives_json"]), ScenarioState(r["state"]), r["selected_by"], datetime.fromisoformat(r["selected_at"]) if r["selected_at"] else None, datetime.fromisoformat(r["created_at"]), r["version"]) for r in self.conn.execute("SELECT s.* FROM scenario_branches s JOIN (SELECT branch_id, MAX(version) AS version FROM scenario_branches WHERE project_id=? GROUP BY branch_id) latest ON latest.branch_id=s.branch_id AND latest.version=s.version WHERE s.project_id=?", (project_id, project_id))}
+        p.scenario_evolutions = {r["evolution_id"]: ScenarioEvolution(r["evolution_id"], r["scenario_id"], r["from_cycle_id"], r["to_cycle_id"], json.loads(r["changes_json"]), json.loads(r["triggers_json"]), EvolutionState(r["state"]), r["applied_by"], datetime.fromisoformat(r["applied_at"]) if r["applied_at"] else None, r["version"]) for r in self.conn.execute("SELECT e.* FROM scenario_evolutions e JOIN (SELECT evolution_id, MAX(version) AS version FROM scenario_evolutions GROUP BY evolution_id) latest ON latest.evolution_id=e.evolution_id AND latest.version=e.version WHERE e.project_id=?", (project_id,))}
         p.facts = {r["fact_id"]: Fact(**dict(r)) for r in self.conn.execute("SELECT * FROM facts WHERE project_id=?", (project_id,))}
         p.assumptions = {r["assumption_id"]: Assumption(**dict(r)) for r in self.conn.execute("SELECT * FROM assumptions WHERE project_id=?", (project_id,))}
         p.preferences = {r["preference_id"]: Preference(**dict(r)) for r in self.conn.execute("SELECT * FROM preferences WHERE project_id=?", (project_id,))}
@@ -441,6 +455,14 @@ class SQLiteRepository:
     def get_scenario(self, project_id: str, branch_id: str) -> ScenarioBranch | None:
         project = self.get_project(project_id)
         return project.scenario_branches.get(branch_id) if project else None
+
+    def list_scenario_evolutions(self, project_id: str) -> list[ScenarioEvolution]:
+        project = self.get_project(project_id)
+        return list(project.scenario_evolutions.values()) if project else []
+
+    def get_scenario_evolution(self, project_id: str, evolution_id: str) -> ScenarioEvolution | None:
+        project = self.get_project(project_id)
+        return project.scenario_evolutions.get(evolution_id) if project else None
 
     def insert_project(self, project: Project, event: Event) -> None:
         with self.transaction():
