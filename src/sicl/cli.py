@@ -844,9 +844,12 @@ class CLI:
             raise SICLError("INVALID_ARGUMENT", "inputs must be valid JSON") from exc
         if not isinstance(inputs, dict):
             raise SICLError("INVALID_ARGUMENT", "inputs must be a JSON object")
-        if method not in {"parametric_grid_v1", "pattern_variation_v1"}:
+        if method not in {"parametric_grid_v1", "pattern_variation_v1", "evolutionary_v1", "llm_assisted_v1"}:
             raise SICLError("METHOD_NOT_FOUND", method)
-        generation = generate_candidates(p.project_id, method, inputs, f"GEN-{uuid.uuid4().hex[:10]}")
+        try:
+            generation = generate_candidates(p.project_id, method, inputs, f"GEN-{uuid.uuid4().hex[:10]}", project=p)
+        except ValueError as exc:
+            raise SICLError(str(exc), method) from exc
         p.generated_alternatives[generation.generation_id] = generation
         p.version += 1
         self.repo.insert_generation_and_event(generation, p, self._event(p.project_id, "DESIGN_GENERATION_RECORDED", generation_to_dict(generation), "SYSTEM_CALCULATION"))

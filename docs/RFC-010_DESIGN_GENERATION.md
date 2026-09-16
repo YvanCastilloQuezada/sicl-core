@@ -1,8 +1,8 @@
 # RFC-010 — Design Generation
 
-**Estado:** IMPLEMENTED en rama dedicada `rfc-010-design-generation`  
-**Base:** `main@14e31987cff90f4cc93a7167e2d28c5f5cb8be9f`  
-**Alcance:** SICL 2.1 — generación explícita de alternativas candidatas.
+**Estado:** IMPLEMENTED; extendido por RFC-016.1
+**Base:** `main@89c7b604`
+**Alcance:** SICL 2.1–2.2 — generación explícita de alternativas candidatas.
 
 ## Propósito
 
@@ -20,8 +20,18 @@ Los estados son `GENERATED`, `INSUFFICIENT` y `FAILED`. La generación insuficie
 |---|---|---|
 | `parametric_grid_v1` | Activo | Producto cartesiano de parámetros declarados mediante listas, `values` o rangos `min`/`max`/`step`. |
 | `pattern_variation_v1` | Activo | Aplica variaciones declaradas a un patrón de referencia declarado. |
-| `llm_assisted_v1` | Catálogo, inactivo | Requiere un contrato explícito con IA; no se ejecuta. |
-| `evolutionary_v1` | Catálogo, inactivo | Requiere contrato de población y función de aptitud; no se ejecuta. |
+| `evolutionary_v1` | Activo | Evolución determinista de una población declarada con semilla fija, mutación y crossover. Produce candidatos y estadísticas; no decide. |
+| `llm_assisted_v1` | Definido, no configurado | Conserva el contrato mínimo para contexto, objetivos, constraints y cantidad de candidatos. Devuelve `LLM_NOT_CONFIGURED` hasta que exista un proveedor autorizado. |
+
+### evolutionary_v1
+
+El método requiere `base_alternatives` y `objectives`. Acepta `population_size` de 1 a 100, `generations` de 1 a 50, `mutation_rate` y `crossover_rate` entre 0 y 1. La semilla por defecto es fija y puede declararse explícitamente. La salida contiene `final_population`, `best_candidates`, `generation_log`, `convergence` y la semilla utilizada.
+
+El orden estable de candidatos sirve para inspección reproducible. No representa una selección del arquitecto, no genera `Recommendation` y no crea `Decision`.
+
+### llm_assisted_v1
+
+El método acepta `context`, `objectives`, `constraints` y `num_candidates` de 1 a 10 como contrato de entrada. La implementación actual no invoca ningún modelo ni ejecuta comandos. Sin un proveedor configurado devuelve `LLM_NOT_CONFIGURED`. La integración real permanece sujeta a un contrato adicional, a procedencia de las afirmaciones y a confirmación humana.
 
 ## CLI
 
@@ -54,8 +64,10 @@ Las respuestas emplean el envelope canónico v1. Las generaciones y sus candidat
 3. No se aplican filtros ocultos: todos los valores declarados generan candidatos, salvo entradas inválidas o insuficientes.
 4. La promoción requiere autoridad humana representada por `actor` y `authority`.
 5. Las generaciones son persistentes y append-only.
-6. Los métodos no activos no se ejecutan.
+6. `evolutionary_v1` es determinista con la misma semilla y solo propone candidatos.
+7. `llm_assisted_v1` no ejecuta comandos ni afirma datos; sin proveedor devuelve `LLM_NOT_CONFIGURED`.
+8. Las generaciones avanzadas no crean `Decision` ni `Recommendation`.
 
 ## Fuera de alcance
 
-No se implementan generación asistida por LLM, evolución, optimización adicional, decisión automática, recomendación automática ni cambios en frontend o infraestructura.
+La integración real con LLM, la optimización multiobjetivo adicional, la decisión automática, la recomendación automática y los cambios en frontend o infraestructura permanecen fuera de alcance. RFC-016.1 solo implementa el contrato no configurado de `llm_assisted_v1` y el método determinista `evolutionary_v1`.
