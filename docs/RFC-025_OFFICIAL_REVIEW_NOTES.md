@@ -36,3 +36,13 @@ https://www.gob.pe/institucion/vivienda/normas-legales/6667128-107-2025-vivienda
 ## Review conclusion
 
 All six fixture URLs returned HTTP 200 and PDF/HTML content types. That proves availability only. It does not prove current legal vigency. Automatic promotion is blocked for all five fixture regulations until a human reviewer reconciles versions and effective dates, especially the E.030 and IS.010 modifications.
+
+## E.030 review detail
+
+RM 183-2026-VIVIENDA was published on 28 April 2026. Its Article 1 modifies E.030. The resolution text identifies changes concerning soil profiles using Vs, N60 and Su; Ts for categories A and B in seismic zone Z4; simultaneous seismic action in two orthogonal directions; limited-ductility wall criteria; and minimum microzonation study guidelines.
+
+The original transitional provision allowed certain projects already in technical approval, licensing or execution stages to continue under the prior text until completion.
+
+RM 217-2026-VIVIENDA was published on 2 June 2026 and modifies the sole transitional provision of RM 183. Its text includes projects with technical files in preparation or approved, building licences pending or approved, preliminary projects submitted for consultation, PPP projects from structuring onward, and work balances derived from earlier approved files.
+
+Therefore E.030 is recorded as MODIFICADA with HUMAN_REVIEW_REQUIRED, not as a simple VIGENTE status.
