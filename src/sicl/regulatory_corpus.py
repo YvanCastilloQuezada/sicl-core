@@ -15,6 +15,7 @@ REQUIRED_REGULATION_KEYS = {"regulation_id", "code", "title", "authority", "juri
 REQUIRED_EVIDENCE_KEYS = {"evidence_id", "source_id", "evidence_type", "article_reference", "statement", "method_version", "state"}
 ALLOWED_SOURCE_TYPES = {"OFFICIAL", "SECONDARY", "USER_PROVIDED", "UNKNOWN"}
 ALLOWED_REGULATION_STATUSES = {"VIGENTE", "MODIFICADA", "DEROGADA", "NO_VERIFICADA"}
+ALLOWED_EVIDENCE_STATES = {"OBSERVED", "UNVERIFIED", "REVIEWED", "REJECTED"}
 
 
 def load_corpus_fixture(path: str | Path) -> dict[str, Any]:
@@ -78,4 +79,30 @@ def validate_corpus_fixture(payload: dict[str, Any]) -> None:
             raise ValueError(f"duplicate evidence_id: {item['evidence_id']}")
         if item["source_id"] not in source_ids:
             raise ValueError(f"evidence source_id does not exist: {item['source_id']}")
+        if not str(item["article_reference"]).strip():
+            raise ValueError("evidence article_reference is required")
+        if not str(item["method_version"]).strip():
+            raise ValueError("evidence method_version is required")
+        if item["state"] not in ALLOWED_EVIDENCE_STATES:
+            raise ValueError(f"invalid evidence state: {item['state']}")
         evidence_ids.add(item["evidence_id"])
+
+
+def evidence_traceability_report(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return a reviewable report for every evidence-to-source link."""
+    validate_corpus_fixture(payload)
+    sources = {item["source_id"]: item for item in payload["sources"]}
+    rows = []
+    for evidence in payload["evidence"]:
+        source = sources[evidence["source_id"]]
+        rows.append({
+            "evidence_id": evidence["evidence_id"],
+            "source_id": evidence["source_id"],
+            "source_type": source["source_type"],
+            "source_url": source["url"],
+            "article_reference": evidence["article_reference"],
+            "method_version": evidence["method_version"],
+            "state": evidence["state"],
+            "traceable": bool(source["url"] and evidence["article_reference"] and evidence["method_version"]),
+        })
+    return {"fixture_status": payload["corpus_status"], "evidence_count": len(rows), "all_traceable": all(row["traceable"] for row in rows), "rows": rows}

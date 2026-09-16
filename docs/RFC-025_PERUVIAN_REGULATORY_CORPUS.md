@@ -9,7 +9,7 @@
 
 RFC-025 define la integración controlada de fuentes normativas y manuales de diseño peruanos en SICL. El objetivo es que una observación, una regla normativa y una conclusión analítica puedan distinguirse y trazarse de manera reproducible.
 
-Las Fases 1 y 2 de este RFC están implementadas con un subconjunto de prueba de la Norma Técnica A.010, Condiciones Generales de Diseño, del Reglamento Nacional de Edificaciones. El fixture conserva la URL oficial, la autoridad, la versión declarada, la fecha de recuperación, referencias de evidencia y un hash determinista del conjunto de datos.
+Las Fases 1 y 2 de este RFC están implementadas con un subconjunto de prueba del RNE que incluye A.010, E.030, E.060, IS.010 y EM.010. El fixture conserva la URL oficial, la autoridad, la versión declarada, la fecha de recuperación, referencias de evidencia y un hash determinista del conjunto de datos.
 
 El fixture se mantiene en estado `SAMPLE_UNVERIFIED`. No se presenta como un corpus completo, no certifica vigencia jurídica y no genera automáticamente restricciones ni decisiones.
 
@@ -26,8 +26,8 @@ El RFC cubre el RNE, sus Normas Técnicas, instrumentos de planificación territ
 La primera implementación cubre:
 
 1. Registro de fuentes oficiales y sus URLs.
-2. Registro de metadatos de una regulación A.010.
-3. Registro de un subconjunto de evidencias descriptivas.
+2. Registro de metadatos de normas arquitectónicas, estructurales, sanitarias y eléctricas.
+3. Registro y revisión de evidencias descriptivas con trazabilidad completa.
 4. Validación de referencias entre fuentes, regulaciones y evidencias.
 5. Hash determinista del fixture.
 6. Simulación local del Camino A con Open-Meteo, Pareto y RFC-020.
@@ -81,11 +81,11 @@ El estado inicial de una incorporación nueva es `NO_VERIFICADA`. Solo una revis
 
 `NormativeSnapshot` congela el conjunto de regulaciones e interpretaciones consideradas para un proyecto en una fecha de corte. No debe cambiar retrospectivamente cuando una regulación posterior recibe una nueva versión.
 
-## 6. Fuente oficial inicial
+## 6. Fuentes oficiales iniciales
 
 La fuente inicial corresponde al portal del Ministerio de Vivienda, Construcción y Saneamiento, que publica el Reglamento Nacional de Edificaciones y enlaza el documento de la Norma A.010 asociado a la RM N.° 191-2021-VIVIENDA.
 
-El fixture contiene dos registros `Source`: la página oficial del RNE y el PDF oficial de A.010. La norma se registra como `NO_VERIFICADA` porque este RFC implementa la ingesta de prueba, no una certificación jurídica de vigencia.
+El fixture contiene seis registros `Source`: el portal oficial del RNE y los PDF oficiales de A.010, E.030, E.060, IS.010 y EM.010. Todas las normas se registran como `NO_VERIFICADA` porque esta fase implementa la ingesta de prueba, no una certificación jurídica de vigencia.
 
 ## 7. Estructura del fixture
 
@@ -95,9 +95,9 @@ El archivo `data/regulatory/rne_a010_sample.json` contiene:
 - `corpus_status` con valor obligatorio `SAMPLE_UNVERIFIED`.
 - `retrieved_at` para la fecha de captura.
 - `sources` para las URLs oficiales.
-- `regulations` para metadatos de A.010.
-- `evidence` para tres referencias descriptivas.
-- `scope_applicable` para asociar el subconjunto a escalas `EDIFICACION` y `ESPACIO`.
+- `regulations` para metadatos de A.010, E.030, E.060, IS.010 y EM.010.
+- `evidence` para siete referencias descriptivas.
+- `scope_applicable` para asociar las normas a `EDIFICACION`, `SISTEMA` y `ESPACIO`.
 
 El cargador `sicl.regulatory_corpus.load_corpus_fixture` valida las claves, unicidad, tipos de fuente, URLs, referencias y estados. Después calcula `fixture_hash` con JSON canónico ordenado.
 
@@ -127,7 +127,7 @@ La clasificación mínima por escala es:
 
 La Fase 2 incorpora documentos y evidencias sin convertir todavía su contenido en reglas ejecutables. La ingesta debe conservar el archivo o una representación autorizada, calcular un hash, segmentar referencias y registrar el método usado.
 
-El subconjunto A.010 de esta entrega usa resúmenes descriptivos en vez de copiar el documento completo. Las frases no deben interpretarse como una transcripción exhaustiva del texto normativo.
+El subconjunto usa resúmenes descriptivos en vez de copiar los documentos completos. Las frases no deben interpretarse como una transcripción exhaustiva del texto normativo.
 
 Antes de una ingesta de producción se debe comprobar que la fuente puede almacenarse y procesarse conforme a su licencia y a la política del repositorio.
 
@@ -194,38 +194,45 @@ El corpus no puede:
 - Sustituir a una autoridad municipal o profesional.
 - Escribir sobre el Event Log histórico.
 
-## 16. Revisión lingüística y semántica
+## 16. Revisión y validación de evidencias
+
+La revisión ejecutada sobre el fixture comprobó que cada evidencia tiene una fuente existente, una URL HTTP(S), un tipo de fuente, una referencia de artículo o documento, un método de captura y un estado permitido. También comprobó que todas las fuentes del lote son `OFFICIAL`, que no hay identificadores duplicados y que cada regulación apunta a una fuente del mismo lote.
+
+El informe generado por `evidence_traceability_report` contiene una fila por evidencia y el campo `traceable`. El lote actual contiene siete evidencias y todas resultaron trazables. La validación no promueve ninguna evidencia a `REVIEWED` ni ninguna regulación a `VIGENTE`; esos cambios requieren revisión humana posterior.
+
+## 17. Revisión lingüística y semántica
 
 Las normas peruanas pueden contener términos jurídicos, técnicos y regionales. La ingesta debe conservar el texto original cuando esté autorizada, pero los resúmenes deben marcarse como derivados. Cualquier traducción o normalización debe registrar método y responsable.
 
-## 17. Próximas fases
+## 18. Próximas fases
 
-La Fase 3 normalizará artículos y definiciones con referencias estables. La Fase 4 incorporará reglas candidatas revisadas. La Fase 5 añadirá snapshots por proyecto y jurisdicción. La Fase 6 ampliará el corpus a normas estructurales, eléctricas, sanitarias, urbanas, municipales y planes nacionales o regionales.
+La Fase 3 normalizará artículos y definiciones con referencias estables. La Fase 4 incorporará reglas candidatas revisadas. La Fase 5 añadirá snapshots por proyecto y jurisdicción. La Fase 6 ampliará el corpus a normas urbanas, municipales y planes nacionales o regionales.
 
 Cada ampliación debe ejecutarse como lote trazable. No se debe declarar el corpus completo mientras existan documentos faltantes o fuentes con estado `NO_VERIFICADA`.
 
-## 18. Criterios de aceptación
+## 19. Criterios de aceptación
 
 RFC-025 Fases 1 y 2 se consideran implementadas cuando:
 
 - Existe una fuente oficial identificada.
-- Existe un fixture reproducible de A.010.
+- Existe un fixture reproducible de A.010, E.030, E.060, IS.010 y EM.010.
 - Las fuentes, regulaciones y evidencias tienen referencias consistentes.
-- El cargador rechaza referencias rotas y estados inválidos.
+- El cargador rechaza referencias rotas, estados inválidos y evidencias sin referencia o método.
+- El informe de trazabilidad confirma que las siete evidencias del lote están enlazadas a fuentes oficiales.
 - El fixture conserva hash determinista.
 - Open-Meteo se combina con Pareto y RFC-020 en una simulación reproducible.
 - La simulación no crea una Decision.
 - La suite completa permanece verde.
 
-## 19. Limitaciones conocidas
+## 20. Limitaciones conocidas
 
-El fixture no contiene el RNE completo. No contiene todas las disposiciones de A.010. No realiza validación jurídica. No contiene ordenanzas municipales. No incorpora todavía el Plan Estratégico de Desarrollo Nacional al 2050 ni manuales de diseño como reglas computables.
+El fixture no contiene el RNE completo. No contiene todas las disposiciones de A.010, E.030, E.060, IS.010 o EM.010. No realiza validación jurídica. No contiene ordenanzas municipales. No incorpora todavía el Plan Estratégico de Desarrollo Nacional al 2050 ni manuales de diseño como reglas computables.
 
 El resultado de Open-Meteo depende de la disponibilidad de la red y de la respuesta del proveedor. El fallback local debe aparecer como simulado y nunca debe mezclarse con datos observados.
 
-## 20. Firma
+## 21. Firma
 
-**Manus AI:** implementación de Fases 1 y 2, fixture y simulación.  
+**Manus AI:** implementación de Fases 1 y 2, ampliación del fixture, validación de evidencias y simulación.
 **Product Owner / arquitecto:** revisión requerida para ampliar corpus y promover estados regulatorios.  
 **Estado:** `IMPLEMENTED — SAMPLE ONLY; HUMAN REVIEW REQUIRED`.
 
@@ -234,5 +241,13 @@ El resultado de Open-Meteo depende de la disponibilidad de la red y de la respue
 [1]: https://www.gob.pe/institucion/vivienda/informes-publicaciones/2309793-reglamento-nacional-de-edificaciones-rne "Reglamento Nacional de Edificaciones — Ministerio de Vivienda, Construcción y Saneamiento"
 
 [2]: https://cdn.www.gob.pe/uploads/document/file/2366528/35%20A.010%20CONDICIONES%20GENERALES%20DE%20DISE%C3%91O%20-%20RM%20N%C2%B0%20191-2021-VIVIENDA.pdf?v=1636058378 "A.010 Condiciones Generales de Diseño — RM N.° 191-2021-VIVIENDA"
+
+[4]: https://cdn.www.gob.pe/uploads/document/file/2366641/51%20E.030%20DISE%C3%91O%20SISMORRESISTENTE%20RM-043-2019-VIVIENDA.pdf?v=1677250657 "E.030 Diseño Sismorresistente — RM-043-2019-VIVIENDA"
+
+[5]: https://cdn.www.gob.pe/uploads/document/file/2366660/55%20E.060%20CONCRETO%20ARMADO%20DS%20N%C2%B0%20010-2009.pdf?v=1677250657 "E.060 Concreto Armado — DS N.° 010-2009"
+
+[6]: https://cdn.www.gob.pe/uploads/document/file/2366675/60%20IS.010%20INSTALACIONES%20SANITARIAS%20PARA%20EDIFICACIONES%20DS%20N%C2%B0%20017-2012.pdf?v=1677250657 "IS.010 Instalaciones Sanitarias para Edificaciones — DS N.° 017-2012"
+
+[7]: https://cdn.www.gob.pe/uploads/document/file/2366690/62%20EM.010%20INSTALACIONES%20EL%C3%89CTRICAS%20INTERIORES%20-%20RM%20N%C2%B0%20083-2019-VIVIENDA.pdf?v=1677250657 "EM.010 Instalaciones Eléctricas Interiores — RM N.° 083-2019-VIVIENDA"
 
 [3]: https://open-meteo.com/ "Open-Meteo API"
