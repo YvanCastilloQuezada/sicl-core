@@ -18,6 +18,7 @@ from api.schemas import (
     ComparisonCreateRequest,
     EvidenceCreateRequest,
     EvaluationCreateRequest,
+    MultiobjectiveRequest,
     SimulationCreateRequest,
     V1Envelope,
 )
@@ -41,7 +42,7 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "OBJECTIVE_NOT_FOUND"}:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
@@ -51,7 +52,7 @@ def _status_for(code: str) -> int:
         return 404
     if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT"}:
         return 409
-    if code in {"HUMAN_REVIEW_REQUIRED", "SEMANTIC_REJECTION"}:
+    if code in {"HUMAN_REVIEW_REQUIRED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED"}:
         return 422
     return 400
 
@@ -163,6 +164,58 @@ def get_simulation(project_id: str, simulation_id: str, repo: SQLiteRepository =
     if simulation is None:
         _error({"code": "SIMULATION_NOT_FOUND", "message": simulation_id}, project_id)
     return _ok({"simulation": simulation_to_dict(simulation)}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/multiobjective/pareto", dependencies=[Depends(_auth)])
+def multiobjective_pareto(project_id: str, request: MultiobjectiveRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if repo.get_project(project_id) is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    cli = CLI(repo, actor="api")
+    _error(cli.execute(f"/PROJECT OPEN {project_id}"), project_id)
+    result = cli.execute("/MULTIOBJECTIVE PARETO " + " ".join(request.objectives))
+    _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok(result.get("data", {}), project_id, project.version if project else None)
+
+
+@router.post("/projects/{project_id}/multiobjective/tradeoffs", dependencies=[Depends(_auth)])
+def multiobjective_tradeoffs(project_id: str, request: MultiobjectiveRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    if len(request.objectives) != 2:
+        _error({"code": "INVALID_ARGUMENT", "message": "exactly two objectives required"}, project_id)
+    if repo.get_project(project_id) is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    cli = CLI(repo, actor="api")
+    _error(cli.execute(f"/PROJECT OPEN {project_id}"), project_id)
+    result = cli.execute("/MULTIOBJECTIVE TRADEOFFS " + " ".join(request.objectives))
+    _error(result, project_id)
+    project = repo.get_project(project_id)
+    return _ok(result.get("data", {}), project_id, project.version if project else None)
+
+
+@router.get("/projects/{project_id}/multiobjective", dependencies=[Depends(_auth)])
+def list_multiobjective(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    values = []
+    for item in repo.list_multiobjective_results(project_id):
+        value = asdict(item)
+        value["state"] = item.state.value
+        values.append(value)
+    return _ok({"multiobjectives": values}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/multiobjective/{multiobjective_id}", dependencies=[Depends(_auth)])
+def get_multiobjective(project_id: str, multiobjective_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    item = repo.get_multiobjective_result(project_id, multiobjective_id)
+    if item is None:
+        _error({"code": "MULTIOBJECTIVE_NOT_FOUND", "message": multiobjective_id}, project_id)
+    value = asdict(item)
+    value["state"] = item.state.value
+    return _ok({"multiobjective": value}, project_id, project.version)
 
 
 @router.get("/projects", dependencies=[Depends(_auth)])

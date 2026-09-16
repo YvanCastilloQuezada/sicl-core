@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterator
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, Fact, HumanReview, Objective, Preference, Project, Role, Source, SourceType, SpatialScope, TemporalScope
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, Fact, HumanReview, MultiobjectiveResult, MultiobjectiveState, Objective, Preference, Project, Role, Source, SourceType, SpatialScope, TemporalScope
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 from .simulation import Simulation, SimulationState, SimulationType
@@ -126,6 +126,19 @@ class SQLiteRepository:
         CREATE TRIGGER IF NOT EXISTS simulations_no_delete
         BEFORE DELETE ON simulations
         BEGIN SELECT RAISE(ABORT, 'simulations are append-only'); END;
+        CREATE TABLE IF NOT EXISTS multiobjective_results (
+          multiobjective_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
+          method TEXT NOT NULL, method_version TEXT NOT NULL, objectives_json TEXT NOT NULL,
+          alternatives_json TEXT NOT NULL, pareto_front_json TEXT NOT NULL, dominated_json TEXT NOT NULL,
+          incomplete_json TEXT NOT NULL, tradeoffs_json TEXT NOT NULL, state TEXT NOT NULL,
+          inputs_hash TEXT NOT NULL, created_at TEXT NOT NULL, version INTEGER NOT NULL
+        );
+        CREATE TRIGGER IF NOT EXISTS multiobjective_results_no_update
+        BEFORE UPDATE ON multiobjective_results
+        BEGIN SELECT RAISE(ABORT, 'multiobjective results are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS multiobjective_results_no_delete
+        BEFORE DELETE ON multiobjective_results
+        BEGIN SELECT RAISE(ABORT, 'multiobjective results are append-only'); END;
         CREATE TRIGGER IF NOT EXISTS evidence_no_update
         BEFORE UPDATE ON evidence
         BEGIN SELECT RAISE(ABORT, 'evidence is append-only'); END;
@@ -203,6 +216,7 @@ class SQLiteRepository:
         p.sources = {r["source_id"]: Source(r["source_id"], r["project_id"], SourceType(r["source_type"]), r["title"], r["url"], r["version"]) for r in self.conn.execute("SELECT * FROM sources WHERE project_id=?", (project_id,))}
         p.evidence = {r["evidence_id"]: Evidence(r["evidence_id"], r["project_id"], r["source_id"], r["statement"], EvidenceType(r["evidence_type"]), datetime.fromisoformat(r["captured_at"]), r["method_version"], r["evidence_url"], r["evidence_hash"], r["state"], r["version"]) for r in self.conn.execute("SELECT * FROM evidence WHERE project_id=?", (project_id,))}
         p.simulations = {r["simulation_id"]: Simulation(r["simulation_id"], r["project_id"], SimulationType(r["simulation_type"]), r["method"], r["method_version"], json.loads(r["inputs_json"]), json.loads(r["outputs_json"]), SimulationState(r["state"]), datetime.fromisoformat(r["started_at"]), datetime.fromisoformat(r["finished_at"]) if r["finished_at"] else None, r["evidence_hash"], r["version"]) for r in self.conn.execute("SELECT * FROM simulations WHERE project_id=?", (project_id,))}
+        p.multiobjective_results = {r["multiobjective_id"]: MultiobjectiveResult(r["multiobjective_id"], r["project_id"], r["method"], r["method_version"], json.loads(r["objectives_json"]), json.loads(r["alternatives_json"]), json.loads(r["pareto_front_json"]), json.loads(r["dominated_json"]), json.loads(r["incomplete_json"]), json.loads(r["tradeoffs_json"]), MultiobjectiveState(r["state"]), r["inputs_hash"], datetime.fromisoformat(r["created_at"]), r["version"]) for r in self.conn.execute("SELECT * FROM multiobjective_results WHERE project_id=?", (project_id,))}
         return p
 
     def list_projects(self) -> list[Project]:
@@ -255,6 +269,27 @@ class SQLiteRepository:
             )
             self.conn.execute("UPDATE projects SET version=? WHERE project_id=?", (project.version, project.project_id))
             self.add_event(event)
+
+    def insert_multiobjective_and_event(self, result: MultiobjectiveResult, project: Project, event: Event) -> None:
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO multiobjective_results VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (result.multiobjective_id, result.project_id, result.method, result.method_version,
+                 json.dumps(result.objectives, sort_keys=True), json.dumps(result.alternatives, sort_keys=True),
+                 json.dumps(result.pareto_front, sort_keys=True), json.dumps(result.dominated, sort_keys=True),
+                 json.dumps(result.incomplete, sort_keys=True), json.dumps(result.tradeoffs, sort_keys=True),
+                 result.state.value, result.inputs_hash, result.created_at.isoformat(), result.version),
+            )
+            self.conn.execute("UPDATE projects SET version=? WHERE project_id=?", (project.version, project.project_id))
+            self.add_event(event)
+
+    def list_multiobjective_results(self, project_id: str) -> list[MultiobjectiveResult]:
+        project = self.get_project(project_id)
+        return list(project.multiobjective_results.values()) if project else []
+
+    def get_multiobjective_result(self, project_id: str, result_id: str) -> MultiobjectiveResult | None:
+        project = self.get_project(project_id)
+        return project.multiobjective_results.get(result_id) if project else None
 
     def list_simulations(self, project_id: str) -> list[Simulation]:
         project = self.get_project(project_id)

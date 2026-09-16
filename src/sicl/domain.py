@@ -8,6 +8,11 @@ from typing import Any
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 from .simulation import Simulation
 
+
+class MultiobjectiveState(str, Enum):
+    EXECUTED = "EXECUTED"
+    INSUFFICIENT = "INSUFFICIENT"
+
 STAGES = {"DRAFT", "ACTIVE", "PRELIMINARY_DESIGN", "CLOSED"}
 DIRECTIONS = {"MAXIMIZE", "MINIMIZE"}
 KNOWLEDGE_STATES = {"UNKNOWN", "CONFLICTING", "INSUFFICIENT", "OBSERVED"}
@@ -103,6 +108,7 @@ class Project:
     evidence: dict[str, "Evidence"] = field(default_factory=dict)
     sources: dict[str, "Source"] = field(default_factory=dict)
     simulations: dict[str, Simulation] = field(default_factory=dict)
+    multiobjective_results: dict[str, "MultiobjectiveResult"] = field(default_factory=dict)
     # spatial_scope remains optional: null means that no spatial scale is declared.
     spatial_scope: SpatialScope | None = None
     temporal_scope: TemporalScope = TemporalScope.PROYECTO
@@ -198,6 +204,24 @@ class Event:
     payload: dict[str, Any]
     actor: str
     source: str
+
+
+@dataclass(frozen=True)
+class MultiobjectiveResult:
+    multiobjective_id: str
+    project_id: str
+    method: str
+    method_version: str
+    objectives: list[str]
+    alternatives: list[str]
+    pareto_front: list[str]
+    dominated: list[str]
+    incomplete: list[str]
+    tradeoffs: dict[str, Any]
+    state: MultiobjectiveState
+    inputs_hash: str
+    created_at: datetime
+    version: int = 1
 
 
 @dataclass(frozen=True)
