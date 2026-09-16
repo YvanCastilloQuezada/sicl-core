@@ -83,6 +83,18 @@ class SQLiteRepository:
           alternative_ids_json TEXT NOT NULL, evaluations_json TEXT NOT NULL,
           tradeoffs_json TEXT NOT NULL, version INTEGER NOT NULL
         );
+        CREATE TRIGGER IF NOT EXISTS evaluations_no_update
+        BEFORE UPDATE ON evaluations
+        BEGIN SELECT RAISE(ABORT, 'evaluations are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS evaluations_no_delete
+        BEFORE DELETE ON evaluations
+        BEGIN SELECT RAISE(ABORT, 'evaluations are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS comparisons_no_update
+        BEFORE UPDATE ON comparisons
+        BEGIN SELECT RAISE(ABORT, 'comparisons are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS comparisons_no_delete
+        BEFORE DELETE ON comparisons
+        BEGIN SELECT RAISE(ABORT, 'comparisons are append-only'); END;
         CREATE TABLE IF NOT EXISTS recommendations (
           id TEXT PRIMARY KEY, comparison_id TEXT NOT NULL REFERENCES comparisons(id),
           recommended_alternative_id TEXT NOT NULL, reason TEXT NOT NULL,

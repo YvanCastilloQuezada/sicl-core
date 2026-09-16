@@ -52,6 +52,9 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 | Decision | `decision_id`, `project_id`, `statement`, `actor`, `authority`, `version` |
 | HumanReview | `review_id`, `project_id`, `statement`, `actor`, `authority`, `status`, `version` |
 | SiteObservation | `location`, valores con unidad, `source`, `state`, `captured_at`, `method`, `evidence` |
+| Alternative | `alternative_id`, `project_id`, `name`, `description`, `parameters`, `status`, `version`, `source` |
+| Evaluation | `evaluation_id`, `alternative_id`, `objective_id`, `value`, `unit`, `confidence`, `source`, `version` |
+| Comparison | `comparison_id`, `project_id`, `alternative_ids`, `evaluations`, `tradeoffs`, `version` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
 
 ### Multiscale Model
@@ -80,6 +83,8 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 /EVIDENCE ADD <evidence_id> <statement> <evidence_type> [source_id] [evidence_url]
 /EVIDENCE LIST
 /EVIDENCE SHOW <evidence_id>
+/EVALUATE <alternative> <objective> <value> [unit] [confidence] [source]
+/COMPARE <alternative> <alternative> [...]
 /DECISION RECORD <statement> <actor> <authority>
 /STATUS
 /HISTORY
@@ -105,10 +110,16 @@ Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el c
 14. `SiteObservation` no crea restricciones normativas; la normativa requiere una fuente específica y autoridad humana.
 15. `Evidence` solo registra declaraciones capturadas; no se convierte automáticamente en `Fact` o `Assumption`.
 16. `Evidence` acepta únicamente los tipos y estados canónicos, calcula SHA-256 desde `statement` cuando falta hash y es append-only.
+17. `Evaluation` requiere una Alternative y un Objective existentes; no crea Recommendation ni Decision.
+18. `Comparison` requiere al menos dos Alternatives existentes y no crea Recommendation ni Decision.
 
 ## 6. Persistencia
 
 SQLite es el adaptador aprobado del MVP. Se usan tablas de estado para Project y sus entidades, y una tabla `events` inmutable. Cada mutación escribe estado y evento atómicamente.
+
+### HTTP v1 — Evaluation y Comparison
+
+La superficie canónica expone `POST` y `GET` para `/v1/projects/{project_id}/evaluations` y `/v1/projects/{project_id}/comparisons`. Las respuestas usan el envelope v1 con `contract_version`, `status`, `code`, `message`, `project_id`, `observed_version` y `data`. Evaluation puede filtrarse por `alternative` y `objective`; Comparison recibe al menos dos alternativas. Recommendation continúa separada y Decision conserva autoridad humana.
 
 ## 7. Respuestas y errores
 
