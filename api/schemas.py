@@ -102,6 +102,43 @@ class PlanningInstrumentLinkRequest(BaseModel):
     instrument_id: str = Field(min_length=1)
 
 
+class RegulationCreateRequest(BaseModel):
+    regulation_id: str = Field(min_length=1)
+    code: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    jurisdiction: str = "UNKNOWN"
+    source_url: str | None = None
+    authority: str = "UNKNOWN"
+    version: str = "1.0"
+    project_id: str | None = None
+
+
+class RegulationStatusRequest(BaseModel):
+    status: str = Field(min_length=1)
+
+
+class InterpretationCreateRequest(BaseModel):
+    interpretation_id: str = Field(min_length=1)
+    article_reference: str = Field(min_length=1)
+    interpretation_text: str = Field(min_length=1)
+    applied_to_project_id: str | None = None
+
+
+class InterpretationReviewRequest(BaseModel):
+    actor: str = Field(min_length=1)
+    authority: str = Field(min_length=1)
+
+
+class SnapshotCreateRequest(BaseModel):
+    snapshot_id: str = Field(min_length=1)
+    cut_date: str = Field(min_length=10)
+    jurisdiction: str = "UNKNOWN"
+
+
+class SnapshotFreezeRequest(BaseModel):
+    reviewer: str = Field(min_length=1)
+
+
 class ProjectResponse(BaseModel):
     project_id: str
     name: str

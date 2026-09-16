@@ -4,11 +4,11 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import asdict
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Iterator
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, Fact, HumanReview, MultiobjectiveResult, MultiobjectiveState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Role, Source, SourceType, SpatialScope, TemporalScope
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, Fact, HumanReview, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Regulation, RegulationStatus, Role, Source, SourceType, SpatialScope, TemporalScope
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 from .simulation import Simulation, SimulationState, SimulationType
@@ -162,6 +162,44 @@ class SQLiteRepository:
         CREATE TRIGGER IF NOT EXISTS project_planning_no_delete
         BEFORE DELETE ON project_planning_instruments
         BEGIN SELECT RAISE(ABORT, 'planning links are append-only'); END;
+        CREATE TABLE IF NOT EXISTS regulations (
+          regulation_id TEXT NOT NULL, version_field INTEGER NOT NULL, jurisdiction TEXT NOT NULL,
+          authority TEXT NOT NULL, code TEXT NOT NULL, title TEXT NOT NULL, version TEXT NOT NULL,
+          publication_date TEXT NULL, effective_date TEXT NULL, status TEXT NOT NULL,
+          source_url TEXT NULL, source_type TEXT NOT NULL, evidence_hash TEXT NULL,
+          scope_applicable_json TEXT NOT NULL, parent_regulation_id TEXT NULL, summary TEXT NULL,
+          PRIMARY KEY(regulation_id, version_field)
+        );
+        CREATE TABLE IF NOT EXISTS normative_interpretations (
+          interpretation_id TEXT NOT NULL, version INTEGER NOT NULL, regulation_id TEXT NOT NULL,
+          article_reference TEXT NOT NULL, interpretation_text TEXT NOT NULL, applied_to_project_id TEXT NULL,
+          interpreted_by TEXT NOT NULL, interpretation_date TEXT NOT NULL, confidence TEXT NOT NULL,
+          state TEXT NOT NULL, disclaimer TEXT NOT NULL, PRIMARY KEY(interpretation_id, version)
+        );
+        CREATE TABLE IF NOT EXISTS normative_snapshots (
+          snapshot_id TEXT NOT NULL, version INTEGER NOT NULL, project_id TEXT NOT NULL REFERENCES projects(project_id),
+          cut_date TEXT NOT NULL, jurisdiction TEXT NOT NULL, regulations_included_json TEXT NOT NULL,
+          interpretations_included_json TEXT NOT NULL, state TEXT NOT NULL, reviewer TEXT NULL,
+          created_at TEXT NOT NULL, PRIMARY KEY(snapshot_id, version)
+        );
+        CREATE TRIGGER IF NOT EXISTS regulations_no_update
+        BEFORE UPDATE ON regulations
+        BEGIN SELECT RAISE(ABORT, 'regulations are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS regulations_no_delete
+        BEFORE DELETE ON regulations
+        BEGIN SELECT RAISE(ABORT, 'regulations are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS interpretations_no_update
+        BEFORE UPDATE ON normative_interpretations
+        BEGIN SELECT RAISE(ABORT, 'interpretations are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS interpretations_no_delete
+        BEFORE DELETE ON normative_interpretations
+        BEGIN SELECT RAISE(ABORT, 'interpretations are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS snapshots_no_update
+        BEFORE UPDATE ON normative_snapshots
+        BEGIN SELECT RAISE(ABORT, 'normative snapshots are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS snapshots_no_delete
+        BEFORE DELETE ON normative_snapshots
+        BEGIN SELECT RAISE(ABORT, 'normative snapshots are append-only'); END;
         CREATE TRIGGER IF NOT EXISTS evidence_no_update
         BEFORE UPDATE ON evidence
         BEGIN SELECT RAISE(ABORT, 'evidence is append-only'); END;
@@ -229,6 +267,20 @@ class SQLiteRepository:
             row["summary"], row["source"], row["version"],
         )
 
+    @staticmethod
+    def _regulation_from_row(row: sqlite3.Row) -> Regulation:
+        from datetime import date
+        return Regulation(row["regulation_id"], row["jurisdiction"], row["authority"], row["code"], row["title"], row["version"], date.fromisoformat(row["publication_date"]) if row["publication_date"] else None, date.fromisoformat(row["effective_date"]) if row["effective_date"] else None, RegulationStatus(row["status"]), row["source_url"], SourceType(row["source_type"]), row["evidence_hash"], [SpatialScope(value) for value in json.loads(row["scope_applicable_json"])], row["parent_regulation_id"], row["summary"], row["version_field"])
+
+    @staticmethod
+    def _interpretation_from_row(row: sqlite3.Row) -> NormativeInterpretation:
+        from datetime import date
+        return NormativeInterpretation(row["interpretation_id"], row["regulation_id"], row["article_reference"], row["interpretation_text"], row["applied_to_project_id"], row["interpreted_by"], date.fromisoformat(row["interpretation_date"]), InterpretationConfidence(row["confidence"]), InterpretationState(row["state"]), row["disclaimer"], row["version"])
+
+    @staticmethod
+    def _snapshot_from_row(row: sqlite3.Row) -> NormativeSnapshot:
+        return NormativeSnapshot(row["snapshot_id"], row["project_id"], date.fromisoformat(row["cut_date"]), row["jurisdiction"], json.loads(row["regulations_included_json"]), json.loads(row["interpretations_included_json"]), NormativeSnapshotState(row["state"]), row["reviewer"], datetime.fromisoformat(row["created_at"]), row["version"])
+
     def get_project(self, project_id: str) -> Project | None:
         row = self.conn.execute("SELECT * FROM projects WHERE project_id=?", (project_id,)).fetchone()
         if not row:
@@ -253,6 +305,7 @@ class SQLiteRepository:
         p.simulations = {r["simulation_id"]: Simulation(r["simulation_id"], r["project_id"], SimulationType(r["simulation_type"]), r["method"], r["method_version"], json.loads(r["inputs_json"]), json.loads(r["outputs_json"]), SimulationState(r["state"]), datetime.fromisoformat(r["started_at"]), datetime.fromisoformat(r["finished_at"]) if r["finished_at"] else None, r["evidence_hash"], r["version"]) for r in self.conn.execute("SELECT * FROM simulations WHERE project_id=?", (project_id,))}
         p.multiobjective_results = {r["multiobjective_id"]: MultiobjectiveResult(r["multiobjective_id"], r["project_id"], r["method"], r["method_version"], json.loads(r["objectives_json"]), json.loads(r["alternatives_json"]), json.loads(r["pareto_front_json"]), json.loads(r["dominated_json"]), json.loads(r["incomplete_json"]), json.loads(r["tradeoffs_json"]), MultiobjectiveState(r["state"]), r["inputs_hash"], datetime.fromisoformat(r["created_at"]), r["version"]) for r in self.conn.execute("SELECT * FROM multiobjective_results WHERE project_id=?", (project_id,))}
         p.planning_instruments = {item.instrument_id: item for item in self.list_project_planning_instruments(project_id)}
+        p.normative_snapshots = {item.snapshot_id: item for item in self.list_normative_snapshots(project_id)}
         return p
 
     def list_projects(self) -> list[Project]:
@@ -375,6 +428,69 @@ class SQLiteRepository:
             (project_id,),
         ).fetchall()
         return [self._planning_from_row(row) for row in rows]
+
+    def insert_regulation_and_event(self, regulation: Regulation, event: Event) -> None:
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO regulations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (regulation.regulation_id, regulation.version_field, regulation.jurisdiction, regulation.authority, regulation.code, regulation.title, regulation.version,
+                 regulation.publication_date.isoformat() if regulation.publication_date else None, regulation.effective_date.isoformat() if regulation.effective_date else None,
+                 regulation.status.value, regulation.source_url, regulation.source_type.value, regulation.evidence_hash,
+                 json.dumps([item.value for item in regulation.scope_applicable]), regulation.parent_regulation_id, regulation.summary),
+            )
+            self.conn.execute("UPDATE projects SET version=version+1 WHERE project_id=?", (event.project_id,))
+            self.add_event(event)
+
+    def list_regulations(self) -> list[Regulation]:
+        rows = self.conn.execute("SELECT r.* FROM regulations r WHERE NOT EXISTS (SELECT 1 FROM regulations newer WHERE newer.regulation_id=r.regulation_id AND newer.version_field>r.version_field) ORDER BY r.regulation_id").fetchall()
+        return [self._regulation_from_row(row) for row in rows]
+
+    def get_regulation(self, regulation_id: str) -> Regulation | None:
+        row = self.conn.execute("SELECT r.* FROM regulations r WHERE r.regulation_id=? AND NOT EXISTS (SELECT 1 FROM regulations newer WHERE newer.regulation_id=r.regulation_id AND newer.version_field>r.version_field)", (regulation_id,)).fetchone()
+        return self._regulation_from_row(row) if row else None
+
+    def insert_interpretation_and_event(self, interpretation: NormativeInterpretation, event: Event) -> None:
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO normative_interpretations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (interpretation.interpretation_id, interpretation.version, interpretation.regulation_id, interpretation.article_reference, interpretation.interpretation_text,
+                 interpretation.applied_to_project_id, interpretation.interpreted_by, interpretation.interpretation_date.isoformat(), interpretation.confidence.value,
+                 interpretation.state.value, interpretation.disclaimer),
+            )
+            self.conn.execute("UPDATE projects SET version=version+1 WHERE project_id=?", (event.project_id,))
+            self.add_event(event)
+
+    def list_interpretations(self, regulation_id: str | None = None) -> list[NormativeInterpretation]:
+        query = "SELECT i.* FROM normative_interpretations i WHERE NOT EXISTS (SELECT 1 FROM normative_interpretations newer WHERE newer.interpretation_id=i.interpretation_id AND newer.version>i.version)"
+        params: list[str] = []
+        if regulation_id:
+            query += " AND i.regulation_id=?"
+            params.append(regulation_id)
+        rows = self.conn.execute(query + " ORDER BY i.interpretation_id", params).fetchall()
+        return [self._interpretation_from_row(row) for row in rows]
+
+    def get_interpretation(self, interpretation_id: str) -> NormativeInterpretation | None:
+        row = self.conn.execute("SELECT i.* FROM normative_interpretations i WHERE i.interpretation_id=? AND NOT EXISTS (SELECT 1 FROM normative_interpretations newer WHERE newer.interpretation_id=i.interpretation_id AND newer.version>i.version)", (interpretation_id,)).fetchone()
+        return self._interpretation_from_row(row) if row else None
+
+    def insert_snapshot_and_event(self, snapshot: NormativeSnapshot, event: Event) -> None:
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO normative_snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (snapshot.snapshot_id, snapshot.version, snapshot.project_id, snapshot.cut_date.isoformat(), snapshot.jurisdiction,
+                 json.dumps(snapshot.regulations_included), json.dumps(snapshot.interpretations_included), snapshot.state.value,
+                 snapshot.reviewer, snapshot.created_at.isoformat()),
+            )
+            self.conn.execute("UPDATE projects SET version=version+1 WHERE project_id=?", (snapshot.project_id,))
+            self.add_event(event)
+
+    def list_normative_snapshots(self, project_id: str) -> list[NormativeSnapshot]:
+        rows = self.conn.execute("SELECT s.* FROM normative_snapshots s WHERE s.project_id=? AND NOT EXISTS (SELECT 1 FROM normative_snapshots newer WHERE newer.snapshot_id=s.snapshot_id AND newer.version>s.version) ORDER BY s.snapshot_id", (project_id,)).fetchall()
+        return [self._snapshot_from_row(row) for row in rows]
+
+    def get_normative_snapshot(self, snapshot_id: str) -> NormativeSnapshot | None:
+        row = self.conn.execute("SELECT s.* FROM normative_snapshots s WHERE s.snapshot_id=? AND NOT EXISTS (SELECT 1 FROM normative_snapshots newer WHERE newer.snapshot_id=s.snapshot_id AND newer.version>s.version)", (snapshot_id,)).fetchone()
+        return self._snapshot_from_row(row) if row else None
 
     def list_simulations(self, project_id: str) -> list[Simulation]:
         project = self.get_project(project_id)

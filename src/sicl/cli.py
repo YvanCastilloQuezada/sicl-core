@@ -5,11 +5,11 @@ import uuid
 import json
 import csv
 import hashlib
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from dataclasses import asdict
 from typing import Any
 
-from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, HumanReview, Fact, MultiobjectiveResult, MultiobjectiveState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Role, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
+from .domain import Assumption, Constraint, Decision, Evidence, EvidenceType, Event, HumanReview, Fact, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Project, Regulation, RegulationStatus, Role, SpatialScope, SourceType, TemporalScope, KNOWLEDGE_STATES, DIRECTIONS, STAGES, now_iso
 from .repository import SICLError, SQLiteRepository
 from .v11 import Alternative, Comparison, Evaluation, Recommendation, EVALUATION_SOURCES
 from .export import dashboard_text, export_csv, export_project_json, export_report, report_text, tradeoffs_text
@@ -18,6 +18,7 @@ from .agents import BioclimaticAgent, EconomicAgent, StructuralAgent
 from .optimization import GenerativeOptimizer, pareto_front, tradeoff_matrix
 from .simulation import METHODS, Simulation, SimulationState, SimulationType, canonical_hash, execute_method, list_methods, now_utc, simulation_to_dict
 from .design_principles import get_principle, list_principles
+from .regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_dict, snapshot_to_dict
 
 
 class CLI:
@@ -43,7 +44,7 @@ class CLI:
         try:
             parts = shlex.split(command)
             if not parts or parts[0] == "/HELP":
-                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
+                return self._ok({"commands": ["/PROJECT CREATE", "/PROJECT OPEN", "/PROJECT SET SCOPE", "/PROJECT SHOW", "/PROJECT LIST", "/STAGE SET", "/OBJECTIVE SET", "/CONSTRAINT SET", "/ROLE ADD", "/FACT SET", "/ASSUMPTION SET", "/EVIDENCE ADD", "/EVIDENCE LIST", "/EVIDENCE SHOW", "/HUMAN REVIEW", "/SITE INTELLIGENCE", "/AGENT RUN", "/DEBATE", "/GENERATE", "/PARETO", "/TRADEOFF_MATRIX", "/MULTIOBJECTIVE", "/PLANNING ADD", "/PLANNING LIST", "/PLANNING SHOW", "/PLANNING TYPES", "/REGULATION ADD", "/REGULATION LIST", "/REGULATION SHOW", "/REGULATION STATUS", "/INTERPRET ADD", "/INTERPRET LIST", "/INTERPRET REVIEW", "/SNAPSHOT CREATE", "/SNAPSHOT LIST", "/SNAPSHOT FREEZE", "/DECISION RECORD", "/STATUS", "/HISTORY", "/EXIT"]})
             head = tuple(p.upper() for p in parts[:2])
             if head == ("/EXIT",):
                 self.closed = True
@@ -137,6 +138,26 @@ class CLI:
                 return self.planning_show(parts[2:])
             if head == ("/PLANNING", "TYPES"):
                 return self._ok({"types": [item.value for item in PlanningInstrumentType]})
+            if head == ("/REGULATION", "ADD"):
+                return self.regulation_add(parts[2:])
+            if head == ("/REGULATION", "LIST"):
+                return self.regulation_list()
+            if head == ("/REGULATION", "SHOW"):
+                return self.regulation_show(parts[2:])
+            if head == ("/REGULATION", "STATUS"):
+                return self.regulation_status(parts[2:])
+            if head == ("/INTERPRET", "ADD"):
+                return self.interpret_add(parts[2:])
+            if head == ("/INTERPRET", "LIST"):
+                return self.interpret_list(parts[2:])
+            if head == ("/INTERPRET", "REVIEW"):
+                return self.interpret_review(parts[2:])
+            if head == ("/SNAPSHOT", "CREATE"):
+                return self.snapshot_create(parts[2:])
+            if head == ("/SNAPSHOT", "LIST"):
+                return self.snapshot_list(parts[2:])
+            if head == ("/SNAPSHOT", "FREEZE"):
+                return self.snapshot_freeze(parts[2:])
             if parts[0].upper() == "/REPORT":
                 return self._text_response(report_text(self.repo, self._project()))
             if parts[0].upper() == "/TRADEOFFS":
@@ -208,6 +229,110 @@ class CLI:
         if instrument is None:
             raise SICLError("PLANNING_INSTRUMENT_NOT_FOUND", args[0])
         return self._ok({"instrument": self._planning_dict(instrument)})
+
+    def regulation_add(self, args: list[str]) -> dict:
+        if len(args) < 3 or len(args) > 5:
+            raise SICLError("INVALID_ARGUMENT", "regulation_id code title [jurisdiction] [source_url] required")
+        project = self._project()
+        regulation_id, code, title = args[:3]
+        if self.repo.get_regulation(regulation_id):
+            raise SICLError("CONFLICT", f"regulation already exists: {regulation_id}")
+        jurisdiction = args[3] if len(args) >= 4 else "UNKNOWN"
+        source_url = args[4] if len(args) >= 5 else None
+        regulation = Regulation(regulation_id, jurisdiction, "UNKNOWN", code, title, "1.0", None, None, RegulationStatus.NO_VERIFICADA, source_url, SourceType.OFFICIAL if source_url else SourceType.UNKNOWN, None, [], None, None)
+        self.repo.insert_regulation_and_event(regulation, self._event(project.project_id, "REGULATION_REGISTERED", regulation_to_dict(regulation)))
+        return self._ok({"regulation": regulation_to_dict(regulation)})
+
+    def regulation_list(self) -> dict:
+        return self._ok({"regulations": [regulation_to_dict(item) for item in self.repo.list_regulations()]})
+
+    def regulation_show(self, args: list[str]) -> dict:
+        if len(args) != 1:
+            raise SICLError("INVALID_ARGUMENT", "regulation_id required")
+        item = self.repo.get_regulation(args[0])
+        if item is None:
+            raise SICLError("REGULATION_NOT_FOUND", args[0])
+        return self._ok({"regulation": regulation_to_dict(item)})
+
+    def regulation_status(self, args: list[str]) -> dict:
+        if len(args) != 2:
+            raise SICLError("INVALID_ARGUMENT", "regulation_id status required")
+        project = self._project()
+        current = self.repo.get_regulation(args[0])
+        if current is None:
+            raise SICLError("REGULATION_NOT_FOUND", args[0])
+        try:
+            status = RegulationStatus(args[1].upper())
+        except ValueError as exc:
+            raise SICLError("INVALID_ARGUMENT", "invalid regulation status") from exc
+        updated = Regulation(current.regulation_id, current.jurisdiction, current.authority, current.code, current.title, current.version, current.publication_date, current.effective_date, status, current.source_url, current.source_type, current.evidence_hash, current.scope_applicable, current.parent_regulation_id, current.summary, current.version_field + 1)
+        self.repo.insert_regulation_and_event(updated, self._event(project.project_id, "REGULATION_STATUS_CHANGED", regulation_to_dict(updated)))
+        return self._ok({"regulation": regulation_to_dict(updated)})
+
+    def interpret_add(self, args: list[str]) -> dict:
+        if len(args) != 4:
+            raise SICLError("INVALID_ARGUMENT", "interpretation_id regulation_id article_reference interpretation_text required")
+        project = self._project()
+        if self.repo.get_regulation(args[1]) is None:
+            raise SICLError("REGULATION_NOT_FOUND", args[1])
+        if self.repo.get_interpretation(args[0]):
+            raise SICLError("CONFLICT", f"interpretation already exists: {args[0]}")
+        item = NormativeInterpretation(args[0], args[1], args[2], args[3], None, self.actor, date.today(), InterpretationConfidence.UNKNOWN, InterpretationState.DRAFT, LEGAL_DISCLAIMER)
+        self.repo.insert_interpretation_and_event(item, self._event(project.project_id, "NORMATIVE_INTERPRETATION_REGISTERED", interpretation_to_dict(item)))
+        return self._ok({"interpretation": interpretation_to_dict(item)})
+
+    def interpret_list(self, args: list[str]) -> dict:
+        if len(args) > 1:
+            raise SICLError("INVALID_ARGUMENT", "optional regulation_id only")
+        return self._ok({"interpretations": [interpretation_to_dict(item) for item in self.repo.list_interpretations(args[0] if args else None)]})
+
+    def interpret_review(self, args: list[str]) -> dict:
+        if len(args) != 3:
+            raise SICLError("INVALID_ARGUMENT", "interpretation_id actor authority required")
+        project = self._project()
+        current = self.repo.get_interpretation(args[0])
+        if current is None:
+            raise SICLError("INTERPRETATION_NOT_FOUND", args[0])
+        if not args[1] or not args[2]:
+            raise SICLError("INVALID_ARGUMENT", "actor and authority required")
+        reviewed = NormativeInterpretation(current.interpretation_id, current.regulation_id, current.article_reference, current.interpretation_text, current.applied_to_project_id, args[1], current.interpretation_date, current.confidence, InterpretationState.REVIEWED, LEGAL_DISCLAIMER, current.version + 1)
+        self.repo.insert_interpretation_and_event(reviewed, self._event(project.project_id, "NORMATIVE_INTERPRETATION_REVIEWED", {**interpretation_to_dict(reviewed), "authority": args[2]}))
+        return self._ok({"interpretation": interpretation_to_dict(reviewed), "authority": args[2], "applicable": True})
+
+    def snapshot_create(self, args: list[str]) -> dict:
+        if len(args) != 3:
+            raise SICLError("INVALID_ARGUMENT", "snapshot_id project_id cut_date required")
+        project = self.repo.get_project(args[1])
+        if project is None:
+            raise SICLError("PROJECT_NOT_FOUND", args[1])
+        try:
+            cut_date = date.fromisoformat(args[2])
+        except ValueError as exc:
+            raise SICLError("INVALID_ARGUMENT", "cut_date must be YYYY-MM-DD") from exc
+        if self.repo.get_normative_snapshot(args[0]):
+            raise SICLError("CONFLICT", f"snapshot already exists: {args[0]}")
+        item = NormativeSnapshot(args[0], args[1], cut_date, "UNKNOWN", [r.regulation_id for r in self.repo.list_regulations()], [i.interpretation_id for i in self.repo.list_interpretations()], NormativeSnapshotState.DRAFT, None, datetime.now(timezone.utc))
+        self.repo.insert_snapshot_and_event(item, self._event(args[1], "NORMATIVE_SNAPSHOT_CREATED", snapshot_to_dict(item)))
+        return self._ok({"snapshot": snapshot_to_dict(item)})
+
+    def snapshot_list(self, args: list[str]) -> dict:
+        if len(args) != 1:
+            raise SICLError("INVALID_ARGUMENT", "project_id required")
+        if self.repo.get_project(args[0]) is None:
+            raise SICLError("PROJECT_NOT_FOUND", args[0])
+        return self._ok({"snapshots": [snapshot_to_dict(item) for item in self.repo.list_normative_snapshots(args[0])]})
+
+    def snapshot_freeze(self, args: list[str]) -> dict:
+        if len(args) != 2:
+            raise SICLError("INVALID_ARGUMENT", "snapshot_id reviewer required")
+        current = self.repo.get_normative_snapshot(args[0])
+        if current is None:
+            raise SICLError("SNAPSHOT_NOT_FOUND", args[0])
+        if current.state == NormativeSnapshotState.FROZEN:
+            raise SICLError("INVALID_STATE", "FROZEN snapshot is immutable")
+        frozen = NormativeSnapshot(current.snapshot_id, current.project_id, current.cut_date, current.jurisdiction, current.regulations_included, current.interpretations_included, NormativeSnapshotState.FROZEN, args[1], current.created_at, current.version + 1)
+        self.repo.insert_snapshot_and_event(frozen, self._event(current.project_id, "NORMATIVE_SNAPSHOT_FROZEN", snapshot_to_dict(frozen)))
+        return self._ok({"snapshot": snapshot_to_dict(frozen)})
 
     def project_create(self, args: list[str]) -> dict:
         if len(args) < 2: raise SICLError("INVALID_ARGUMENT", "project_id and name required")

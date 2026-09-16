@@ -104,6 +104,33 @@ class PlanningInstrumentStatus(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
+class RegulationStatus(str, Enum):
+    VIGENTE = "VIGENTE"
+    MODIFICADA = "MODIFICADA"
+    DEROGADA = "DEROGADA"
+    NO_VERIFICADA = "NO_VERIFICADA"
+
+
+class InterpretationConfidence(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    UNKNOWN = "UNKNOWN"
+
+
+class InterpretationState(str, Enum):
+    DRAFT = "DRAFT"
+    REVIEWED = "REVIEWED"
+    REJECTED = "REJECTED"
+
+
+class NormativeSnapshotState(str, Enum):
+    DRAFT = "DRAFT"
+    REVIEWED = "REVIEWED"
+    FROZEN = "FROZEN"
+    SUPERSEDED = "SUPERSEDED"
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -131,6 +158,9 @@ class Project:
     simulations: dict[str, Simulation] = field(default_factory=dict)
     multiobjective_results: dict[str, "MultiobjectiveResult"] = field(default_factory=dict)
     planning_instruments: dict[str, "PlanningInstrument"] = field(default_factory=dict)
+    regulations: dict[str, "Regulation"] = field(default_factory=dict)
+    interpretations: dict[str, "NormativeInterpretation"] = field(default_factory=dict)
+    normative_snapshots: dict[str, "NormativeSnapshot"] = field(default_factory=dict)
     # spatial_scope remains optional: null means that no spatial scale is declared.
     spatial_scope: SpatialScope | None = None
     temporal_scope: TemporalScope = TemporalScope.PROYECTO
@@ -262,6 +292,55 @@ class PlanningInstrument:
     url: str | None
     summary: str | None
     source: str
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class Regulation:
+    regulation_id: str
+    jurisdiction: str
+    authority: str
+    code: str
+    title: str
+    version: str
+    publication_date: date | None
+    effective_date: date | None
+    status: RegulationStatus
+    source_url: str | None
+    source_type: SourceType
+    evidence_hash: str | None
+    scope_applicable: list[SpatialScope]
+    parent_regulation_id: str | None
+    summary: str | None
+    version_field: int = 1
+
+
+@dataclass(frozen=True)
+class NormativeInterpretation:
+    interpretation_id: str
+    regulation_id: str
+    article_reference: str
+    interpretation_text: str
+    applied_to_project_id: str | None
+    interpreted_by: str
+    interpretation_date: date
+    confidence: InterpretationConfidence
+    state: InterpretationState
+    disclaimer: str = "No constituye certificación legal ni reemplaza revisión profesional."
+    version: int = 1
+
+
+@dataclass(frozen=True)
+class NormativeSnapshot:
+    snapshot_id: str
+    project_id: str
+    cut_date: date
+    jurisdiction: str
+    regulations_included: list[str]
+    interpretations_included: list[str]
+    state: NormativeSnapshotState
+    reviewer: str | None
+    created_at: datetime
     version: int = 1
 
 
