@@ -62,7 +62,7 @@ from sicl.temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
 from sicl.memory import memory_to_dict, memory_types
 from sicl.repository import SQLiteRepository
-from sicl.site_intelligence import fetch_open_meteo_solar, fetch_open_meteo_solar_coordinates, get_site_observation
+from sicl.site_intelligence import fetch_open_meteo_solar, fetch_open_meteo_solar_coordinates, get_site_observation, fetch_open_meteo_air_quality, fetch_open_meteo_climate
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
 from sicl.design_principles import get_principle, list_principles
 from sicl.regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_dict, snapshot_to_dict
@@ -1483,6 +1483,31 @@ def upao001_pareto_transport(example_id: str) -> V1Envelope:
             "decision_created": dataset.decision_created,
         }
     )
+
+
+@router.get("/examples/{example_id}/territorial-environment", dependencies=[Depends(_auth)])
+def territorial_environment(example_id: str, selected_date: str, selected_time: str = "12:00", spatial_scope: str = "distrito_ciudad", include_air_quality: bool = True, include_climate: bool = True) -> V1Envelope:
+    if example_id != "UPAO-001":
+        _error({"code": "EXAMPLE_NOT_FOUND", "message": example_id}, example_id)
+    if spatial_scope != "distrito_ciudad":
+        _error({"code": "SCOPE_NOT_AUTHORIZED", "message": "Only distrito_ciudad pilot is active"}, example_id)
+    latitude, longitude = -8.1116, -79.0287
+    layers: list[dict[str, Any]] = []
+    errors: list[dict[str, str]] = []
+    if include_air_quality:
+        try:
+            aq = fetch_open_meteo_air_quality(latitude, longitude, selected_date, location_label="Trujillo / distrito_ciudad proxy")
+            index = (aq["hourly"].get("time") or []).index(f"{selected_date}T{selected_time}")
+            layers.append({"family": "AIR_QUALITY", "status": "AVAILABLE", "provider": aq["source"], "model": aq["source_model"], "time": f"{selected_date}T{selected_time}", "values": {k: v[index] for k, v in aq["hourly"].items() if k != "time"}, "spatial_resolution": aq["spatial_resolution"], "provenance": aq["evidence_url"]})
+        except Exception as exc:
+            errors.append({"family": "AIR_QUALITY", "code": "SOURCE_UNAVAILABLE", "message": str(exc)})
+    if include_climate:
+        try:
+            climate = fetch_open_meteo_climate(latitude, longitude, start_date=selected_date, end_date=selected_date, location_label="Trujillo / distrito_ciudad climate proxy")
+            layers.append({"family": "CLIMATE", "status": "AVAILABLE", "provider": climate["source"], "model": climate["source_model"], "time_horizon": {"start": climate["start_date"], "end": climate["end_date"]}, "temporal_resolution": climate["temporal_resolution"], "values": {k: (v[0] if isinstance(v, list) and v else None) for k, v in climate["daily"].items() if k != "time"}, "spatial_resolution": climate["spatial_resolution"], "bias_correction": climate["bias_correction"], "provenance": climate["evidence_url"]})
+        except Exception as exc:
+            errors.append({"family": "CLIMATE", "code": "SOURCE_UNAVAILABLE", "message": str(exc)})
+    return _ok({"example_id": example_id, "spatial_scope": spatial_scope, "representation": "POINT_CONTEXT + PROVIDER_MODEL_GRID", "location": {"name": "Trujillo / distrito_ciudad proxy", "latitude": latitude, "longitude": longitude, "provenance": "Open-Meteo model output; not local sensor or cadastral boundary"}, "selected_date": selected_date, "selected_time": selected_time, "weather_vs_climate_separated": True, "layers": layers, "errors": errors, "decision_created": False, "human_review_created": False, "recommendation_created": False, "read_only": True})
 
 
 @router.get("/examples/{example_id}/environmental-analysis", dependencies=[Depends(_auth)])

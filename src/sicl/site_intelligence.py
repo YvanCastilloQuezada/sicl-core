@@ -177,6 +177,24 @@ def fetch_open_meteo_solar(location: str, selected_date: str, timeout: float = 5
     }
 
 
+
+def fetch_open_meteo_air_quality(latitude: float, longitude: float, selected_date: str, *, location_label: str = "Territorial environmental proxy", timeout: float = 5.0) -> dict[str, Any]:
+    url = "https://air-quality-api.open-meteo.com/v1/air-quality?" + urlencode({"latitude": latitude, "longitude": longitude, "hourly": "pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,dust,aerosol_optical_depth,uv_index,european_aqi,us_aqi", "start_date": selected_date, "end_date": selected_date, "timezone": "America/Lima"})
+    raw = _get_json(url, timeout)
+    hourly = raw.get("hourly") or {}
+    if not hourly.get("time"):
+        raise ValueError("Open-Meteo Air Quality response lacks hourly timestamps")
+    return {"location": location_label, "latitude": float(latitude), "longitude": float(longitude), "timezone": str(raw.get("timezone") or "America/Lima"), "source": "OPEN_METEO_AIR_QUALITY_API", "source_model": str(raw.get("model") or "CAMS"), "source_variables": [k for k in hourly if k != "time"], "hourly": hourly, "selected_date": selected_date, "evidence_url": url, "raw_response": {"air_quality": raw}, "captured_at": _now_iso(), "method_version": "OPEN_METEO_AIR_QUALITY_HOURLY/1", "spatial_resolution": "provider model grid; not local sensor"}
+
+
+def fetch_open_meteo_climate(latitude: float, longitude: float, *, start_date: str = "1991-01-01", end_date: str = "2050-12-31", model: str = "EC_Earth3P_HR", location_label: str = "Territorial climate proxy", timeout: float = 5.0) -> dict[str, Any]:
+    url = "https://climate-api.open-meteo.com/v1/climate?" + urlencode({"latitude": latitude, "longitude": longitude, "start_date": start_date, "end_date": end_date, "models": model, "daily": "temperature_2m_mean,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_mean,wind_speed_10m_max,shortwave_radiation_sum,cloud_cover_mean,relative_humidity_2m_mean,pressure_msl_mean,soil_moisture_0_to_10cm_mean,et0_fao_evapotranspiration"})
+    raw = _get_json(url, timeout)
+    daily = raw.get("daily") or {}
+    if not daily.get("time"):
+        raise ValueError("Open-Meteo Climate response lacks daily timestamps")
+    return {"location": location_label, "latitude": float(latitude), "longitude": float(longitude), "timezone": str(raw.get("timezone") or "GMT"), "source": "OPEN_METEO_CLIMATE_API", "source_model": model, "source_variables": [k for k in daily if k != "time"], "daily": daily, "start_date": start_date, "end_date": end_date, "temporal_resolution": "daily", "spatial_resolution": "provider climate model cell; approximately 10-51 km depending on model", "evidence_url": url, "raw_response": {"climate": raw}, "captured_at": _now_iso(), "method_version": "OPEN_METEO_CLIMATE_DAILY_CMIP6/1", "bias_correction": "provider/model dependent; not assumed"}
+
 def fallback_observation(location: str) -> SiteObservation:
     if "TRUJILLO" in location.upper():
         return FALLBACK_TRUJILLO
