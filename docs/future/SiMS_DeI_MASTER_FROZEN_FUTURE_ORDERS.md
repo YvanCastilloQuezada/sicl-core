@@ -2,7 +2,7 @@
 
 **Document status:** Canonical documentary and architectural registry
 **Product implementation authority:** None
-**Baseline used for classification:** `main` at the documentation branch creation point
+**Baseline used for classification:** GDI-P1 normalized result — Core `9ab4417c1a0bb4f0426312bb9cd6f97fd3c735d2`, Web `94598740dc8830a2ab66f428d15429e297fea0d2`
 **Scope:** Classification and consolidation only
 
 > **DOCUMENTED != AUTHORIZED != IMPLEMENTED != INTEGRATED != DEPLOYED**
@@ -392,11 +392,11 @@ Spatial design generation should produce traceable alternatives from a design pr
 
 ### Already implemented
 
-SpatialRepresentation, deterministic UPAO-001 generation, synthetic alternatives, 2D/3D viewers, and A/B/C comparison foundations are implemented. The current pilot is educational and does not claim real building performance.
+SpatialRepresentation, deterministic UPAO-001 generation, synthetic alternatives, 2D/3D viewers, A/B/C comparison foundations, GDI-P1 DesignOperation semantics, LOCK/FREE/RANGE controls, bounded exploration, Design DNA, design families, basic branching/evolution, raw Pareto exploration, design-space mapping, bounded multi-agent challenge, and direct derived-alternative visualization are implemented. GDI-P1 is the single generative semantic foundation. The current pilot is educational and does not claim real building performance.
 
 ### Frozen remainder
 
-Parametric, constraint-aware, objective-aware, typology-aware generation, mutation, recombination, design-space exploration, alternative genealogy, iterative evolution, human-guided generation, and AI-assisted generation remain frozen.
+GDI-P2 through GDI-P8 remain documented/frozen: Generative Studio / Visual Authoring Layer; Spatial Synthesis / New Semantic Depth; Multimodal Input Adapter Layer; Design Memory Projection / Query Layer; Advanced Design Evolution; Multiscale Generation; and Advanced Multi-Agent Design. Advanced parametric, constraint-aware, objective-aware, typology-aware generation, partial inheritance, cross-branch composition, multimodal input, durable design memory, scale-specific generation, and AI-assisted generation remain frozen.
 
 ### Not authorized
 
@@ -421,6 +421,40 @@ SpatialRepresentation remains the common derived representation for 2D, 3D, anal
 ### Notes / open questions
 
 No parallel spatial model should be introduced without an explicit contract decision.
+
+## 11A. GDI-P1 administrative normalization
+
+**GDI-P1:** `IMPLEMENTED / CLOSED / PASS`
+
+**CORE_RESULT:** `9ab4417c1a0bb4f0426312bb9cd6f97fd3c735d2`
+
+**WEB_RESULT:** `94598740dc8830a2ab66f428d15429e297fea0d2`
+
+GDI-P1 is the single generative semantic foundation for future generative capabilities. It reuses `Alternative`, `SpatialRepresentation`, `DesignOperation`, lineage, Event Log, Design DNA, Evaluation, Pareto, Comparison, Challenge, and Human Authority. No parallel semantic system is authorized.
+
+The following remain documented/frozen and are not activated by this normalization:
+
+| Phase | Consolidated role | Status |
+|---|---|---|
+| GDI-P2 | Generative Studio / Visual Authoring Layer | DOCUMENTED / FROZEN |
+| GDI-P3 | Spatial Synthesis / New Semantic Depth | DOCUMENTED / FROZEN |
+| GDI-P4 | Multimodal Input Adapter Layer | DOCUMENTED / FROZEN |
+| GDI-P5 | Design Memory Projection / Query Layer | DOCUMENTED / FROZEN |
+| GDI-P6 | Advanced Design Evolution | DOCUMENTED / FROZEN |
+| GDI-P7 | Multiscale Generation | DOCUMENTED / FROZEN |
+| GDI-P8 | Advanced Multi-Agent Design | DOCUMENTED / FROZEN |
+
+Cross-cutting concepts remain frozen: Negative Design Preferences as a Human Intent extension, Multiple Autonomy Modes as governance, AI-GENERATIVE-FUTURE, and Design Genome as a conceptual umbrella only. No `DesignGenome` entity, table, or API is authorized.
+
+The anti-duplication rule is constitutional:
+
+```text
+ONE SEMANTIC FOUNDATION
+```
+
+No parallel systems may be created for `DesignOperation`, `Alternative`, `SpatialRepresentation`, lineage, Event Log, Design Memory, Design DNA, Pareto, Challenge, Comparison, or Human Authority.
+
+This section is administrative documentation only. It does not activate GDI-P2, change the Core Contract, change the Web product, create endpoints, create database schema, add dependencies, or authorize deployment.
 
 ## 12. FFO-10 — Advanced Evaluation, Simulation & Multiobjective Optimization
 
