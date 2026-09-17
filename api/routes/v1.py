@@ -80,6 +80,7 @@ from sicl.environmental import EnvironmentalAnalysisError, EnvironmentalLocation
 from sicl.capabilities import resolve_example_capability
 from sicl.design_intent import confirm_intent, interpret_intent
 from sicl.design_intelligence import controlled_exploration, query_design_knowledge_for_intent
+from sicl.gdi import evolve_from_candidate, explore_design_space, multi_agent_challenge, multiobjective_search
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -253,6 +254,46 @@ def design_intelligence_explore(project_id: str, request: CanonicalWriteRequest,
     except ValueError as exc:
         _error({"code": str(exc), "message": str(exc)}, project_id)
     return _ok(result, project_id)
+
+
+@router.post("/projects/{project_id}/gdi/operations", dependencies=[Depends(_auth)])
+def gdi_operations(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    payload = request.payload
+    adopted = payload.get("adopted_intent", {})
+    if adopted.get("adoption") != "HUMAN_CONFIRMED":
+        _error({"code": "HUMAN_CONFIRMATION_REQUIRED", "message": "Human-confirmed intent is required"}, project_id)
+    knowledge = payload.get("knowledge", {})
+    result = explore_design_space(str(payload.get("base_alternative_id", "UPAO-001-A")), adopted, knowledge, payload)
+    return _ok(result, project_id)
+
+
+@router.post("/projects/{project_id}/gdi/evolve", dependencies=[Depends(_auth)])
+def gdi_evolve(project_id: str, request: CanonicalWriteRequest) -> V1Envelope:
+    payload = request.payload
+    candidate = payload.get("candidate")
+    if not isinstance(candidate, dict):
+        _error({"code": "CANDIDATE_REQUIRED", "message": "A generated candidate is required"}, project_id)
+    if payload.get("action") not in {"KEEP_THIS", "CHANGE_THAT", "RETURN_TO_PARENT", "EXPLORE_FROM_HERE"}:
+        _error({"code": "INVALID_EVOLUTION_ACTION", "message": "Unsupported architect evolution action"}, project_id)
+    if payload["action"] == "KEEP_THIS":
+        return _ok({"candidate": candidate, "state": "KEPT_FOR_EXPLORATION", "decision_created": False}, project_id)
+    return _ok(evolve_from_candidate(candidate, payload["action"], payload), project_id)
+
+
+@router.post("/projects/{project_id}/gdi/challenge", dependencies=[Depends(_auth)])
+def gdi_challenge(project_id: str, request: CanonicalWriteRequest) -> V1Envelope:
+    candidate = request.payload.get("candidate")
+    if not isinstance(candidate, dict):
+        _error({"code": "CANDIDATE_REQUIRED", "message": "A candidate is required"}, project_id)
+    return _ok(multi_agent_challenge(candidate, request.payload.get("knowledge")), project_id)
+
+
+@router.post("/projects/{project_id}/gdi/multiobjective", dependencies=[Depends(_auth)])
+def gdi_multiobjective(project_id: str, request: CanonicalWriteRequest) -> V1Envelope:
+    exploration = request.payload.get("exploration")
+    if not isinstance(exploration, dict):
+        _error({"code": "EXPLORATION_REQUIRED", "message": "A bounded exploration is required"}, project_id)
+    return _ok(multiobjective_search(exploration), project_id)
 
 
 @router.post("/projects/{project_id}/bim/snapshots", dependencies=[Depends(_auth)])
