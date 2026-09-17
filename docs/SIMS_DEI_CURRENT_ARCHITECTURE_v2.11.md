@@ -55,10 +55,57 @@ RFC-025 distingue ingesta documental, evidencia, interpretación normativa y dec
 El frontend inicia en Guided Mode. El modo experto es configurable. Los catálogos, formularios y Command Bar ayudan a aprender SICL, pero el contrato canónico sigue siendo el comando SICL. El proxy server-side añade el token y clasifica `CORE_UNAVAILABLE`, `CORE_UNAUTHORIZED`, errores de ontología y errores de servicio.
 
 ## 8. Limitaciones honestas
-
 La integración remota no está verificada hasta disponer de `SICL_CORE_URL`, `SICL_CORE_SERVICE_TOKEN`, volumen persistente y un Ollama accesible desde el Core. Revit y Archicad requieren sus hosts y SDKs nativos. La exportación BIM permanece condicionada a HumanReview. El alias localizado RFC-019 del frontend no sustituye la sintaxis canónica del Core.
 
-## References
+## 9. DL-EXECUTION-EFFICIENCY-01 — Gobierno permanente de ejecución
 
+Esta decisión del Product Owner establece la política permanente para el desarrollo actual y futuro de SiMS-DeI, SICL, Core, Web, Design Intelligence, GDI, inteligencia ambiental, inteligencia normativa, interoperabilidad, simulación, evaluación y optimización.
+
+La secuencia canónica de trabajo es:
+
+```text
+PASSIVE FIRST
+→ REUSE
+→ TARGETED VERIFY
+→ EXECUTE
+→ PASS
+→ CONTINUE
+→ CONSOLIDATED VALIDATION
+→ ONE REPORT
+```
+
+La política exige **Passive First**, **Reuse Before Creation**, **Verify Only When Necessary**, **Batch Safe Work**, **Evidence Reuse**, **Proportional Validation**, **Consolidated Reporting** y **Stop Only at Real Gates**.
+
+No se debe realizar una auditoría amplia únicamente porque comienza una nueva fase. La inspección se justifica cuando existe incertidumbre arquitectónica, contradicción semántica, incertidumbre de integración, dependencia desconocida, riesgo constitucional, cambio irreversible, riesgo de seguridad, incertidumbre del baseline o necesidad de evidencia para una decisión del Product Owner.
+
+La evidencia previamente verificada conserva su validez mientras el cambio activo no pueda invalidarla. Si la superficie verificada no cambia, se reutiliza la evidencia anterior. Si cambia, la verificación se limita a la superficie afectada.
+
+Antes de crear una entidad, modelo, tabla, API, servicio, motor, renderer, workflow, ledger, grafo o integración, debe comprobarse si la semántica existente es suficiente. Una capacidad suficiente se reutiliza. Una capacidad parcial se extiende. Solo una semántica genuinamente nueva justifica una adición mínima.
+
+Las tareas compatibles, reversibles y autorizadas deben agruparse en macroórdenes. No se debe interrumpir cada paso seguro para solicitar una nueva autorización. La autonomía operativa no concede autoridad de producto.
+
+La validación debe ser proporcional a la superficie de cambio. Durante la implementación se utilizan pruebas focalizadas. En los límites de macroetapa se ejecutan las comprobaciones necesarias. En el hito final se ejecutan las pruebas, typecheck, build y comprobaciones de integridad que sean justificadas por la superficie modificada.
+
+Esta política no permite omitir pruebas críticas, ocultar incertidumbre, fabricar estados PASS ni reducir la trazabilidad. Tampoco autoriza push, merge, deployment, cambios constitucionales del Core Contract, migraciones destructivas, nuevos servicios externos o fases congeladas.
+
+Las invariantes de autoridad permanecen vigentes:
+
+```text
+AI SUGGESTION ≠ HUMAN INTENT
+RECOMMENDATION ≠ HUMAN REVIEW
+HUMAN REVIEW ≠ DECISION
+PARETO ≠ BEST
+GENERATED ALTERNATIVE ≠ DECISION
+```
+
+La política queda registrada como decisión constitucional permanente:
+
+```text
+DL-EXECUTION-EFFICIENCY-01
+STATUS = CLOSED / ACTIVE / PERMANENT
+AUTHORITY = PRODUCT OWNER / HUMAN AUTHORITY
+```
+
+## References
 [1]: https://github.com/YvanCastilloQuezada/sicl-core "SICL Core repository"
 [2]: https://github.com/YvanCastilloQuezada/sicl-web "SiMS-DeI web repository"

@@ -19,6 +19,8 @@ def test_space_layout_has_identifiable_spaces_and_circulation():
     assert len(zones) == 6
     assert len(circulation) == 1
     assert all(item["metadata"]["program_requirement_id"] for item in zones)
+    assert all(item["metadata"]["vertical_extent_status"] == "CONCEPTUAL_DERIVED" for item in zones)
+    assert all(item["metadata"]["conceptual_volume_m3"] > 0 for item in zones)
     assert layout["validation"] == "GENERATED_LAYOUT_NOT_VALIDATED"
 
 
