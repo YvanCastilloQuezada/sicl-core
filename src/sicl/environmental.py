@@ -146,8 +146,8 @@ def build_solar_analysis(
         source_retrieved_at=source_retrieved_at,
         source_variables=source_variables,
         source_values=dict(source_values),
-        derived_metrics={"solar_azimuth_degrees": position.azimuth_degrees, "solar_elevation_degrees": position.elevation_degrees, "solar_vector_local_enu": position.solar_vector},
-        units={"solar_azimuth_degrees": "degrees", "solar_elevation_degrees": "degrees", "solar_vector_local_enu": "unitless direction vector"},
+        derived_metrics={"solar_azimuth_degrees": position.azimuth_degrees, "solar_elevation_degrees": position.elevation_degrees, "solar_vector_local_enu": position.solar_vector, "wind_speed_m_s": source_values.get("wind_speed_10m"), "wind_direction_degrees": source_values.get("wind_direction_10m")},
+        units={"solar_azimuth_degrees": "degrees", "solar_elevation_degrees": "degrees", "solar_vector_local_enu": "unitless direction vector", "wind_speed_m_s": "m/s", "wind_direction_degrees": "degrees FROM (meteorological)"},
         provenance={"source_data": "meteorological input only", "derived_spatial_analysis": "astronomical solar position from location/date/time", "location_role": location.role, "location_class": location.location_class, "location_provenance": location.provenance, "surveyed_site": False, "cadastral_location": False, "verified_upao_site": False},
     )
 
