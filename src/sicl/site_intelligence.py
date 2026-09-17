@@ -111,7 +111,7 @@ def fetch_open_meteo_solar_coordinates(latitude: float, longitude: float, select
     """Fetch hourly solar source variables directly for confirmed EPSG:4326 coordinates."""
     weather_url = "https://api.open-meteo.com/v1/forecast?" + urlencode({
         "latitude": latitude, "longitude": longitude,
-        "hourly": "shortwave_radiation,direct_radiation,diffuse_radiation,wind_speed_10m,wind_direction_10m",
+        "hourly": "shortwave_radiation,direct_radiation,diffuse_radiation,wind_speed_10m,wind_direction_10m,temperature_2m",
         "wind_speed_unit": "ms",
         "start_date": selected_date, "end_date": selected_date,
         "timezone": "America/Lima",
@@ -126,7 +126,7 @@ def fetch_open_meteo_solar_coordinates(latitude: float, longitude: float, select
         "timezone": str(weather.get("timezone") or "America/Lima"),
         "source": "OPEN_METEO_API",
         "source_model": str(weather.get("generationtime_ms", "unknown")),
-        "source_variables": ["shortwave_radiation", "direct_radiation", "diffuse_radiation", "wind_speed_10m", "wind_direction_10m"],
+        "source_variables": ["shortwave_radiation", "direct_radiation", "diffuse_radiation", "wind_speed_10m", "wind_direction_10m", "temperature_2m"],
         "hourly": hourly, "selected_date": selected_date, "evidence_url": weather_url,
         "raw_response": {"weather": weather}, "captured_at": _now_iso(),
         "method_version": "OPEN_METEO_HOURLY_SOLAR_COORDINATES/1",
@@ -149,7 +149,7 @@ def fetch_open_meteo_solar(location: str, selected_date: str, timeout: float = 5
     weather_url = "https://api.open-meteo.com/v1/forecast?" + urlencode({
         "latitude": latitude,
         "longitude": longitude,
-        "hourly": "shortwave_radiation,direct_radiation,diffuse_radiation,wind_speed_10m,wind_direction_10m",
+        "hourly": "shortwave_radiation,direct_radiation,diffuse_radiation,wind_speed_10m,wind_direction_10m,temperature_2m",
         "wind_speed_unit": "ms",
         "start_date": selected_date,
         "end_date": selected_date,
@@ -167,7 +167,7 @@ def fetch_open_meteo_solar(location: str, selected_date: str, timeout: float = 5
         "timezone": str(weather.get("timezone") or "America/Lima"),
         "source": "OPEN_METEO_API",
         "source_model": str(weather.get("generationtime_ms", "unknown")),
-        "source_variables": ["shortwave_radiation", "direct_radiation", "diffuse_radiation", "wind_speed_10m", "wind_direction_10m"],
+        "source_variables": ["shortwave_radiation", "direct_radiation", "diffuse_radiation", "wind_speed_10m", "wind_direction_10m", "temperature_2m"],
         "hourly": hourly,
         "selected_date": selected_date,
         "evidence_url": f"{geo_url} | {weather_url}",

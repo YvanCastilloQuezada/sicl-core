@@ -49,14 +49,15 @@ def test_analysis_separates_source_radiation_from_derived_position() -> None:
         selected_date="2026-09-17",
         selected_time="15:00",
         location=EnvironmentalLocation("Trujillo, Peru", -8.1116, -79.0287),
-        source_values={"shortwave_radiation": 120.0, "direct_radiation": 90.0, "diffuse_radiation": 30.0},
+        source_values={"shortwave_radiation": 120.0, "direct_radiation": 90.0, "diffuse_radiation": 30.0, "wind_speed_10m": 4.2, "wind_direction_10m": 270, "temperature_2m": 27.0},
         source="OPEN_METEO_API",
         source_model="test",
         source_retrieved_at="2026-09-17T00:00:00+00:00",
-        source_variables=("shortwave_radiation", "direct_radiation", "diffuse_radiation", "wind_speed_10m", "wind_direction_10m"),
+        source_variables=("shortwave_radiation", "direct_radiation", "diffuse_radiation", "wind_speed_10m", "wind_direction_10m", "temperature_2m"),
     ).to_dict()
     assert result["source_values"]["shortwave_radiation"] == 120.0
     assert "solar_azimuth_degrees" in result["derived_metrics"]
+    assert result["derived_metrics"]["air_temperature_c"] == 27.0
     assert result["provenance"]["source_data"] != result["provenance"]["derived_spatial_analysis"]
     assert result["location"]["timezone"] == "America/Lima"
 
@@ -68,8 +69,8 @@ def test_environmental_endpoint_uses_same_time_for_abc(monkeypatch) -> None:
         "source": "OPEN_METEO_API",
         "source_model": "test",
         "captured_at": "2026-09-17T00:00:00+00:00",
-        "source_variables": ["shortwave_radiation", "direct_radiation", "diffuse_radiation", "wind_speed_10m", "wind_direction_10m"],
-        "hourly": {"time": ["2026-09-17T15:00"], "shortwave_radiation": [120], "direct_radiation": [90], "diffuse_radiation": [30], "wind_speed_10m": [4.2], "wind_direction_10m": [270]},
+        "source_variables": ["shortwave_radiation", "direct_radiation", "diffuse_radiation", "wind_speed_10m", "wind_direction_10m", "temperature_2m"],
+        "hourly": {"time": ["2026-09-17T15:00"], "shortwave_radiation": [120], "direct_radiation": [90], "diffuse_radiation": [30], "wind_speed_10m": [4.2], "wind_direction_10m": [270], "temperature_2m": [27.0]},
     }
     monkeypatch.setattr("api.routes.v1.fetch_open_meteo_solar", lambda location, selected_date: source)
     client = TestClient(create_app())
