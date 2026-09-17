@@ -31,6 +31,7 @@ class SiteObservation:
     method_version: str = "OPEN_METEO_DAILY_INDICATORS/1"
     evidence_url: str = ""
     evidence_hash: str = ""
+    timezone: str = "America/Lima"
 
     def __post_init__(self) -> None:
         if self.state not in KNOWLEDGE_STATES:
@@ -82,7 +83,7 @@ def fetch_open_meteo(location: str, timeout: float = 5.0) -> SiteObservation:
         "longitude": longitude,
         "daily": "temperature_2m_mean,wind_speed_10m_max,shortwave_radiation_sum",
         "forecast_days": 7,
-        "timezone": "UTC",
+        "timezone": "America/Lima",
     })
     weather = _get_json(weather_url, timeout)
     daily = weather.get("daily") or {}
@@ -102,7 +103,76 @@ def fetch_open_meteo(location: str, timeout: float = 5.0) -> SiteObservation:
         raw_response={"geocoding": geo, "weather": weather},
         method_version="OPEN_METEO_GEOCODING_FORECAST/1",
         evidence_url=f"{geo_url} | {weather_url}",
+        timezone=str(weather.get("timezone") or "America/Lima"),
     )
+
+
+def fetch_open_meteo_solar_coordinates(latitude: float, longitude: float, selected_date: str, *, location_label: str = "Confirmed project location", timeout: float = 5.0) -> dict[str, Any]:
+    """Fetch hourly solar source variables directly for confirmed EPSG:4326 coordinates."""
+    weather_url = "https://api.open-meteo.com/v1/forecast?" + urlencode({
+        "latitude": latitude, "longitude": longitude,
+        "hourly": "shortwave_radiation,direct_radiation,diffuse_radiation",
+        "start_date": selected_date, "end_date": selected_date,
+        "timezone": "America/Lima",
+    })
+    weather = _get_json(weather_url, timeout)
+    hourly = weather.get("hourly") or {}
+    times = hourly.get("time") or []
+    if not times:
+        raise ValueError("Open-Meteo response lacks hourly solar timestamps")
+    return {
+        "location": location_label, "latitude": float(latitude), "longitude": float(longitude),
+        "timezone": str(weather.get("timezone") or "America/Lima"),
+        "source": "OPEN_METEO_API",
+        "source_model": str(weather.get("generationtime_ms", "unknown")),
+        "source_variables": ["shortwave_radiation", "direct_radiation", "diffuse_radiation"],
+        "hourly": hourly, "selected_date": selected_date, "evidence_url": weather_url,
+        "raw_response": {"weather": weather}, "captured_at": _now_iso(),
+        "method_version": "OPEN_METEO_HOURLY_SOLAR_COORDINATES/1",
+    }
+
+def fetch_open_meteo_solar(location: str, selected_date: str, timeout: float = 5.0) -> dict[str, Any]:
+    """Fetch hourly solar source variables for one day in local civil time.
+
+    This is source data only. It does not calculate facade exposure, shadows,
+    energy performance, or thermal comfort.
+    """
+    geo_url = "https://geocoding-api.open-meteo.com/v1/search?" + urlencode({"name": location, "count": 1, "language": "en", "format": "json"})
+    geo = _get_json(geo_url, timeout)
+    results = geo.get("results") or []
+    if not results:
+        raise ValueError(f"location not found: {location}")
+    place = results[0]
+    latitude = float(place["latitude"])
+    longitude = float(place["longitude"])
+    weather_url = "https://api.open-meteo.com/v1/forecast?" + urlencode({
+        "latitude": latitude,
+        "longitude": longitude,
+        "hourly": "shortwave_radiation,direct_radiation,diffuse_radiation",
+        "start_date": selected_date,
+        "end_date": selected_date,
+        "timezone": "America/Lima",
+    })
+    weather = _get_json(weather_url, timeout)
+    hourly = weather.get("hourly") or {}
+    times = hourly.get("time") or []
+    if not times:
+        raise ValueError("Open-Meteo response lacks hourly solar timestamps")
+    return {
+        "location": location,
+        "latitude": latitude,
+        "longitude": longitude,
+        "timezone": str(weather.get("timezone") or "America/Lima"),
+        "source": "OPEN_METEO_API",
+        "source_model": str(weather.get("generationtime_ms", "unknown")),
+        "source_variables": ["shortwave_radiation", "direct_radiation", "diffuse_radiation"],
+        "hourly": hourly,
+        "selected_date": selected_date,
+        "evidence_url": f"{geo_url} | {weather_url}",
+        "raw_response": {"geocoding": geo, "weather": weather},
+        "captured_at": _now_iso(),
+        "method_version": "OPEN_METEO_HOURLY_SOLAR/1",
+    }
 
 
 def fallback_observation(location: str) -> SiteObservation:

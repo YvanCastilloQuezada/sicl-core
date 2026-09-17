@@ -27,6 +27,10 @@ class SuggestedVariable:
     variable_type: VariableType
     spatial_scope: str
     normative_reference: str | None = None
+    canonical_variable_id: str | None = None
+    catalog_version: str | None = None
+    definition_version: str | None = None
+    profile_version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -44,6 +48,10 @@ class ProjectVariable:
     version: int = 1
     supersedes_variable_id: str | None = None
     normative_reference: str | None = None
+    canonical_variable_id: str | None = None
+    catalog_version: str | None = None
+    definition_version: str | None = None
+    profile_version: str | None = None
 
     def __post_init__(self) -> None:
         if not all((self.variable_id, self.project_id, self.normalized_key, self.actor_id, self.authority)):

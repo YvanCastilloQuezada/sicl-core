@@ -342,3 +342,23 @@ class OGCQueryRequest(BaseModel):
 class CopilotTranslateRequest(BaseModel):
     text: str = Field(min_length=1)
     model: str | None = None
+
+
+class SpatialLocationCreateRequest(BaseModel):
+    location_id: str | None = None
+    spatial_scope: str = "parcela_sitio"
+    geometry_type: str = "Point"
+    geometry: dict[str, Any]
+    crs: str = "EPSG:4326"
+    place_label: str | None = None
+    acquisition_method: str = "MAP_SELECTION"
+    provenance: str = "USER_DECLARED"
+    actor_id: str = Field(default="api", min_length=1)
+    authority: str = Field(default="project_owner", min_length=1)
+    supersedes_location_id: str | None = None
+    confirm: bool = False
+
+class SpatialLocationConfirmRequest(BaseModel):
+    actor_id: str = Field(min_length=1)
+    authority: str = Field(min_length=1)
+    confirm: bool = True

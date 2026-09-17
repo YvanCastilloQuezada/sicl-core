@@ -14,6 +14,7 @@ from .v11 import Alternative, Comparison, Evaluation, Recommendation
 from .simulation import Simulation, SimulationState, SimulationType
 from .bim import BIMChangeSet, BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelSnapshot, BIMReviewState
 from .gis import ParcelSnapshot
+from .spatial_location import SpatialLocation, LocationStatus
 
 
 class SQLiteRepository:
@@ -560,6 +561,12 @@ class SQLiteRepository:
                 p.project_variables[payload["variable_id"]] = payload
             elif event.type == "FEASIBILITY_EVALUATED" and "alternative_id" in payload:
                 p.feasibility_results[payload["alternative_id"]] = payload
+            elif event.type == "SPATIAL_LOCATION_CONFIRMED" and "location_id" in payload:
+                location = SpatialLocation.from_dict(payload)
+                p.spatial_locations[location.location_id] = location
+            elif event.type == "SPATIAL_LOCATION_SUPERSEDED" and "location_id" in payload:
+                location = SpatialLocation.from_dict(payload)
+                p.spatial_locations[location.location_id] = location
         return p
 
     def list_projects(self) -> list[Project]:
