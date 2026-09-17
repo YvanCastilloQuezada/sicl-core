@@ -48,6 +48,8 @@ from api.schemas import (
     ProjectVariableCreateRequest,
     FeasibilityCheckRequest,
     FeasibleParetoRequest,
+    SpatialLocationCreateRequest,
+    SpatialLocationConfirmRequest,
     DesignKnowledgeQueryRequest,
     BIMSnapshotCreateRequest,
     BIMChangeSetCreateRequest,
@@ -69,6 +71,7 @@ from sicl.feasibility import ProjectVariable, VariableType, evaluate_feasibility
 from sicl.design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery, list_items as list_knowledge_items, list_patterns as list_knowledge_patterns, list_sources as list_knowledge_sources
 from sicl.bim import BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelSnapshot, BIMReviewState, build_preview_change_set, change_set_to_dict, snapshot_to_dict as bim_snapshot_to_dict
 from sicl.ifc_adapter import parse_ifc_file
+from sicl.spatial_location import SpatialLocation, LocationStatus, AcquisitionMethod, LocationProvenance
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -91,9 +94,9 @@ def _status_for(code: str) -> int:
         return 422
     if code == "PROJECT_NOT_FOUND":
         return 404
-    if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT", "SOURCE_ALREADY_EXISTS", "BIM_SNAPSHOT_ALREADY_EXISTS", "PLANNING_INSTRUMENT_ALREADY_LINKED", "INVALID_SCOPE_RELATION"}:
+    if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT", "SOURCE_ALREADY_EXISTS", "BIM_SNAPSHOT_ALREADY_EXISTS", "PLANNING_INSTRUMENT_ALREADY_LINKED", "INVALID_SCOPE_RELATION", "LOCATION_ALREADY_EXISTS"}:
         return 409
-    if code in {"HUMAN_REVIEW_REQUIRED", "HUMAN_AUTHORITY_REQUIRED", "MEMORY_REVOKED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED", "INVALID_SOURCE_TYPE", "BIM_PREVIEW_ONLY"}:
+    if code in {"HUMAN_REVIEW_REQUIRED", "HUMAN_AUTHORITY_REQUIRED", "HUMAN_CONFIRMATION_REQUIRED", "MEMORY_REVOKED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED", "INVALID_SOURCE_TYPE", "INVALID_LOCATION", "BIM_PREVIEW_ONLY"}:
         return 422
     return 400
 
@@ -1289,3 +1292,92 @@ def get_evidence(project_id: str, evidence_id: str, repo: SQLiteRepository = Dep
     if evidence is None:
         _error({"code": "EVIDENCE_NOT_FOUND", "message": evidence_id}, project_id)
     return _ok({"evidence": asdict(evidence)}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/locations", dependencies=[Depends(_auth)])
+def create_project_location(project_id: str, request: SpatialLocationCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    if not request.confirm:
+        _error({"code": "HUMAN_CONFIRMATION_REQUIRED", "message": "Location candidate must be explicitly confirmed"}, project_id)
+    try:
+        location = SpatialLocation(
+            location_id=request.location_id or f"LOC-{uuid.uuid4().hex[:12]}",
+            project_id=project_id,
+            spatial_scope=SpatialScope(request.spatial_scope),
+            geometry_type=request.geometry_type,
+            geometry=request.geometry,
+            crs=request.crs,
+            place_label=request.place_label,
+            acquisition_method=AcquisitionMethod(request.acquisition_method),
+            provenance=LocationProvenance(request.provenance),
+            status=LocationStatus.CONFIRMED,
+            actor_id=request.actor_id,
+            authority=request.authority,
+            version=max((item.version for item in project.spatial_locations.values()), default=0) + 1,
+            supersedes_location_id=request.supersedes_location_id,
+        )
+    except (ValueError, KeyError) as exc:
+        _error({"code": "INVALID_LOCATION", "message": str(exc)}, project_id)
+    if location.location_id in project.spatial_locations:
+        _error({"code": "LOCATION_ALREADY_EXISTS", "message": location.location_id}, project_id)
+    project.spatial_locations[location.location_id] = location
+    project.version += 1
+    repo.save(project)
+    repo.add_event(CLI(repo, actor=request.actor_id)._event(project_id, "SPATIAL_LOCATION_CONFIRMED", location.to_dict()))
+    return _ok({"location": location.to_dict()}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/locations", dependencies=[Depends(_auth)])
+def list_project_locations(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    locations = [item.to_dict() for item in project.spatial_locations.values()]
+    return _ok({"locations": locations}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/locations/current", dependencies=[Depends(_auth)])
+def current_project_location(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    locations = list(project.spatial_locations.values())
+    current = locations[-1] if locations else None
+    return _ok({"location": current.to_dict() if current else None}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/missing-data", dependencies=[Depends(_auth)])
+def project_missing_data(project_id: str, spatial_scope: str = "edificacion", repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    try:
+        scope = SpatialScope(spatial_scope)
+        from sicl.variable_catalog import seed_catalog
+        catalog = seed_catalog()
+        location = list(project.spatial_locations.values())[-1] if project.spatial_locations else None
+        values = project.project_variables
+        statuses: list[dict[str, Any]] = []
+        for variable_id in catalog.definitions:
+            try:
+                profile = catalog.profile(variable_id, scope)
+            except KeyError:
+                continue
+            if variable_id in values:
+                state = "PRESENT"
+                source = values[variable_id].get("source", "PROJECT_VARIABLE")
+            elif variable_id == "SITE_COORDINATE_REFERENCE" and location:
+                state, source = "PRESENT", location.acquisition_method.value
+            elif profile.applicability == "NOT_APPLICABLE":
+                state, source = "NOT_APPLICABLE", None
+            elif profile.applicability == "NOT_AVAILABLE":
+                state, source = "NOT_AVAILABLE", None
+            else:
+                state, source = "MISSING", None
+            statuses.append({"canonical_variable_id": variable_id, "state": state, "source": source, "acquisition_paths": ["USER_INPUT", "MAP_SELECTION", "PROJECT_DOCUMENT", "GIS", "EXTERNAL_SOURCE", "DERIVATION", "ASSUMPTION"] if state == "MISSING" else []})
+        solar = "AVAILABLE" if location else "REQUIRES_DATA"
+        return _ok({"spatial_scope": scope.value, "location_present": bool(location), "variables": statuses, "capabilities": [{"capability_id": "SOLAR_ANALYSIS", "state": solar, "missing_requirements": [] if location else ["SITE_COORDINATE_REFERENCE"]}]}, project_id, project.version)
+    except ValueError as exc:
+        _error({"code": "INVALID_SCOPE", "message": str(exc)}, project_id)
