@@ -1,6 +1,6 @@
 # RFC-028 — Integración GIS y Catastro para PARCELA_SITIO
 
-**Estado:** DRAFT — propuesta técnica
+**Estado:** IMPLEMENTED — fase inicial de solo lectura
 **Sistema:** SiMS-DeI / SICL
 **Fecha:** 16 de septiembre de 2026
 **Dependencias:** RFC-019, RFC-020, RFC-021, RFC-024, RFC-025, RFC-027
@@ -115,3 +115,9 @@ La fase siguiente añadirá un catálogo de fuentes por jurisdicción y almacena
 
 [1]: https://ogcapi.ogc.org/features/overview.html "OGC API Features overview"
 [2]: https://www.ogc.org/standards/ogcapi-records/ "OGC API Records standard"
+
+## 13. Implementación inicial
+
+La fase inicial está implementada en `src/sicl/gis.py`. El adaptador acepta features GeoJSON, exige escala `PARCELA_SITIO`, valida geometría, identificador, CRS y URL de fuente, y calcula un hash canónico de la respuesta. También puede consultar una colección OGC API Features por HTTP y convertir sus features en snapshots para revisión humana.
+
+Los endpoints disponibles son `POST /v1/projects/{project_id}/gis/parcel-snapshots` y `POST /v1/projects/{project_id}/gis/ogc-query`. Ambos son de solo lectura respecto de la fuente externa y devuelven `decision_created: false`. La persistencia catastral append-only, catálogo por jurisdicción, reconciliación de límites y revisión de vigencia quedan para la siguiente extensión de RFC-028.
