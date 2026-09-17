@@ -319,3 +319,26 @@ class ProjectResponse(BaseModel):
     evaluations: dict[str, Any] = Field(default_factory=dict)
     comparisons: dict[str, Any] = Field(default_factory=dict)
     recommendations: dict[str, Any] = Field(default_factory=dict)
+
+
+class ParcelSnapshotCreateRequest(BaseModel):
+    feature: dict[str, Any]
+    source_url: str = Field(min_length=1)
+    source_type: str = "OFFICIAL"
+    jurisdiction: str = "UNKNOWN"
+    source_crs: str = "EPSG:4326"
+    analysis_crs: str = "EPSG:4326"
+    validity_date: str | None = None
+
+
+class OGCQueryRequest(BaseModel):
+    url: str = Field(min_length=1)
+    source_type: str = "OFFICIAL"
+    jurisdiction: str = "UNKNOWN"
+    source_crs: str = "EPSG:4326"
+    analysis_crs: str = "EPSG:4326"
+
+
+class CopilotTranslateRequest(BaseModel):
+    text: str = Field(min_length=1)
+    model: str | None = None
