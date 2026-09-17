@@ -53,7 +53,7 @@ def test_analysis_separates_source_radiation_from_derived_position() -> None:
         source="OPEN_METEO_API",
         source_model="test",
         source_retrieved_at="2026-09-17T00:00:00+00:00",
-        source_variables=("shortwave_radiation", "direct_radiation", "diffuse_radiation", "wind_speed_10m", "wind_direction_10m", "temperature_2m"),
+        source_variables=("shortwave_radiation", "direct_radiation", "diffuse_radiation", "direct_normal_irradiance", "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m", "temperature_2m", "apparent_temperature", "relative_humidity_2m", "dew_point_2m", "precipitation", "rain", "showers", "precipitation_probability", "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "pressure_msl", "surface_pressure"),
     ).to_dict()
     assert result["source_values"]["shortwave_radiation"] == 120.0
     assert "solar_azimuth_degrees" in result["derived_metrics"]
@@ -69,8 +69,8 @@ def test_environmental_endpoint_uses_same_time_for_abc(monkeypatch) -> None:
         "source": "OPEN_METEO_API",
         "source_model": "test",
         "captured_at": "2026-09-17T00:00:00+00:00",
-        "source_variables": ["shortwave_radiation", "direct_radiation", "diffuse_radiation", "wind_speed_10m", "wind_direction_10m", "temperature_2m"],
-        "hourly": {"time": ["2026-09-17T15:00"], "shortwave_radiation": [120], "direct_radiation": [90], "diffuse_radiation": [30], "wind_speed_10m": [4.2], "wind_direction_10m": [270], "temperature_2m": [27.0]},
+        "source_variables": ["shortwave_radiation", "direct_radiation", "diffuse_radiation", "direct_normal_irradiance", "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m", "temperature_2m", "apparent_temperature", "relative_humidity_2m", "dew_point_2m", "precipitation", "rain", "showers", "precipitation_probability", "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "pressure_msl", "surface_pressure"],
+        "hourly": {"time": ["2026-09-17T15:00"], "shortwave_radiation": [120], "direct_radiation": [90], "diffuse_radiation": [30], "direct_normal_irradiance": [110], "wind_speed_10m": [4.2], "wind_direction_10m": [270], "wind_gusts_10m": [7.5], "temperature_2m": [27.0], "apparent_temperature": [27.5], "relative_humidity_2m": [65], "dew_point_2m": [20.0], "precipitation": [0.0], "rain": [0.0], "showers": [0.0], "precipitation_probability": [10], "cloud_cover": [25], "cloud_cover_low": [10], "cloud_cover_mid": [20], "cloud_cover_high": [30], "pressure_msl": [1012], "surface_pressure": [1008]},
     }
     monkeypatch.setattr("api.routes.v1.fetch_open_meteo_solar", lambda location, selected_date: source)
     client = TestClient(create_app())
