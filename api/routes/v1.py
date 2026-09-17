@@ -69,6 +69,7 @@ from sicl.feasibility import ProjectVariable, VariableType, evaluate_feasibility
 from sicl.design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery, list_items as list_knowledge_items, list_patterns as list_knowledge_patterns, list_sources as list_knowledge_sources
 from sicl.bim import BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelSnapshot, BIMReviewState, build_preview_change_set, change_set_to_dict, snapshot_to_dict as bim_snapshot_to_dict
 from sicl.ifc_adapter import parse_ifc_file
+from sicl.spatial_generator import UPAO001SpatialGenerator, generate_upao001_alternatives
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -1289,3 +1290,43 @@ def get_evidence(project_id: str, evidence_id: str, repo: SQLiteRepository = Dep
     if evidence is None:
         _error({"code": "EVIDENCE_NOT_FOUND", "message": evidence_id}, project_id)
     return _ok({"evidence": asdict(evidence)}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/spatial-representations", dependencies=[Depends(_auth)])
+def spatial_representations(project_id: str, alternative: str | None = None, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    """Read-only transport for the S2 derived spatial projection.
+
+    UPAO-001 is an explicit synthetic educational fixture. Other projects
+    require persisted alternatives and are never silently fabricated.
+    """
+    project = repo.get_project(project_id)
+    if project is None and project_id != "UPAO-001":
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    if project_id == "UPAO-001":
+        alternatives = list(generate_upao001_alternatives())
+        version = None
+    else:
+        alternatives = list(project.alternatives.values()) if project else []
+        version = project.version if project else None
+    if alternative:
+        alternatives = [item for item in alternatives if item.alternative_id == alternative or item.name == alternative.upper()]
+        if not alternatives:
+            _error({"code": "ALTERNATIVE_NOT_FOUND", "message": alternative}, project_id)
+    if not alternatives:
+        _error({"code": "SPATIAL_REPRESENTATION_UNAVAILABLE", "message": "no alternatives available"}, project_id)
+    generator = UPAO001SpatialGenerator()
+    try:
+        representations = [generator.generate(item) for item in alternatives]
+    except Exception as exc:
+        _error({"code": "SPATIAL_GENERATION_ERROR", "message": str(exc)}, project_id)
+    return _ok(
+        {
+            "representations": [item.to_dict() for item in representations],
+            "metrics": {item.alternative_id: generator.metrics(item) for item in representations},
+            "explanations": {item.alternative_id: generator.explain(item) for item in representations},
+            "provenance": "SYNTHETIC / EDUCATIONAL / MODEL PROJECT" if project_id == "UPAO-001" else "DERIVED_FROM_PROJECT_ALTERNATIVE",
+            "read_only": True,
+        },
+        project_id,
+        version,
+    )
