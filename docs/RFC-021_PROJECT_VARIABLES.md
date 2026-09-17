@@ -1,6 +1,6 @@
 # RFC-021 — Decision Variables by Scale
 
-**Estado:** IMPLEMENTED ON MAIN — incluido en `main@faff4f8e`.
+**Estado:** IMPLEMENTED ON MAIN — incluido en `main@f2c4d205198e6050cdfd50e228e8ba21d3d4c79f`.
 
 ## ProjectVariable
 

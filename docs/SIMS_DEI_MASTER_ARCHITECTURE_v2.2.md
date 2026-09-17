@@ -849,3 +849,8 @@ Este documento conserva el histórico de versiones anteriores, pero el baseline 
 La arquitectura actual comprende cuatro fronteras: fuentes BIM/GIS, adaptadores de ingestión, Core SICL determinista y revisión humana. El Copiloto local solo traduce lenguaje natural a una propuesta de comando. No ejecuta acciones ni crea decisiones.
 
 La persistencia parcelaria, caducidad, catálogo y conflictos GIS están implementados. BIM mantiene importación IFC y PREVIEW. Revit/Archicad nativos continúan requiriendo host y SDK. El despliegue productivo remoto no se considera verificado hasta completar la configuración de secretos y el E2E contra una URL real.
+
+
+## Matriz vigente RFC-015–026
+
+Consulte [`SIMS_DEI_CURRENT_ARCHITECTURE_v2.11.md`](SIMS_DEI_CURRENT_ARCHITECTURE_v2.11.md) y [`RFC_015_026_COHERENCE_AUDIT.md`](RFC_015_026_COHERENCE_AUDIT.md). Estas referencias corrigen la lectura de estados históricos y registran las mejoras de simulación, factibilidad, generación, variables, normativa y conocimiento de diseño.

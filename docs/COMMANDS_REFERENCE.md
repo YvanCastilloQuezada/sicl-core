@@ -1548,3 +1548,8 @@ El Core actual incluye importación IFC física de solo lectura, snapshots BIM p
 Estas capacidades no otorgan autoridad automática. El Copiloto no ejecuta comandos ni crea decisiones. Los adaptadores Revit y Archicad requieren sus hosts y SDKs nativos. La exportación BIM queda pendiente de ejecución externa después de una HumanReview aprobada. Las fuentes catastrales requieren registro explícito, licencia y validación humana.
 
 La referencia operativa es [`PRODUCTION_CORE_DEPLOYMENT_MANUAL.md`](PRODUCTION_CORE_DEPLOYMENT_MANUAL.md). La suite E2E se ejecuta con `PYTHONPATH=.:src pytest -q tests/test_e2e_ollama_sicl.py -ra`.
+
+
+## Matriz vigente RFC-015–026
+
+Consulte [`SIMS_DEI_CURRENT_ARCHITECTURE_v2.11.md`](SIMS_DEI_CURRENT_ARCHITECTURE_v2.11.md) y [`RFC_015_026_COHERENCE_AUDIT.md`](RFC_015_026_COHERENCE_AUDIT.md). Estas referencias corrigen la lectura de estados históricos y registran las mejoras de simulación, factibilidad, generación, variables, normativa y conocimiento de diseño.

@@ -1,6 +1,6 @@
 # RFC-019 — Multiscale Refinement
 
-**Estado:** IMPLEMENTED en la rama `rfc-019-multiscale-refinement`
+**Estado:** IMPLEMENTED ON MAIN — incluido en `main@f2c4d205198e6050cdfd50e228e8ba21d3d4c79f`
 
 ## Objetivo
 

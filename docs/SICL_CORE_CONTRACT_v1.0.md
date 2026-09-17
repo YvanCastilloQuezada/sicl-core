@@ -285,3 +285,8 @@ Los contratos nativos Revit y Archicad responden `HOST_REQUIRED` fuera de sus ap
 ## 20. Estado de despliegue
 
 El código está publicado en `main` y el tag `sims-dei-2.11-deploy-e2e`. La suite vigente contiene 241 pruebas. La verificación E2E remota queda condicionada a una URL HTTPS real, `SICL_CORE_SERVICE_TOKEN`, volumen persistente y Ollama accesible desde el Core.
+
+
+## Matriz vigente RFC-015–026
+
+Consulte [`SIMS_DEI_CURRENT_ARCHITECTURE_v2.11.md`](SIMS_DEI_CURRENT_ARCHITECTURE_v2.11.md) y [`RFC_015_026_COHERENCE_AUDIT.md`](RFC_015_026_COHERENCE_AUDIT.md). Estas referencias corrigen la lectura de estados históricos y registran las mejoras de simulación, factibilidad, generación, variables, normativa y conocimiento de diseño.

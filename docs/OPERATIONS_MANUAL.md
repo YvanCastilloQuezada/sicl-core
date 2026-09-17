@@ -930,3 +930,8 @@ Los horizontes temporales son `proyecto`, `corto_plazo`, `mediano_plazo`, `largo
 El baseline vigente incluye RFC-027, RFC-028 y RFC-029. El Core incorpora IFC físico de solo lectura, BIMChangeSet PREVIEW, conflictos BIM, exportación condicionada a HumanReview, ParcelSnapshot persistente, catálogo GIS, caducidad, ParcelBoundaryConflict, OGC API Features y Copiloto Ollama en PREVIEW_ONLY.
 
 Revit y Archicad requieren host y SDK nativos. La exportación BIM no escribe externamente sin revisión aprobada. La verificación remota requiere URL HTTPS, token server-side, volumen y Ollama accesible.
+
+
+## Matriz vigente RFC-015–026
+
+Consulte [`SIMS_DEI_CURRENT_ARCHITECTURE_v2.11.md`](SIMS_DEI_CURRENT_ARCHITECTURE_v2.11.md) y [`RFC_015_026_COHERENCE_AUDIT.md`](RFC_015_026_COHERENCE_AUDIT.md). Estas referencias corrigen la lectura de estados históricos y registran las mejoras de simulación, factibilidad, generación, variables, normativa y conocimiento de diseño.

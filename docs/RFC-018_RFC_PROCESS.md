@@ -1,12 +1,12 @@
 # RFC-018 — RFC Process
 
-**Estado:** DRAFT
+**Estado:** IMPLEMENTED ON MAIN — proceso activo; el encabezado histórico DRAFT se conserva en el registro de proceso
 **Fecha:** 16 de septiembre de 2026
 **Sistema:** SiMS-DeI
 **Lenguaje formal:** SICL — Spatial Intelligence Command Language
 **Repositorio:** `YvanCastilloQuezada/sicl-core`
 **Rama:** `docs/rfc-018-process`
-**Baseline:** `main@0d8e278be469aad2678453036b280fd8019d7d24`
+**Baseline vigente:** `main@f2c4d205198e6050cdfd50e228e8ba21d3d4c79f`
 **Product Owner:** Usuario / arquitecto responsable
 
 ## 1. Objetivo
