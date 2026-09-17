@@ -11,7 +11,7 @@ from dataclasses import asdict
 from datetime import date, datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile
 
 from api.deps import get_repository
 from api.schemas import (
@@ -62,7 +62,7 @@ from sicl.temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
 from sicl.memory import memory_to_dict, memory_types
 from sicl.repository import SQLiteRepository
-from sicl.site_intelligence import get_site_observation
+from sicl.site_intelligence import fetch_open_meteo_solar, get_site_observation
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
 from sicl.design_principles import get_principle, list_principles
 from sicl.regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_dict, snapshot_to_dict
@@ -72,6 +72,10 @@ from sicl.design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery, li
 from sicl.bim import BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelSnapshot, BIMReviewState, build_preview_change_set, change_set_to_dict, snapshot_to_dict as bim_snapshot_to_dict
 from sicl.ifc_adapter import parse_ifc_file
 from sicl.spatial_location import SpatialLocation, LocationStatus, AcquisitionMethod, LocationProvenance
+from sicl.spatial_generator import UPAO001SpatialGenerator, generate_upao001_alternatives
+from sicl.spatial_evaluation import build_upao001_dataset
+from sicl.environmental import EnvironmentalAnalysisError, EnvironmentalLocation, build_solar_analysis
+from sicl.capabilities import resolve_example_capability
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -86,7 +90,7 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "BIM_SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "BIM_SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED", "EXAMPLE_NOT_FOUND"}:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
@@ -1294,6 +1298,7 @@ def get_evidence(project_id: str, evidence_id: str, repo: SQLiteRepository = Dep
     return _ok({"evidence": asdict(evidence)}, project_id, project.version)
 
 
+<<<<<<< HEAD
 @router.post("/projects/{project_id}/locations", dependencies=[Depends(_auth)])
 def create_project_location(project_id: str, request: SpatialLocationCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
     project = repo.get_project(project_id)
@@ -1381,3 +1386,181 @@ def project_missing_data(project_id: str, spatial_scope: str = "edificacion", re
         return _ok({"spatial_scope": scope.value, "location_present": bool(location), "variables": statuses, "capabilities": [{"capability_id": "SOLAR_ANALYSIS", "state": solar, "missing_requirements": [] if location else ["SITE_COORDINATE_REFERENCE"]}]}, project_id, project.version)
     except ValueError as exc:
         _error({"code": "INVALID_SCOPE", "message": str(exc)}, project_id)
+=======
+@router.get("/projects/{project_id}/spatial-representations", dependencies=[Depends(_auth)])
+def spatial_representations(project_id: str, alternative: str | None = None, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    """Read-only transport for the S2 derived spatial projection.
+
+    UPAO-001 is an explicit synthetic educational fixture. Other projects
+    require persisted alternatives and are never silently fabricated.
+    """
+    project = repo.get_project(project_id)
+    if project is None and project_id != "UPAO-001":
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    if project_id == "UPAO-001":
+        alternatives = list(generate_upao001_alternatives())
+        version = None
+    else:
+        alternatives = list(project.alternatives.values()) if project else []
+        version = project.version if project else None
+    if alternative:
+        alternatives = [item for item in alternatives if item.alternative_id == alternative or item.name == alternative.upper()]
+        if not alternatives:
+            _error({"code": "ALTERNATIVE_NOT_FOUND", "message": alternative}, project_id)
+    if not alternatives:
+        _error({"code": "SPATIAL_REPRESENTATION_UNAVAILABLE", "message": "no alternatives available"}, project_id)
+    generator = UPAO001SpatialGenerator()
+    try:
+        representations = [generator.generate(item) for item in alternatives]
+    except Exception as exc:
+        _error({"code": "SPATIAL_GENERATION_ERROR", "message": str(exc)}, project_id)
+    return _ok(
+        {
+            "representations": [item.to_dict() for item in representations],
+            "metrics": {item.alternative_id: generator.metrics(item) for item in representations},
+            "explanations": {item.alternative_id: generator.explain(item) for item in representations},
+            "provenance": "SYNTHETIC / EDUCATIONAL / MODEL PROJECT" if project_id == "UPAO-001" else "DERIVED_FROM_PROJECT_ALTERNATIVE",
+            "read_only": True,
+        },
+        project_id,
+        version,
+    )
+
+
+@router.get("/examples/{example_id}/pareto", dependencies=[Depends(_auth)])
+def upao001_pareto_transport(example_id: str) -> V1Envelope:
+    """Read-only transport for the canonical UPAO-001 educational Pareto dataset."""
+    if example_id != "UPAO-001":
+        _error({"code": "EXAMPLE_NOT_FOUND", "message": example_id})
+
+    generator = UPAO001SpatialGenerator()
+    representations = [
+        generator.generate(item) for item in generate_upao001_alternatives()
+    ]
+    dataset = build_upao001_dataset(representations)
+    values = {
+        (item.alternative_id, item.objective_id): item.value
+        for item in dataset.evaluations
+    }
+    statuses = {item: "NON_DOMINATED" for item in dataset.pareto.non_dominated}
+    statuses.update({item: "DOMINATED" for item in dataset.pareto.dominated})
+    statuses.update({item: "INCOMPLETE" for item in dataset.pareto.incomplete})
+
+    alternatives = []
+    for representation in representations:
+        alternative_id = representation.alternative_id
+        alternatives.append(
+            {
+                "alternative_id": alternative_id,
+                "gross_massing_area": values[(alternative_id, "OBJ-GROSS-MASSING-AREA")],
+                "gross_massing_area_unit": "m²",
+                "open_site_area": values[(alternative_id, "OBJ-OPEN-SITE-AREA")],
+                "open_site_area_unit": "m²",
+                "raw_pareto_status": statuses[alternative_id],
+            }
+        )
+
+    return _ok(
+        {
+            "example_id": example_id,
+            "objectives": ["GROSS_MASSING_AREA", "OPEN_SITE_AREA"],
+            "alternatives": alternatives,
+            "provenance": list(dataset.provenance),
+            "read_only": True,
+            "evaluations_persisted": False,
+            "feasible_pareto_used": False,
+            "recommendation_created": dataset.recommendation_created,
+            "human_review_created": dataset.human_review_created,
+            "decision_created": dataset.decision_created,
+        }
+    )
+
+
+@router.get("/examples/{example_id}/environmental-analysis", dependencies=[Depends(_auth)])
+def upao001_environmental_analysis(example_id: str, selected_date: str, selected_time: str) -> V1Envelope:
+    """Read-only hourly solar analysis for the approved educational location."""
+    if example_id != "UPAO-001":
+        _error({"code": "EXAMPLE_NOT_FOUND", "message": example_id})
+    if len(selected_time) != 5 or selected_time[2] != ":" or selected_time[3:] != "00":
+        _error({"code": "INVALID_DATE_TIME", "message": "selected_time must be an hourly HH:00 value"}, example_id)
+    try:
+        source = fetch_open_meteo_solar("Trujillo, Peru", selected_date)
+        location = EnvironmentalLocation(
+            name="Trujillo, Peru",
+            latitude=-8.1116,
+            longitude=-79.0287,
+            timezone=source["timezone"],
+        )
+        local_key = f"{selected_date}T{selected_time}"
+        hourly = source["hourly"]
+        timestamps = hourly.get("time", [])
+        if local_key not in timestamps:
+            _error({"code": "SOURCE_TIME_UNAVAILABLE", "message": local_key}, example_id)
+        index = timestamps.index(local_key)
+        source_values = {name: (hourly.get(name) or [None] * len(timestamps))[index] for name in source["source_variables"]}
+        if any(value is None for value in source_values.values()):
+            _error({"code": "ANALYSIS_INCOMPLETE", "message": "Open-Meteo lacks a required hourly solar variable"}, example_id)
+        analyses = [
+            build_solar_analysis(
+                example_id=example_id,
+                alternative_id=alternative_id,
+                selected_date=selected_date,
+                selected_time=selected_time,
+                location=location,
+                source_values=source_values,
+                source=source["source"],
+                source_model=source["source_model"],
+                source_retrieved_at=source["captured_at"],
+                source_variables=tuple(source["source_variables"]),
+            ).to_dict()
+            for alternative_id in ("UPAO-001-A", "UPAO-001-B", "UPAO-001-C")
+        ]
+    except EnvironmentalAnalysisError as exc:
+        _error({"code": exc.code, "message": str(exc)}, example_id)
+    except Exception as exc:
+        _error({"code": "WEATHER_SOURCE_UNAVAILABLE", "message": str(exc)}, example_id)
+    return _ok({
+        "example_id": example_id,
+        "analysis_type": "SOLAR",
+        "temporal_mode": "INSTANT",
+        "selected_date": selected_date,
+        "selected_time": selected_time,
+        "location": {"name": "Trujillo, Peru", "latitude": -8.1116, "longitude": -79.0287, "timezone": source["timezone"], "role": "ENVIRONMENTAL_REFERENCE", "location_class": "EDUCATIONAL_PROXY", "provenance": "SYNTHETIC / EDUCATIONAL_REFERENCE", "surveyed_site": False, "cadastral_location": False, "verified_upao_site": False},
+        "analyses": analyses,
+        "source_data_disclaimer": "Open-Meteo weather/radiation source data; not building simulation.",
+        "educational_disclaimer": "UPAO-001 remains synthetic LOCAL_ENU geometry and is not a surveyed UPAO site.",
+        "read_only": True,
+        "recommendation_created": False,
+        "human_review_created": False,
+        "decision_created": False,
+    }, example_id)
+
+
+@router.get("/examples/{example_id}/capabilities/{capability_id}", dependencies=[Depends(_auth)])
+def get_example_capability(
+    example_id: str,
+    capability_id: str,
+    spatial_scope: str = Query(...),
+    typology: str | None = Query(default=None),
+    stage: str | None = Query(default=None),
+    available_data: list[str] | None = Query(default=None),
+    objectives: list[str] | None = Query(default=None),
+    context: str | None = Query(default=None),
+) -> V1Envelope:
+    try:
+        result = resolve_example_capability(
+            example_id,
+            capability_id,
+            spatial_scope,
+            typology=typology,
+            stage=stage,
+            available_data=available_data,
+            objectives=objectives,
+            context=context,
+        )
+    except ValueError as exc:
+        message = str(exc)
+        code = message.split(":", 1)[0]
+        _error({"code": code, "message": message}, example_id)
+    return _ok(result.to_dict(), example_id)
+>>>>>>> refs/remotes/origin/feat/multiscale-capability-foundation-s7p05
