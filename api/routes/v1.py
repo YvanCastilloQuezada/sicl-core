@@ -62,7 +62,7 @@ from sicl.temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
 from sicl.memory import memory_to_dict, memory_types
 from sicl.repository import SQLiteRepository
-from sicl.site_intelligence import fetch_open_meteo_solar, get_site_observation
+from sicl.site_intelligence import fetch_open_meteo_solar, fetch_open_meteo_solar_coordinates, get_site_observation
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
 from sicl.design_principles import get_principle, list_principles
 from sicl.regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_dict, snapshot_to_dict
@@ -133,6 +133,17 @@ def _ok(data: dict[str, Any], project_id: str | None = None, version: int | None
         data=data,
     )
 
+
+
+
+def _confirmed_location(project: Any) -> SpatialLocation | None:
+    if project is None:
+        return None
+    confirmed = [
+        item for item in project.spatial_locations.values()
+        if item.status is LocationStatus.CONFIRMED and item.geometry_type == "Point"
+    ]
+    return confirmed[-1] if confirmed else None
 
 def _snapshot(repo: SQLiteRepository, project_id: str) -> tuple[dict[str, Any], int]:
     project = repo.get_project(project_id)
@@ -1298,7 +1309,6 @@ def get_evidence(project_id: str, evidence_id: str, repo: SQLiteRepository = Dep
     return _ok({"evidence": asdict(evidence)}, project_id, project.version)
 
 
-<<<<<<< HEAD
 @router.post("/projects/{project_id}/locations", dependencies=[Depends(_auth)])
 def create_project_location(project_id: str, request: SpatialLocationCreateRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
     project = repo.get_project(project_id)
@@ -1348,8 +1358,7 @@ def current_project_location(project_id: str, repo: SQLiteRepository = Depends(g
     project = repo.get_project(project_id)
     if project is None:
         _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
-    locations = list(project.spatial_locations.values())
-    current = locations[-1] if locations else None
+    current = _confirmed_location(project)
     return _ok({"location": current.to_dict() if current else None}, project_id, project.version)
 
 
@@ -1362,7 +1371,7 @@ def project_missing_data(project_id: str, spatial_scope: str = "edificacion", re
         scope = SpatialScope(spatial_scope)
         from sicl.variable_catalog import seed_catalog
         catalog = seed_catalog()
-        location = list(project.spatial_locations.values())[-1] if project.spatial_locations else None
+        location = _confirmed_location(project)
         values = project.project_variables
         statuses: list[dict[str, Any]] = []
         for variable_id in catalog.definitions:
@@ -1386,7 +1395,7 @@ def project_missing_data(project_id: str, spatial_scope: str = "edificacion", re
         return _ok({"spatial_scope": scope.value, "location_present": bool(location), "variables": statuses, "capabilities": [{"capability_id": "SOLAR_ANALYSIS", "state": solar, "missing_requirements": [] if location else ["SITE_COORDINATE_REFERENCE"]}]}, project_id, project.version)
     except ValueError as exc:
         _error({"code": "INVALID_SCOPE", "message": str(exc)}, project_id)
-=======
+
 @router.get("/projects/{project_id}/spatial-representations", dependencies=[Depends(_auth)])
 def spatial_representations(project_id: str, alternative: str | None = None, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
     """Read-only transport for the S2 derived spatial projection.
@@ -1477,20 +1486,35 @@ def upao001_pareto_transport(example_id: str) -> V1Envelope:
 
 
 @router.get("/examples/{example_id}/environmental-analysis", dependencies=[Depends(_auth)])
-def upao001_environmental_analysis(example_id: str, selected_date: str, selected_time: str) -> V1Envelope:
+def upao001_environmental_analysis(example_id: str, selected_date: str, selected_time: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
     """Read-only hourly solar analysis for the approved educational location."""
     if example_id != "UPAO-001":
         _error({"code": "EXAMPLE_NOT_FOUND", "message": example_id})
     if len(selected_time) != 5 or selected_time[2] != ":" or selected_time[3:] != "00":
         _error({"code": "INVALID_DATE_TIME", "message": "selected_time must be an hourly HH:00 value"}, example_id)
     try:
-        source = fetch_open_meteo_solar("Trujillo, Peru", selected_date)
-        location = EnvironmentalLocation(
-            name="Trujillo, Peru",
-            latitude=-8.1116,
-            longitude=-79.0287,
-            timezone=source["timezone"],
-        )
+        confirmed = _confirmed_location(repo.get_project(example_id))
+        if confirmed is not None:
+            source = fetch_open_meteo_solar_coordinates(
+                confirmed.latitude, confirmed.longitude, selected_date,
+                location_label=confirmed.place_label or f"{confirmed.latitude:.6f}, {confirmed.longitude:.6f}",
+            )
+            location = EnvironmentalLocation(
+                name=confirmed.place_label or "Confirmed project location",
+                latitude=confirmed.latitude,
+                longitude=confirmed.longitude,
+                timezone=source["timezone"],
+                location_class="PROJECT_CONFIRMED",
+                provenance=f"{confirmed.provenance.value} / {confirmed.acquisition_method.value}",
+            )
+        else:
+            source = fetch_open_meteo_solar("Trujillo, Peru", selected_date)
+            location = EnvironmentalLocation(
+                name="Trujillo, Peru",
+                latitude=-8.1116,
+                longitude=-79.0287,
+                timezone=source["timezone"],
+            )
         local_key = f"{selected_date}T{selected_time}"
         hourly = source["hourly"]
         timestamps = hourly.get("time", [])
@@ -1525,7 +1549,7 @@ def upao001_environmental_analysis(example_id: str, selected_date: str, selected
         "temporal_mode": "INSTANT",
         "selected_date": selected_date,
         "selected_time": selected_time,
-        "location": {"name": "Trujillo, Peru", "latitude": -8.1116, "longitude": -79.0287, "timezone": source["timezone"], "role": "ENVIRONMENTAL_REFERENCE", "location_class": "EDUCATIONAL_PROXY", "provenance": "SYNTHETIC / EDUCATIONAL_REFERENCE", "surveyed_site": False, "cadastral_location": False, "verified_upao_site": False},
+        "location": asdict(location),
         "analyses": analyses,
         "source_data_disclaimer": "Open-Meteo weather/radiation source data; not building simulation.",
         "educational_disclaimer": "UPAO-001 remains synthetic LOCAL_ENU geometry and is not a surveyed UPAO site.",
@@ -1546,15 +1570,21 @@ def get_example_capability(
     available_data: list[str] | None = Query(default=None),
     objectives: list[str] | None = Query(default=None),
     context: str | None = Query(default=None),
+    repo: SQLiteRepository = Depends(get_repository),
 ) -> V1Envelope:
     try:
+        project = repo.get_project(example_id)
+        confirmed = _confirmed_location(project)
+        data = None
+        if project is not None:
+            data = {"location", "environmental_data"} if confirmed is not None else set()
         result = resolve_example_capability(
             example_id,
             capability_id,
             spatial_scope,
             typology=typology,
             stage=stage,
-            available_data=available_data,
+            available_data=(available_data if available_data is not None else data),
             objectives=objectives,
             context=context,
         )
@@ -1563,4 +1593,3 @@ def get_example_capability(
         code = message.split(":", 1)[0]
         _error({"code": code, "message": message}, example_id)
     return _ok(result.to_dict(), example_id)
->>>>>>> refs/remotes/origin/feat/multiscale-capability-foundation-s7p05

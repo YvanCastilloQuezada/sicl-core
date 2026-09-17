@@ -107,6 +107,30 @@ def fetch_open_meteo(location: str, timeout: float = 5.0) -> SiteObservation:
     )
 
 
+def fetch_open_meteo_solar_coordinates(latitude: float, longitude: float, selected_date: str, *, location_label: str = "Confirmed project location", timeout: float = 5.0) -> dict[str, Any]:
+    """Fetch hourly solar source variables directly for confirmed EPSG:4326 coordinates."""
+    weather_url = "https://api.open-meteo.com/v1/forecast?" + urlencode({
+        "latitude": latitude, "longitude": longitude,
+        "hourly": "shortwave_radiation,direct_radiation,diffuse_radiation",
+        "start_date": selected_date, "end_date": selected_date,
+        "timezone": "America/Lima",
+    })
+    weather = _get_json(weather_url, timeout)
+    hourly = weather.get("hourly") or {}
+    times = hourly.get("time") or []
+    if not times:
+        raise ValueError("Open-Meteo response lacks hourly solar timestamps")
+    return {
+        "location": location_label, "latitude": float(latitude), "longitude": float(longitude),
+        "timezone": str(weather.get("timezone") or "America/Lima"),
+        "source": "OPEN_METEO_API",
+        "source_model": str(weather.get("generationtime_ms", "unknown")),
+        "source_variables": ["shortwave_radiation", "direct_radiation", "diffuse_radiation"],
+        "hourly": hourly, "selected_date": selected_date, "evidence_url": weather_url,
+        "raw_response": {"weather": weather}, "captured_at": _now_iso(),
+        "method_version": "OPEN_METEO_HOURLY_SOLAR_COORDINATES/1",
+    }
+
 def fetch_open_meteo_solar(location: str, selected_date: str, timeout: float = 5.0) -> dict[str, Any]:
     """Fetch hourly solar source variables for one day in local civil time.
 

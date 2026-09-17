@@ -81,7 +81,7 @@ def resolve_capability(capability_id: str, project_context: ProjectCapabilityCon
 def resolve_example_capability(example_id: str, capability_id: str, spatial_scope: SpatialScope | str, *, typology: str | None = None, stage: str | None = None, available_data: Iterable[str] | None = None, objectives: Iterable[str] | None = None, context: str | None = None) -> CapabilityResolution:
     if example_id != "UPAO-001":
         raise ValueError(f"EXAMPLE_NOT_FOUND: {example_id}")
-    data = _data(available_data) or frozenset({"location", "environmental_data"})
+    data = frozenset({"location", "environmental_data"}) if available_data is None else _data(available_data)
     return resolve_capability(capability_id, ProjectCapabilityContext(spatial_scope, typology, stage, data, tuple(objectives or ()), context))
 
 
