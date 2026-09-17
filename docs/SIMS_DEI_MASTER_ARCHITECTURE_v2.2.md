@@ -840,3 +840,12 @@ Este documento representa el estado documental propuesto para SiMS-DeI 2.2 en el
 El baseline posterior a SiMS-DeI 2.2 incorpora RFC-019 Multiscale Refinement, RFC-020 Feasibility Filtering y RFC-021 Decision Variables by Scale en `main@faff4f8e`. RFC-019 establece once escalas espaciales canónicas; RFC-021 registra variables explícitas con actor y autoridad; RFC-020 evalúa factibilidad y filtra el frente Pareto sin producir Recommendation, HumanReview ni Decision.
 
 Este addendum no altera las invariantes constitucionales: Fact continúa separado de Assumption y Preference; Recommendation continúa separado de Decision; y toda Decision requiere HumanReview, actor y authority.
+
+
+## Estado vigente y corrección de alcance
+
+Este documento conserva el histórico de versiones anteriores, pero el baseline vigente es `sims-dei-2.11-deploy-e2e`, commit `e8dbcd999cbf6b6708e09bb73a7e7a192fbaafad`. RFC-027, RFC-028 y RFC-029 están implementados y publicados.
+
+La arquitectura actual comprende cuatro fronteras: fuentes BIM/GIS, adaptadores de ingestión, Core SICL determinista y revisión humana. El Copiloto local solo traduce lenguaje natural a una propuesta de comando. No ejecuta acciones ni crea decisiones.
+
+La persistencia parcelaria, caducidad, catálogo y conflictos GIS están implementados. BIM mantiene importación IFC y PREVIEW. Revit/Archicad nativos continúan requiriendo host y SDK. El despliegue productivo remoto no se considera verificado hasta completar la configuración de secretos y el E2E contra una URL real.

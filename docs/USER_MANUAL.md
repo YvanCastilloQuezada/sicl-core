@@ -737,3 +737,14 @@ Cualquier persona que necesite comprender el sistema, pero las operaciones decis
 [13]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-014_USER_COPILOT.md "RFC-014 User Copilot"
 [14]: https://github.com/YvanCastilloQuezada/sicl-web/blob/main/docs/RFC-015_FRONTEND_V2.md "RFC-015 Frontend v2"
 [15]: https://github.com/YvanCastilloQuezada/sicl-core/blob/main/docs/RFC-002_EVIDENCE_HTTP.md#source-http "RFC-016 Source HTTP"
+
+
+## Estado vigente de capacidades — actualización 2026-09-16
+
+> Esta sección supersede las afirmaciones históricas de este documento que indiquen que GIS, BIM o el Copiloto local están fuera de alcance. El baseline vigente incluye RFC-027, RFC-028 y RFC-029.
+
+El Core actual incluye importación IFC física de solo lectura, snapshots BIM persistentes, BIMChangeSet en modo PREVIEW, detección de conflictos BIM, contratos de exportación que exigen HumanReview, persistencia SQLite de ParcelSnapshot, catálogo GIS por jurisdicción, caducidad y ParcelBoundaryConflict, consulta OGC API Features y traducción Ollama a comandos SICL en modo PREVIEW_ONLY.
+
+Estas capacidades no otorgan autoridad automática. El Copiloto no ejecuta comandos ni crea decisiones. Los adaptadores Revit y Archicad requieren sus hosts y SDKs nativos. La exportación BIM queda pendiente de ejecución externa después de una HumanReview aprobada. Las fuentes catastrales requieren registro explícito, licencia y validación humana.
+
+La referencia operativa es [`PRODUCTION_CORE_DEPLOYMENT_MANUAL.md`](PRODUCTION_CORE_DEPLOYMENT_MANUAL.md). La suite E2E se ejecuta con `PYTHONPATH=.:src pytest -q tests/test_e2e_ollama_sicl.py -ra`.

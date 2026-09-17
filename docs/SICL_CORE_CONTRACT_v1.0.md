@@ -272,3 +272,16 @@ El baseline `main@faff4f8e` expone el registro explícito de variables y el filt
 Comandos CLI: `/VARIABLE ADD <variable_id> <key> <type> <value> <actor_id> <authority> [unit] [spatial_scope]`, `/VARIABLE LIST`, `/FEASIBILITY CHECK <alternative_id> '<values_json>'` y `/MULTIOBJECTIVE FEASIBLE_PARETO '<pareto_ids_json>'`.
 
 Endpoints HTTP: `POST /v1/projects/{project_id}/variables`, `GET /v1/projects/{project_id}/variables`, `POST /v1/projects/{project_id}/feasibility` y `POST /v1/projects/{project_id}/multiobjective/feasible-pareto`.
+
+
+## 19. Capacidades de integración vigentes
+
+El contrato vigente incorpora RFC-027–029. Las rutas BIM soportan snapshots IFC, importación física IFC y change sets PREVIEW. Las rutas GIS soportan snapshots GeoJSON, persistencia SQLite, consulta OGC y catálogo de fuentes. `ParcelBoundaryConflict` y `BIMConflict` se reportan como `HUMAN_REVIEW_REQUIRED`.
+
+`POST /v1/copilot/translate` devuelve una intención SICL candidata. Su contrato exige `PREVIEW_ONLY`, `executed: false` y `decision_created: false`. El Core conserva la validación determinista y la autoridad humana.
+
+Los contratos nativos Revit y Archicad responden `HOST_REQUIRED` fuera de sus aplicaciones. No se afirma compatibilidad propietaria sin el SDK y host correspondientes.
+
+## 20. Estado de despliegue
+
+El código está publicado en `main` y el tag `sims-dei-2.11-deploy-e2e`. La suite vigente contiene 241 pruebas. La verificación E2E remota queda condicionada a una URL HTTPS real, `SICL_CORE_SERVICE_TOKEN`, volumen persistente y Ollama accesible desde el Core.

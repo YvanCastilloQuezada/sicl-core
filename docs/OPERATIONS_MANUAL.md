@@ -923,3 +923,10 @@ Los horizontes temporales son `proyecto`, `corto_plazo`, `mediano_plazo`, `largo
 [8]: docs/RFC-018_RFC_PROCESS.md "RFC-018 RFC Process"
 
 **Firma documental.** Este manual fue redactado como una perspectiva operativa independiente sobre el código y los contratos del baseline indicado. No sustituye el Core Contract ni la aprobación del Product Owner.
+
+
+## Estado vigente de capacidades — actualización 2026-09-16
+
+El baseline vigente incluye RFC-027, RFC-028 y RFC-029. El Core incorpora IFC físico de solo lectura, BIMChangeSet PREVIEW, conflictos BIM, exportación condicionada a HumanReview, ParcelSnapshot persistente, catálogo GIS, caducidad, ParcelBoundaryConflict, OGC API Features y Copiloto Ollama en PREVIEW_ONLY.
+
+Revit y Archicad requieren host y SDK nativos. La exportación BIM no escribe externamente sin revisión aprobada. La verificación remota requiere URL HTTPS, token server-side, volumen y Ollama accesible.
