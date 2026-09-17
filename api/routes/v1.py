@@ -70,6 +70,7 @@ from sicl.design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery, li
 from sicl.bim import BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelSnapshot, BIMReviewState, build_preview_change_set, change_set_to_dict, snapshot_to_dict as bim_snapshot_to_dict
 from sicl.ifc_adapter import parse_ifc_file
 from sicl.spatial_generator import UPAO001SpatialGenerator, generate_upao001_alternatives
+from sicl.spatial_evaluation import build_upao001_dataset
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -84,7 +85,7 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "BIM_SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "BIM_SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED", "EXAMPLE_NOT_FOUND"}:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
@@ -1329,4 +1330,53 @@ def spatial_representations(project_id: str, alternative: str | None = None, rep
         },
         project_id,
         version,
+    )
+
+
+@router.get("/examples/{example_id}/pareto", dependencies=[Depends(_auth)])
+def upao001_pareto_transport(example_id: str) -> V1Envelope:
+    """Read-only transport for the canonical UPAO-001 educational Pareto dataset."""
+    if example_id != "UPAO-001":
+        _error({"code": "EXAMPLE_NOT_FOUND", "message": example_id})
+
+    generator = UPAO001SpatialGenerator()
+    representations = [
+        generator.generate(item) for item in generate_upao001_alternatives()
+    ]
+    dataset = build_upao001_dataset(representations)
+    values = {
+        (item.alternative_id, item.objective_id): item.value
+        for item in dataset.evaluations
+    }
+    statuses = {item: "NON_DOMINATED" for item in dataset.pareto.non_dominated}
+    statuses.update({item: "DOMINATED" for item in dataset.pareto.dominated})
+    statuses.update({item: "INCOMPLETE" for item in dataset.pareto.incomplete})
+
+    alternatives = []
+    for representation in representations:
+        alternative_id = representation.alternative_id
+        alternatives.append(
+            {
+                "alternative_id": alternative_id,
+                "gross_massing_area": values[(alternative_id, "OBJ-GROSS-MASSING-AREA")],
+                "gross_massing_area_unit": "m²",
+                "open_site_area": values[(alternative_id, "OBJ-OPEN-SITE-AREA")],
+                "open_site_area_unit": "m²",
+                "raw_pareto_status": statuses[alternative_id],
+            }
+        )
+
+    return _ok(
+        {
+            "example_id": example_id,
+            "objectives": ["GROSS_MASSING_AREA", "OPEN_SITE_AREA"],
+            "alternatives": alternatives,
+            "provenance": list(dataset.provenance),
+            "read_only": True,
+            "evaluations_persisted": False,
+            "feasible_pareto_used": False,
+            "recommendation_created": dataset.recommendation_created,
+            "human_review_created": dataset.human_review_created,
+            "decision_created": dataset.decision_created,
+        }
     )
