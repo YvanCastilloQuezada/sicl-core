@@ -60,7 +60,7 @@ from sicl.temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
 from sicl.memory import memory_to_dict, memory_types
 from sicl.repository import SQLiteRepository
-from sicl.site_intelligence import get_site_observation
+from sicl.site_intelligence import fetch_open_meteo_solar, get_site_observation
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
 from sicl.design_principles import get_principle, list_principles
 from sicl.regulatory import LEGAL_DISCLAIMER, interpretation_to_dict, regulation_to_dict, snapshot_to_dict
@@ -71,6 +71,7 @@ from sicl.bim import BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelS
 from sicl.ifc_adapter import parse_ifc_file
 from sicl.spatial_generator import UPAO001SpatialGenerator, generate_upao001_alternatives
 from sicl.spatial_evaluation import build_upao001_dataset
+from sicl.environmental import EnvironmentalAnalysisError, EnvironmentalLocation, build_solar_analysis
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -1380,3 +1381,63 @@ def upao001_pareto_transport(example_id: str) -> V1Envelope:
             "decision_created": dataset.decision_created,
         }
     )
+
+
+@router.get("/examples/{example_id}/environmental-analysis", dependencies=[Depends(_auth)])
+def upao001_environmental_analysis(example_id: str, selected_date: str, selected_time: str) -> V1Envelope:
+    """Read-only hourly solar analysis for the approved educational location."""
+    if example_id != "UPAO-001":
+        _error({"code": "EXAMPLE_NOT_FOUND", "message": example_id})
+    if len(selected_time) != 5 or selected_time[2] != ":" or selected_time[3:] != "00":
+        _error({"code": "INVALID_DATE_TIME", "message": "selected_time must be an hourly HH:00 value"}, example_id)
+    try:
+        source = fetch_open_meteo_solar("Trujillo, Peru", selected_date)
+        location = EnvironmentalLocation(
+            name="Trujillo, Peru",
+            latitude=-8.1116,
+            longitude=-79.0287,
+            timezone=source["timezone"],
+        )
+        local_key = f"{selected_date}T{selected_time}"
+        hourly = source["hourly"]
+        timestamps = hourly.get("time", [])
+        if local_key not in timestamps:
+            _error({"code": "SOURCE_TIME_UNAVAILABLE", "message": local_key}, example_id)
+        index = timestamps.index(local_key)
+        source_values = {name: (hourly.get(name) or [None] * len(timestamps))[index] for name in source["source_variables"]}
+        if any(value is None for value in source_values.values()):
+            _error({"code": "ANALYSIS_INCOMPLETE", "message": "Open-Meteo lacks a required hourly solar variable"}, example_id)
+        analyses = [
+            build_solar_analysis(
+                example_id=example_id,
+                alternative_id=alternative_id,
+                selected_date=selected_date,
+                selected_time=selected_time,
+                location=location,
+                source_values=source_values,
+                source=source["source"],
+                source_model=source["source_model"],
+                source_retrieved_at=source["captured_at"],
+                source_variables=tuple(source["source_variables"]),
+            ).to_dict()
+            for alternative_id in ("UPAO-001-A", "UPAO-001-B", "UPAO-001-C")
+        ]
+    except EnvironmentalAnalysisError as exc:
+        _error({"code": exc.code, "message": str(exc)}, example_id)
+    except Exception as exc:
+        _error({"code": "WEATHER_SOURCE_UNAVAILABLE", "message": str(exc)}, example_id)
+    return _ok({
+        "example_id": example_id,
+        "analysis_type": "SOLAR",
+        "temporal_mode": "INSTANT",
+        "selected_date": selected_date,
+        "selected_time": selected_time,
+        "location": {"name": "Trujillo, Peru", "latitude": -8.1116, "longitude": -79.0287, "timezone": source["timezone"], "role": "ENVIRONMENTAL_REFERENCE", "location_class": "EDUCATIONAL_PROXY", "provenance": "SYNTHETIC / EDUCATIONAL_REFERENCE", "surveyed_site": False, "cadastral_location": False, "verified_upao_site": False},
+        "analyses": analyses,
+        "source_data_disclaimer": "Open-Meteo weather/radiation source data; not building simulation.",
+        "educational_disclaimer": "UPAO-001 remains synthetic LOCAL_ENU geometry and is not a surveyed UPAO site.",
+        "read_only": True,
+        "recommendation_created": False,
+        "human_review_created": False,
+        "decision_created": False,
+    }, example_id)
