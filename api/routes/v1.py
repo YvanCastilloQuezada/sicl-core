@@ -51,12 +51,14 @@ from api.schemas import (
     SpatialLocationCreateRequest,
     SpatialLocationConfirmRequest,
     DesignKnowledgeQueryRequest,
+    DesignIntentInterpretRequest,
+    DesignIntentConfirmRequest,
     BIMSnapshotCreateRequest,
     BIMChangeSetCreateRequest,
     V1Envelope,
 )
 from sicl.cli import CLI
-from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, Source, SourceType, SpatialScope
+from sicl.domain import Evidence, EvidenceType, Event, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, Source, SourceType, SpatialScope
 from sicl.actors import actor_to_dict, position_to_dict
 from sicl.temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
@@ -76,6 +78,7 @@ from sicl.spatial_generator import UPAO001SpatialGenerator, generate_upao001_alt
 from sicl.spatial_evaluation import build_upao001_dataset
 from sicl.environmental import EnvironmentalAnalysisError, EnvironmentalLocation, build_solar_analysis
 from sicl.capabilities import resolve_example_capability
+from sicl.design_intent import confirm_intent, interpret_intent
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -204,6 +207,29 @@ def query_design_knowledge(request: DesignKnowledgeQueryRequest, repo: SQLiteRep
         preferences=request.preferences,
     ))
     return _ok(asdict(result))
+
+
+@router.post("/design-intents/interpret", dependencies=[Depends(_auth)])
+def interpret_design_intent(request: DesignIntentInterpretRequest) -> V1Envelope:
+    try:
+        result = interpret_intent(request.text, project_id=request.project_id, spatial_scope=request.spatial_scope)
+    except ValueError as exc:
+        _error({"code": str(exc), "message": str(exc)})
+    return _ok(result, request.project_id)
+
+
+@router.post("/projects/{project_id}/design-intents/confirm", dependencies=[Depends(_auth)])
+def confirm_design_intent(project_id: str, request: DesignIntentConfirmRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    try:
+        adopted, event_payload = confirm_intent(project_id, request.interpretation, request.approved_ids, request.actor)
+    except ValueError as exc:
+        _error({"code": str(exc), "message": str(exc)}, project_id)
+    event = Event(None, datetime.now(timezone.utc).isoformat(), project_id, event_payload["type"], event_payload["payload"], request.actor, event_payload["source"])
+    repo.add_event(event)
+    return _ok({"adopted_intent": adopted, "event_type": event.type, "decision_created": False, "human_authority": True}, project_id, project.version)
 
 
 @router.post("/projects/{project_id}/bim/snapshots", dependencies=[Depends(_auth)])

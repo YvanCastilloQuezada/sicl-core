@@ -362,3 +362,15 @@ class SpatialLocationConfirmRequest(BaseModel):
     actor_id: str = Field(min_length=1)
     authority: str = Field(min_length=1)
     confirm: bool = True
+
+
+class DesignIntentInterpretRequest(BaseModel):
+    text: str = Field(min_length=1)
+    project_id: str | None = None
+    spatial_scope: str | None = None
+
+
+class DesignIntentConfirmRequest(BaseModel):
+    interpretation: dict[str, Any]
+    approved_ids: list[str] = Field(min_length=1)
+    actor: str = Field(min_length=1)
