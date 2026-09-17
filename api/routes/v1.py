@@ -11,7 +11,7 @@ from dataclasses import asdict
 from datetime import date, datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile
 
 from api.deps import get_repository
 from api.schemas import (
@@ -72,6 +72,7 @@ from sicl.ifc_adapter import parse_ifc_file
 from sicl.spatial_generator import UPAO001SpatialGenerator, generate_upao001_alternatives
 from sicl.spatial_evaluation import build_upao001_dataset
 from sicl.environmental import EnvironmentalAnalysisError, EnvironmentalLocation, build_solar_analysis
+from sicl.capabilities import resolve_example_capability
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -1441,3 +1442,32 @@ def upao001_environmental_analysis(example_id: str, selected_date: str, selected
         "human_review_created": False,
         "decision_created": False,
     }, example_id)
+
+
+@router.get("/examples/{example_id}/capabilities/{capability_id}", dependencies=[Depends(_auth)])
+def get_example_capability(
+    example_id: str,
+    capability_id: str,
+    spatial_scope: str = Query(...),
+    typology: str | None = Query(default=None),
+    stage: str | None = Query(default=None),
+    available_data: list[str] | None = Query(default=None),
+    objectives: list[str] | None = Query(default=None),
+    context: str | None = Query(default=None),
+) -> V1Envelope:
+    try:
+        result = resolve_example_capability(
+            example_id,
+            capability_id,
+            spatial_scope,
+            typology=typology,
+            stage=stage,
+            available_data=available_data,
+            objectives=objectives,
+            context=context,
+        )
+    except ValueError as exc:
+        message = str(exc)
+        code = message.split(":", 1)[0]
+        _error({"code": code, "message": message}, example_id)
+    return _ok(result.to_dict(), example_id)
