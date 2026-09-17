@@ -18,7 +18,7 @@ El código está publicado en GitHub y las suites locales están verdes. El E2E 
 
 | Componente | Baseline | Estado |
 |---|---|---|
-| Core | `main@c7c068e262e1a53fac61e9ce6676c0aa51f5f366` | Publicado |
+| Core | `main@3fa1387f149cdf19047cc90083fe0fc43aad534e` | Publicado |
 | Core release documental | `sims-dei-2.13-rfc015-026-audit` | Publicado |
 | Frontend | `main@6abca7fe913c057372821048b61aeb4ad74e2983` | Publicado |
 | Frontend checkpoint | `manus-webdev://6abca7fe` | Disponible |
