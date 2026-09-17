@@ -79,6 +79,7 @@ from sicl.spatial_evaluation import build_upao001_dataset
 from sicl.environmental import EnvironmentalAnalysisError, EnvironmentalLocation, build_solar_analysis
 from sicl.capabilities import resolve_example_capability
 from sicl.design_intent import confirm_intent, interpret_intent
+from sicl.design_intelligence import controlled_exploration, query_design_knowledge_for_intent
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -230,6 +231,28 @@ def confirm_design_intent(project_id: str, request: DesignIntentConfirmRequest, 
     event = Event(None, datetime.now(timezone.utc).isoformat(), project_id, event_payload["type"], event_payload["payload"], request.actor, event_payload["source"])
     repo.add_event(event)
     return _ok({"adopted_intent": adopted, "event_type": event.type, "decision_created": False, "human_authority": True}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/design-intelligence/knowledge", dependencies=[Depends(_auth)])
+def design_intelligence_knowledge(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    adopted = request.payload.get("adopted_intent", request.payload)
+    regulations = [regulation_to_dict(item) for item in repo.list_regulations()]
+    result = query_design_knowledge_for_intent(adopted, regulations=regulations)
+    return _ok(result, project_id)
+
+
+@router.post("/projects/{project_id}/design-intelligence/explore", dependencies=[Depends(_auth)])
+def design_intelligence_explore(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    payload = request.payload
+    adopted = payload.get("adopted_intent", {})
+    if adopted.get("adoption") != "HUMAN_CONFIRMED":
+        _error({"code": "HUMAN_CONFIRMATION_REQUIRED", "message": "Adopted human intent is required"}, project_id)
+    knowledge = payload.get("knowledge") or query_design_knowledge_for_intent(adopted, regulations=[regulation_to_dict(item) for item in repo.list_regulations()])
+    try:
+        result = controlled_exploration(str(payload.get("base_alternative_id", "UPAO-001-A")), adopted, knowledge)
+    except ValueError as exc:
+        _error({"code": str(exc), "message": str(exc)}, project_id)
+    return _ok(result, project_id)
 
 
 @router.post("/projects/{project_id}/bim/snapshots", dependencies=[Depends(_auth)])

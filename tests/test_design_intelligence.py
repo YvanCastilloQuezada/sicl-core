@@ -7,6 +7,53 @@ from api.main import app
 from sicl.cli import CLI
 from sicl.repository import SQLiteRepository
 from sicl.design_principles import PRINCIPLES
+from sicl.design_intelligence import controlled_exploration, query_design_knowledge_for_intent
+from sicl.design_intent import confirm_intent, interpret_intent
+
+
+def _adopted_intent():
+    interpretation = interpret_intent("Quiero maximizar el espacio abierto con una masa compacta.", project_id="UPAO-001", spatial_scope="edificacion")
+    adopted, _ = confirm_intent("UPAO-001", interpretation, [item["intent_id"] for item in interpretation["suggestions"]], "human-architect")
+    return adopted
+
+
+def test_adopted_intent_links_to_existing_design_knowledge():
+    knowledge = query_design_knowledge_for_intent(_adopted_intent())
+    assert knowledge["applicable_items"] or knowledge["applicable_patterns"]
+    assert knowledge["links"]
+    assert knowledge["decision_created"] is False
+    assert all(link["knowledge_match"] for link in knowledge["links"])
+
+
+def test_controlled_exploration_preserves_lineage_and_exposes_tradeoffs():
+    adopted = _adopted_intent()
+    knowledge = query_design_knowledge_for_intent(adopted)
+    result = controlled_exploration("UPAO-001-A", adopted, knowledge)
+    assert result["parent_alternative_id"] == "UPAO-001-A"
+    assert result["derived_alternative"]["alternative_id"] != "UPAO-001-A"
+    assert result["generation_operation"] == "CONTROLLED_PARAMETER_TRANSFORMATION"
+    assert result["changed_parameters"]
+    assert result["intent_linkage"]
+    assert result["knowledge_linkage"]
+    assert result["metrics"]["deltas"]
+    assert result["decision_created"] is False
+
+
+def test_human_review_and_decision_close_the_existing_loop(tmp_path):
+    repo = SQLiteRepository(tmp_path / "div-p0.sqlite")
+    try:
+        cli = CLI(repo, actor="human-architect")
+        assert cli.execute('/PROJECT CREATE DIV-P0-001 "DIV P0"')['code'] == "OK"
+        assert cli.execute('/PROJECT OPEN DIV-P0-001')['code'] == "OK"
+        review = cli.execute('/HUMAN REVIEW human-architect 2026-09-17T12:00:00Z "ACCEPT FOR FURTHER DEVELOPMENT" "UPAO-001-D reviewed against intent" project_owner')
+        assert review['code'] == "OK"
+        decision = cli.execute('/DECISION RECORD "UPAO-001-D accepted for further development" human-architect project_owner')
+        assert decision['code'] == "OK"
+        assert repo.get_project("DIV-P0-001").decisions
+        assert any(event.type == "HUMAN_REVIEW_RECORDED" for event in repo.events("DIV-P0-001"))
+        assert any(event.type == "DECISION_RECORDED" for event in repo.events("DIV-P0-001"))
+    finally:
+        repo.close()
 
 
 def configured_client(tmp_path, monkeypatch):
