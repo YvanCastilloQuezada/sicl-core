@@ -1489,9 +1489,18 @@ def upao001_pareto_transport(example_id: str) -> V1Envelope:
 def territorial_environment(example_id: str, selected_date: str, selected_time: str = "12:00", spatial_scope: str = "distrito_ciudad", include_air_quality: bool = True, include_climate: bool = True) -> V1Envelope:
     if example_id != "UPAO-001":
         _error({"code": "EXAMPLE_NOT_FOUND", "message": example_id}, example_id)
-    if spatial_scope != "distrito_ciudad":
-        _error({"code": "SCOPE_NOT_AUTHORIZED", "message": "Only distrito_ciudad pilot is active"}, example_id)
+    allowed_scopes = {"distrito_ciudad", "provincia_metropoli", "region", "macro_region", "pais"}
+    if spatial_scope not in allowed_scopes:
+        _error({"code": "SCOPE_NOT_AUTHORIZED", "message": "TESU-P1 supports only distrito_ciudad, provincia_metropoli, region, macro_region and pais"}, example_id)
     latitude, longitude = -8.1116, -79.0287
+    profiles = {
+        "distrito_ciudad": {"role": "LOCAL_CONTEXT", "visual": "POINT_CONTEXT + PROVIDER_MODEL_GRID", "goal": "Understand city-district environmental context", "resolution": "provider cell; not administrative boundary"},
+        "provincia_metropoli": {"role": "METROPOLITAN_PATTERN", "visual": "PROVIDER_MODEL_GRID + TEMPORAL_SERIES", "goal": "Compare metropolitan environmental patterns", "resolution": "provider cell; not provincial boundary"},
+        "region": {"role": "REGIONAL_CONTEXT", "visual": "REGIONAL_PATTERN + TEMPORAL_SERIES", "goal": "Understand regional climate and environmental context", "resolution": "provider model cell; no regional polygon asserted"},
+        "macro_region": {"role": "MACRO_REGIONAL_PATTERN", "visual": "PATTERN_COMPARISON + SCENARIO_CONTEXT", "goal": "Compare broader territorial environmental patterns", "resolution": "provider model resolution; no macro-region polygon asserted"},
+        "pais": {"role": "NATIONAL_PATTERN", "visual": "NATIONAL_PATTERN + REGIONAL_COMPARISON", "goal": "Explore national environmental patterns without architectural geometry", "resolution": "provider model resolution; no national polygon asserted"},
+    }
+    profile = profiles[spatial_scope]
     layers: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
     if include_air_quality:
@@ -1507,7 +1516,7 @@ def territorial_environment(example_id: str, selected_date: str, selected_time: 
             layers.append({"family": "CLIMATE", "status": "AVAILABLE", "provider": climate["source"], "model": climate["source_model"], "time_horizon": {"start": climate["start_date"], "end": climate["end_date"]}, "temporal_resolution": climate["temporal_resolution"], "values": {k: (v[0] if isinstance(v, list) and v else None) for k, v in climate["daily"].items() if k != "time"}, "spatial_resolution": climate["spatial_resolution"], "bias_correction": climate["bias_correction"], "provenance": climate["evidence_url"]})
         except Exception as exc:
             errors.append({"family": "CLIMATE", "code": "SOURCE_UNAVAILABLE", "message": str(exc)})
-    return _ok({"example_id": example_id, "spatial_scope": spatial_scope, "representation": "POINT_CONTEXT + PROVIDER_MODEL_GRID", "location": {"name": "Trujillo / distrito_ciudad proxy", "latitude": latitude, "longitude": longitude, "provenance": "Open-Meteo model output; not local sensor or cadastral boundary"}, "selected_date": selected_date, "selected_time": selected_time, "weather_vs_climate_separated": True, "layers": layers, "errors": errors, "decision_created": False, "human_review_created": False, "recommendation_created": False, "read_only": True})
+    return _ok({"example_id": example_id, "spatial_scope": spatial_scope, "capability_profile": profile, "representation": profile["visual"], "location": {"name": f"Trujillo / {spatial_scope} provider context", "latitude": latitude, "longitude": longitude, "provenance": "Open-Meteo model output; not local sensor or cadastral boundary"}, "selected_date": selected_date, "selected_time": selected_time, "weather_vs_climate_separated": True, "cross_scale": {"from": "distrito_ciudad", "to": spatial_scope, "containment_asserted": False, "relationship_evidence": "none"}, "layers": layers, "errors": errors, "decision_created": False, "human_review_created": False, "recommendation_created": False, "read_only": True})
 
 
 @router.get("/examples/{example_id}/environmental-analysis", dependencies=[Depends(_auth)])

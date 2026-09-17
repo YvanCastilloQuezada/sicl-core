@@ -26,5 +26,19 @@ def test_territorial_endpoint_separates_air_quality_and_climate(monkeypatch):
 
 def test_territorial_endpoint_rejects_non_authorized_scope():
     os.environ["SICL_CORE_SERVICE_TOKEN"] = "test-token"
-    response = TestClient(create_app()).get("/v1/examples/UPAO-001/territorial-environment?selected_date=2026-09-17&spatial_scope=region", headers={"Authorization": "Bearer test-token"})
+    response = TestClient(create_app()).get("/v1/examples/UPAO-001/territorial-environment?selected_date=2026-09-17&spatial_scope=objeto", headers={"Authorization": "Bearer test-token"})
     assert response.status_code == 400
+
+
+def test_tesu_scopes_share_shell_but_change_capability_profile(monkeypatch):
+    os.environ["SICL_CORE_SERVICE_TOKEN"] = "test-token"
+    monkeypatch.setattr("api.routes.v1.fetch_open_meteo_air_quality", lambda *args, **kwargs: {"source": "AQ", "source_model": "CAMS", "spatial_resolution": "provider grid", "evidence_url": "aq", "hourly": _aq()["hourly"]})
+    monkeypatch.setattr("api.routes.v1.fetch_open_meteo_climate", lambda *args, **kwargs: {"source": "CLIMATE", "source_model": "MODEL", "spatial_resolution": "model cell", "evidence_url": "climate", "start_date": "2026-09-17", "end_date": "2026-09-17", "temporal_resolution": "daily", "bias_correction": "not assumed", "daily": _climate()["daily"]})
+    client = TestClient(create_app())
+    for scope in ("provincia_metropoli", "region", "macro_region", "pais"):
+        r = client.get(f"/v1/examples/UPAO-001/territorial-environment?selected_date=2026-09-17&selected_time=12:00&spatial_scope={scope}", headers={"Authorization": "Bearer test-token"})
+        assert r.status_code == 200
+        body = r.json()["data"]
+        assert body["spatial_scope"] == scope
+        assert body["capability_profile"]["visual"] != "POINT_CONTEXT + PROVIDER_MODEL_GRID"
+        assert body["cross_scale"]["containment_asserted"] is False
