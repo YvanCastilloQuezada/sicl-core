@@ -81,6 +81,7 @@ from sicl.capabilities import resolve_example_capability
 from sicl.design_intent import confirm_intent, interpret_intent
 from sicl.design_intelligence import controlled_exploration, query_design_knowledge_for_intent
 from sicl.gdi import evolve_from_candidate, explore_design_space, multi_agent_challenge, multiobjective_search
+from sicl.spatial_synthesis import build_spatial_graph, demo_program, generate_space_layout, synthesize_form_space
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -294,6 +295,39 @@ def gdi_multiobjective(project_id: str, request: CanonicalWriteRequest) -> V1Env
     if not isinstance(exploration, dict):
         _error({"code": "EXPLORATION_REQUIRED", "message": "A bounded exploration is required"}, project_id)
     return _ok(multiobjective_search(exploration), project_id)
+
+
+@router.post("/projects/{project_id}/spatial-synthesis/program", dependencies=[Depends(_auth)])
+def spatial_synthesis_program(project_id: str, request: CanonicalWriteRequest) -> V1Envelope:
+    program = demo_program(project_id)
+    graph = build_spatial_graph(program)
+    return _ok({"program": program.to_dict(), "spatial_graph": graph.to_dict(), "provenance": "SYNTHETIC / DEMONSTRATION DATA", "decision_created": False}, project_id)
+
+
+@router.post("/projects/{project_id}/spatial-synthesis/generate", dependencies=[Depends(_auth)])
+def spatial_synthesis_generate(project_id: str, request: CanonicalWriteRequest) -> V1Envelope:
+    payload = request.payload
+    adopted = payload.get("adopted_intent", {})
+    if adopted.get("adoption") != "HUMAN_CONFIRMED":
+        _error({"code": "HUMAN_CONFIRMATION_REQUIRED", "message": "Human-confirmed intent is required before spatial synthesis"}, project_id)
+    program = demo_program(project_id)
+    graph = build_spatial_graph(program)
+    families = payload.get("families") or ["CENTRALIZED", "COURTYARD", "LINEAR"]
+    alternatives = [generate_space_layout(program, graph, f"{project_id}-P3-{index + 1}", str(family)) for index, family in enumerate(families[:5])]
+    result = synthesize_form_space(program, graph, alternatives)
+    result["intent_id"] = adopted.get("intent_id") or adopted.get("interpretation_id")
+    result["gdi_p1_loop"] = ["GENERATE", "SELECT", "KEEP_THIS", "CHANGE_THAT", "BRANCH", "EVOLVE", "COMPARE", "EVALUATE", "CHALLENGE", "HUMAN_REVIEW", "HUMAN_DECISION"]
+    return _ok(result, project_id)
+
+
+@router.post("/projects/{project_id}/spatial-synthesis/layout", dependencies=[Depends(_auth)])
+def spatial_synthesis_layout(project_id: str, request: CanonicalWriteRequest) -> V1Envelope:
+    payload = request.payload
+    program = demo_program(project_id)
+    graph = build_spatial_graph(program)
+    family = str(payload.get("family", "COURTYARD"))
+    alternative_id = str(payload.get("alternative_id", f"{project_id}-P3-SELECTED"))
+    return _ok(generate_space_layout(program, graph, alternative_id, family), project_id)
 
 
 @router.post("/projects/{project_id}/bim/snapshots", dependencies=[Depends(_auth)])
