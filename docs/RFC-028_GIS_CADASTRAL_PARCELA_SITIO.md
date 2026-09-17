@@ -121,3 +121,12 @@ La fase siguiente añadirá un catálogo de fuentes por jurisdicción y almacena
 La fase inicial está implementada en `src/sicl/gis.py`. El adaptador acepta features GeoJSON, exige escala `PARCELA_SITIO`, valida geometría, identificador, CRS y URL de fuente, y calcula un hash canónico de la respuesta. También puede consultar una colección OGC API Features por HTTP y convertir sus features en snapshots para revisión humana.
 
 Los endpoints disponibles son `POST /v1/projects/{project_id}/gis/parcel-snapshots` y `POST /v1/projects/{project_id}/gis/ogc-query`. Ambos son de solo lectura respecto de la fuente externa y devuelven `decision_created: false`. La persistencia catastral append-only, catálogo por jurisdicción, reconciliación de límites y revisión de vigencia quedan para la siguiente extensión de RFC-028.
+
+
+## 14. Fase de persistencia y conflictos implementada
+
+`ParcelSnapshot` ahora se persiste en SQLite mediante una tabla append-only con triggers que rechazan `UPDATE` y `DELETE`. El repositorio expone inserción y consulta de los snapshots más recientes por proyecto.
+
+El adaptador incluye `is_expired`, que identifica snapshots cuya fecha de vigencia ya pasó, y `reconcile_parcels`, que compara dos snapshots de la misma parcela. Cuando los hashes difieren, genera `ParcelBoundaryConflict` en estado `HUMAN_REVIEW_REQUIRED`. No se realiza merge geométrico automático.
+
+La integración con fuentes catastrales reales continúa limitada a un cliente OGC de solo lectura. La autorización, licencia y selección de cada fuente oficial deben configurarse por jurisdicción antes de usarla en producción.

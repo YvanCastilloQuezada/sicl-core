@@ -83,3 +83,60 @@ def parcel_to_dict(item: ParcelSnapshot) -> dict[str, Any]:
     result = asdict(item)
     result["spatial_scope"] = item.spatial_scope.value
     return result
+
+
+@dataclass(frozen=True)
+class ParcelBoundaryConflict:
+    conflict_id: str
+    project_id: str
+    parcel_id: str
+    left_hash: str
+    right_hash: str
+    reason: str
+    state: str = "HUMAN_REVIEW_REQUIRED"
+
+
+def is_expired(snapshot: ParcelSnapshot, now: datetime | None = None) -> bool:
+    if not snapshot.validity_date:
+        return False
+    current = (now or datetime.now(timezone.utc)).date().isoformat()
+    return snapshot.validity_date < current
+
+
+def reconcile_parcels(left: ParcelSnapshot, right: ParcelSnapshot) -> ParcelBoundaryConflict | None:
+    if left.project_id != right.project_id or left.parcel_id != right.parcel_id:
+        raise ValueError("reconciliation requires the same project and parcel")
+    if left.response_hash == right.response_hash:
+        return None
+    conflict_id = canonical_hash({"left": left.response_hash, "right": right.response_hash})[7:23]
+    return ParcelBoundaryConflict(conflict_id, left.project_id, left.parcel_id, left.response_hash, right.response_hash, "parcel boundaries or source attributes differ")
+
+
+def conflict_to_dict(conflict: ParcelBoundaryConflict) -> dict[str, Any]:
+    return asdict(conflict)
+
+
+@dataclass(frozen=True)
+class CadastralSource:
+    source_id: str
+    jurisdiction: str
+    title: str
+    collection_url: str
+    source_type: str = "OFFICIAL"
+    status: str = "REVIEW_REQUIRED"
+    license: str | None = None
+
+
+CATALOG: tuple[CadastralSource, ...] = ()
+
+
+def register_cadastral_source(source: CadastralSource) -> None:
+    global CATALOG
+    if any(item.source_id == source.source_id for item in CATALOG):
+        raise ValueError("cadastral source already exists")
+    CATALOG = (*CATALOG, source)
+
+
+def cadastral_catalog(jurisdiction: str | None = None) -> list[dict[str, Any]]:
+    items = CATALOG if not jurisdiction else tuple(item for item in CATALOG if item.jurisdiction == jurisdiction)
+    return [asdict(item) for item in items]

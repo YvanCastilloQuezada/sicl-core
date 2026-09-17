@@ -13,6 +13,7 @@ from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 from .simulation import Simulation, SimulationState, SimulationType
 from .bim import BIMChangeSet, BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelSnapshot, BIMReviewState
+from .gis import ParcelSnapshot
 
 
 class SQLiteRepository:
@@ -339,6 +340,23 @@ class SQLiteRepository:
         CREATE TRIGGER IF NOT EXISTS bim_change_sets_no_delete
         BEFORE DELETE ON bim_change_sets
         BEGIN SELECT RAISE(ABORT, 'BIM change sets are append-only'); END;
+        CREATE TABLE IF NOT EXISTS parcel_snapshots (
+          parcel_id TEXT NOT NULL, version INTEGER NOT NULL,
+          project_id TEXT NOT NULL REFERENCES projects(project_id),
+          geometry_json TEXT NOT NULL, properties_json TEXT NOT NULL,
+          source_url TEXT NOT NULL, source_type TEXT NOT NULL,
+          jurisdiction TEXT NOT NULL, source_crs TEXT NOT NULL,
+          analysis_crs TEXT NOT NULL, retrieved_at TEXT NOT NULL,
+          validity_date TEXT NULL, response_hash TEXT NOT NULL,
+          review_state TEXT NOT NULL, spatial_scope TEXT NOT NULL,
+          PRIMARY KEY(parcel_id, version)
+        );
+        CREATE TRIGGER IF NOT EXISTS parcel_snapshots_no_update
+        BEFORE UPDATE ON parcel_snapshots
+        BEGIN SELECT RAISE(ABORT, 'parcel snapshots are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS parcel_snapshots_no_delete
+        BEFORE DELETE ON parcel_snapshots
+        BEGIN SELECT RAISE(ABORT, 'parcel snapshots are append-only'); END;
         CREATE TABLE IF NOT EXISTS events (
           id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL,
           project_id TEXT NOT NULL, type TEXT NOT NULL, payload TEXT NOT NULL,
@@ -435,6 +453,32 @@ class SQLiteRepository:
             (project_id, project_id),
         ).fetchall()
         return [self._bim_change_set_from_row(row) for row in rows]
+
+    def insert_parcel_snapshot(self, item: ParcelSnapshot) -> ParcelSnapshot:
+        with self.transaction():
+            self.conn.execute(
+                "INSERT INTO parcel_snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (item.parcel_id, item.version, item.project_id, json.dumps(item.geometry, sort_keys=True),
+                 json.dumps(item.properties, sort_keys=True), item.source_url, item.source_type,
+                 item.jurisdiction, item.source_crs, item.analysis_crs, item.retrieved_at,
+                 item.validity_date, item.response_hash, item.review_state, item.spatial_scope.value),
+            )
+        return item
+
+    @staticmethod
+    def _parcel_from_row(row: sqlite3.Row) -> ParcelSnapshot:
+        from .domain import SpatialScope
+        return ParcelSnapshot(row["parcel_id"], row["project_id"], json.loads(row["geometry_json"]),
+                              json.loads(row["properties_json"]), row["source_url"], row["source_type"],
+                              row["jurisdiction"], row["source_crs"], row["analysis_crs"], row["retrieved_at"],
+                              row["validity_date"], row["response_hash"], row["review_state"], SpatialScope(row["spatial_scope"]), row["version"])
+
+    def list_parcel_snapshots(self, project_id: str) -> list[ParcelSnapshot]:
+        rows = self.conn.execute(
+            "SELECT p.* FROM parcel_snapshots p JOIN (SELECT parcel_id, MAX(version) version FROM parcel_snapshots WHERE project_id=? GROUP BY parcel_id) latest ON latest.parcel_id=p.parcel_id AND latest.version=p.version WHERE p.project_id=? ORDER BY p.parcel_id",
+            (project_id, project_id),
+        ).fetchall()
+        return [self._parcel_from_row(row) for row in rows]
 
     def add_event(self, event: Event) -> Event:
         cur = self.conn.execute(
