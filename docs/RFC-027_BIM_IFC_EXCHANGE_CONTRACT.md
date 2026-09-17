@@ -175,3 +175,12 @@ POST /v1/projects/{project_id}/bim/ifc-import
 Recibe un archivo multipart `.ifc` y devuelve el snapshot, los hallazgos RNE, `read_only: true` y `export_applied: false`. El archivo se procesa temporalmente y se elimina después de la lectura. El Core solo persiste el snapshot append-only.
 
 La validación se limita a extracción, trazabilidad y revisión requerida. La escritura en el archivo fuente y la exportación a Revit o Archicad permanecen fuera del alcance.
+
+
+## 14. Fases BIM avanzadas
+
+Se añadieron contratos explícitos para `RevitAdapter` y `ArchicadAdapter`. Fuera del host nativo, ambos adaptadores responden `HOST_REQUIRED` y no intentan parsear archivos propietarios `.rvt` o `.pln`. Esto evita presentar un parser falso como integración real.
+
+El modelo `BIMExportRequest` exige `HumanReview`, aprobación explícita, hash del modelo original y aplicación objetivo. La exportación se representa inicialmente como `PENDING_EXTERNAL_EXECUTION`; ninguna escritura externa se ejecuta desde el Core sin un adaptador host aprobado.
+
+`BIMConflict` y `detect_bim_conflicts` comparan snapshots por `GlobalId` y reportan elementos diferentes en estado `HUMAN_REVIEW_REQUIRED`. No se realiza merge automático. La resolución requiere una revisión manual que seleccione el valor final y genere un nuevo snapshot trazable.

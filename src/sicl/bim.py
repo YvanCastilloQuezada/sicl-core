@@ -118,3 +118,54 @@ def change_set_to_dict(item: BIMChangeSet) -> dict[str, Any]:
 def build_preview_change_set(change_set_id: str, project_id: str, snapshot_id: str, changes: list[dict[str, Any]], requested_by: str) -> BIMChangeSet:
     """Create a non-mutating preview; no BIM file or element is changed."""
     return BIMChangeSet(change_set_id, project_id, snapshot_id, changes, requested_by)
+
+
+@dataclass(frozen=True)
+class BIMExportRequest:
+    export_id: str
+    change_set_id: str
+    target_format: BIMFormat
+    target_application: str
+    human_review_id: str
+    approved: bool
+    source_model_hash: str
+    requested_by: str
+    status: str = "PENDING_EXTERNAL_EXECUTION"
+
+    def __post_init__(self) -> None:
+        if not self.export_id.strip() or not self.change_set_id.strip() or not self.human_review_id.strip():
+            raise ValueError("export_id, change_set_id and human_review_id are required")
+        if not self.approved:
+            raise ValueError("export requires explicit approved HumanReview")
+
+
+@dataclass(frozen=True)
+class BIMConflict:
+    conflict_id: str
+    project_id: str
+    left_snapshot_id: str
+    right_snapshot_id: str
+    differing_global_ids: list[str]
+    state: str = "HUMAN_REVIEW_REQUIRED"
+
+
+def detect_bim_conflicts(left: BIMModelSnapshot, right: BIMModelSnapshot) -> BIMConflict | None:
+    if left.project_id != right.project_id:
+        raise ValueError("BIM conflict comparison requires the same project")
+    left_by_id = {item.global_id: item for item in left.elements}
+    right_by_id = {item.global_id: item for item in right.elements}
+    ids = sorted(set(left_by_id) | set(right_by_id))
+    differing = [global_id for global_id in ids if left_by_id.get(global_id) != right_by_id.get(global_id)]
+    if not differing:
+        return None
+    return BIMConflict(f"CONFLICT-{left.exchange_id}-{right.exchange_id}", left.project_id, left.exchange_id, right.exchange_id, differing)
+
+
+def export_request_to_dict(item: BIMExportRequest) -> dict[str, Any]:
+    result = asdict(item)
+    result["target_format"] = item.target_format.value
+    return result
+
+
+def conflict_to_dict(item: BIMConflict) -> dict[str, Any]:
+    return asdict(item)
