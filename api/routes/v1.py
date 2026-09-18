@@ -86,7 +86,7 @@ from sicl.design_intelligence import controlled_exploration, query_design_knowle
 from sicl.gdi import evolve_from_candidate, explore_design_space, multi_agent_challenge, multiobjective_search
 from sicl.spatial_synthesis import build_spatial_graph, demo_program, generate_space_layout, synthesize_form_space
 from sicl.design_memory import direction_event, explain_design, project_memory, query_memory, replay
-from sicl.advanced_evolution import advanced_evolution, cross_branch, design_distance, search_by_example
+from sicl.advanced_evolution import advanced_evolution, bounded_diverse_exploration, cross_branch, design_distance, search_by_example
 from sicl.candidate_normalization import normalize_design_candidate
 from sicl.multiscale_generative import capability_matrix, cross_scale_context, resolve_generative_capabilities
 from sicl.multi_agent_design import multi_agent_exploration
@@ -374,7 +374,9 @@ def gdi_advanced_evolution(project_id: str, request: CanonicalWriteRequest, repo
         _error({"code": "PARENT_REQUIRED", "message": "A parent historical alternative is required"}, project_id)
     try:
         parent = normalize_design_candidate(parent, project_id)
-        if payload.get("mode") == "DISTANCE":
+        if payload.get("mode") == "BOUNDED_DIVERSE":
+            result = bounded_diverse_exploration(parent, payload)
+        elif payload.get("mode") == "DISTANCE":
             result = design_distance(parent, normalize_design_candidate(payload["other"], project_id))
         elif payload.get("mode") == "SEARCH":
             result = search_by_example(parent, [normalize_design_candidate(item, project_id) for item in payload.get("candidates", [])], payload.get("search_mode", "SIMILAR"))
