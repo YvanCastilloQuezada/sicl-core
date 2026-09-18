@@ -11,7 +11,8 @@ from dataclasses import asdict
 from datetime import date, datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 
 from api.deps import get_repository
 from api.schemas import (
@@ -66,6 +67,7 @@ from sicl.temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
 from sicl.memory import memory_to_dict, memory_types
 from sicl.repository import SQLiteRepository
+from sicl.media_storage import MAX_MEDIA_BYTES, retrieve_media, store_media
 from sicl.site_intelligence import fetch_open_meteo_solar, fetch_open_meteo_solar_coordinates, get_site_observation, fetch_open_meteo_air_quality, fetch_open_meteo_climate
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
 from sicl.design_principles import get_principle, list_principles
@@ -1611,7 +1613,8 @@ def add_spatial_evidence(project_id: str, request: CanonicalWriteRequest, repo: 
         _error({"code": "INVALID_ARGUMENT", "message": "statement is required"}, project_id)
     try:
         observation = validate_observation(payload)
-        evidence_type = EvidenceType(str(payload.get("evidence_type", "OBSERVATION")).upper())
+        requested_evidence_type = str(payload.get("evidence_type", "OBSERVATION")).upper()
+        evidence_type = EvidenceType.OBSERVATION if requested_evidence_type == "PHOTO" else EvidenceType(requested_evidence_type)
     except (ValueError, KeyError) as exc:
         _error({"code": "INVALID_INPUTS", "message": str(exc)}, project_id)
     evidence_id = str(payload.get("evidence_id") or f"EVD-{uuid.uuid4().hex[:12]}")
@@ -1627,9 +1630,67 @@ def add_spatial_evidence(project_id: str, request: CanonicalWriteRequest, repo: 
     evidence = Evidence(evidence_id=evidence_id, project_id=project_id, source_id=payload.get("source_id"), statement=statement, evidence_type=evidence_type, captured_at=captured_at, method_version=str(payload.get("method_version", "SPATIAL-EVIDENCE/1")), evidence_url=payload.get("evidence_url"), evidence_hash=payload.get("evidence_hash") or hashlib.sha256(statement.encode("utf-8")).hexdigest(), state=evidence_state)
     project.evidence[evidence_id] = evidence
     project.version += 1
-    metadata = {"evidence_id": evidence_id, "statement": statement, "spatial_scope": observation["spatial_scope"], "observation_type": payload.get("observation_type", "MANUAL_OBSERVATION"), "value": payload.get("value"), "unit": observation["unit"], "qualifier": observation["qualifier"], "epistemic_state": observation["epistemic_state"], "relevance": observation["relevance"], "source_kind": payload.get("source_kind", "USER / FIELD_OBSERVATION"), "actor": actor, "observed_at": payload.get("observed_at"), "captured_at": captured_at.isoformat(), "retrieved_at": payload.get("retrieved_at"), "observation_point": payload.get("observation_point"), "photo_reference": payload.get("photo_reference"), "photo_direction": payload.get("photo_direction", "UNKNOWN"), "specific_object": payload.get("specific_object", "UNKNOWN"), "unknowns": payload.get("unknowns", []), "human_confirmed": False, "decision_created": False}
+    metadata = {"evidence_id": evidence_id, "statement": statement, "spatial_scope": observation["spatial_scope"], "observation_type": payload.get("observation_type", "MANUAL_OBSERVATION"), "value": payload.get("value"), "unit": observation["unit"], "qualifier": observation["qualifier"], "epistemic_state": observation["epistemic_state"], "relevance": observation["relevance"], "source_kind": payload.get("source_kind", "USER / FIELD_OBSERVATION"), "actor": actor, "observed_at": payload.get("observed_at"), "captured_at": captured_at.isoformat(), "retrieved_at": payload.get("retrieved_at"), "observation_point": payload.get("observation_point"), "photo_reference": payload.get("photo_reference"), "photo_direction": payload.get("photo_direction", "UNKNOWN"), "specific_object": payload.get("specific_object", "UNKNOWN"), "unknowns": payload.get("unknowns", []), "evidence_hash": evidence.evidence_hash, "media_id": payload.get("media_id"), "media_content_type": payload.get("media_content_type"), "media_byte_size": payload.get("media_byte_size"), "media_original_filename": payload.get("media_original_filename"), "media_storage_key": payload.get("media_storage_key"), "human_confirmed": False, "decision_created": False}
     repo.insert_evidence_and_event(evidence, project, CLI(repo, actor=actor)._event(project_id, "SPATIAL_EVIDENCE_ADDED", metadata))
     return _ok({"evidence": metadata, "decision_created": False}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/spatial-evidence/media", dependencies=[Depends(_auth)])
+async def add_persistent_spatial_evidence(
+    project_id: str,
+    file: UploadFile = File(...),
+    payload_json: str = Form(...),
+    repo: SQLiteRepository = Depends(get_repository),
+) -> V1Envelope:
+    """Persist image bytes, then associate the generated reference with Evidence."""
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    try:
+        payload = json.loads(payload_json)
+    except json.JSONDecodeError:
+        _error({"code": "INVALID_INPUTS", "message": "payload_json must be valid JSON"}, project_id)
+    if not isinstance(payload, dict):
+        _error({"code": "INVALID_INPUTS", "message": "payload_json must be an object"}, project_id)
+    if file.content_type not in {"image/jpeg", "image/png", "image/webp"}:
+        _error({"code": "UNSUPPORTED_MEDIA", "message": "only JPEG, PNG and WEBP are supported"}, project_id)
+    content = await file.read(MAX_MEDIA_BYTES + 1)
+    if len(content) > MAX_MEDIA_BYTES:
+        _error({"code": "MEDIA_TOO_LARGE", "message": f"media exceeds {MAX_MEDIA_BYTES} bytes"}, project_id)
+    media_id = str(payload.get("media_id") or f"MED-{uuid.uuid4().hex[:16]}")
+    try:
+        stored = store_media(media_id, content, file.content_type or "application/octet-stream", file.filename or "upload")
+    except ValueError as exc:
+        _error({"code": "INVALID_MEDIA", "message": str(exc)}, project_id)
+    payload.update({
+        "evidence_type": "PHOTO",
+        "evidence_url": f"/v1/projects/{project_id}/spatial-evidence/media/{stored.media_id}",
+        "photo_reference": stored.media_id,
+        "evidence_hash": stored.sha256,
+        "media_id": stored.media_id,
+        "media_content_type": stored.content_type,
+        "media_byte_size": stored.byte_size,
+        "media_original_filename": stored.original_filename,
+        "media_storage_key": stored.storage_key,
+    })
+    return add_spatial_evidence(project_id, CanonicalWriteRequest(**payload), repo)
+
+
+@router.get("/projects/{project_id}/spatial-evidence/media/{media_id}", dependencies=[Depends(_auth)])
+def retrieve_persistent_spatial_evidence(project_id: str, media_id: str, repo: SQLiteRepository = Depends(get_repository)) -> FileResponse:
+    """Retrieve media only through the already-authorized project scope."""
+    project = repo.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="PROJECT_NOT_FOUND")
+    evidence = repo.get_evidence(project_id, media_id) or next((item for item in repo.list_evidence(project_id) if item.evidence_url and item.evidence_url.endswith(f"/{media_id}")), None)
+    if evidence is None:
+        raise HTTPException(status_code=404, detail="MEDIA_NOT_FOUND")
+    try:
+        _, content_type, filename = retrieve_media(media_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="MEDIA_NOT_FOUND") from None
+    from sicl.media_storage import media_root
+    return FileResponse(media_root() / filename, media_type=content_type, filename=filename, headers={"Cache-Control": "private, max-age=0"})
 
 
 @router.get("/projects/{project_id}/spatial-evidence", dependencies=[Depends(_auth)])
