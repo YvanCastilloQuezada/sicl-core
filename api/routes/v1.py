@@ -85,6 +85,7 @@ from sicl.multimodal import confirm_multimodal_candidate, interpret_multimodal_i
 from sicl.design_intelligence import controlled_exploration, query_design_knowledge_for_intent
 from sicl.gdi import evolve_from_candidate, explore_design_space, multi_agent_challenge, multiobjective_search
 from sicl.spatial_synthesis import build_spatial_graph, demo_program, generate_space_layout, synthesize_form_space
+from sicl.design_memory import direction_event, explain_design, project_memory, query_memory, replay
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -237,6 +238,45 @@ def confirm_design_intent(project_id: str, request: DesignIntentConfirmRequest, 
     repo.add_event(event)
     return _ok({"adopted_intent": adopted, "event_type": event.type, "decision_created": False, "human_authority": True}, project_id, project.version)
 
+@router.get("/projects/{project_id}/design-memory", dependencies=[Depends(_auth)])
+def get_design_memory(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    try:
+        return _ok(project_memory(repo, project_id), project_id)
+    except ValueError as exc:
+        _error({"code": str(exc), "message": str(exc)}, project_id)
+
+@router.get("/projects/{project_id}/design-memory/query", dependencies=[Depends(_auth)])
+def query_design_memory(project_id: str, q: str = Query(..., min_length=1), repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    try:
+        return _ok(query_memory(project_memory(repo, project_id), q), project_id)
+    except ValueError as exc:
+        _error({"code": str(exc), "message": str(exc)}, project_id)
+
+@router.get("/projects/{project_id}/design-memory/explain/{alternative_id}", dependencies=[Depends(_auth)])
+def explain_design_memory(project_id: str, alternative_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    try:
+        return _ok(explain_design(project_memory(repo, project_id), alternative_id), project_id)
+    except ValueError as exc:
+        _error({"code": str(exc), "message": str(exc)}, project_id)
+
+@router.get("/projects/{project_id}/design-memory/replay", dependencies=[Depends(_auth)])
+def replay_design_memory(project_id: str, alternative_id: str | None = Query(default=None), repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    try:
+        return _ok(replay(project_memory(repo, project_id), alternative_id), project_id)
+    except ValueError as exc:
+        _error({"code": str(exc), "message": str(exc)}, project_id)
+
+@router.post("/projects/{project_id}/design-memory/directions", dependencies=[Depends(_auth)])
+def record_design_direction(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    payload = request.payload
+    try:
+        event_payload = direction_event(project_id, str(payload["alternative_id"]), str(payload["status"]), request.actor, payload.get("reason"))
+    except (KeyError, ValueError) as exc:
+        _error({"code": str(exc), "message": str(exc)}, project_id)
+    event = Event(None, datetime.now(timezone.utc).isoformat(), project_id, event_payload["type"], event_payload["payload"], request.actor, event_payload["source"])
+    repo.add_event(event)
+    return _ok({"status": event_payload["payload"]["status"], "alternative_id": event_payload["payload"]["alternative_id"], "human_reason": event_payload["payload"]["human_reason"], "decision_created": False}, project_id)
+
 @router.post("/projects/{project_id}/multimodal/interpret", dependencies=[Depends(_auth)])
 def interpret_multimodal(project_id: str, request: MultimodalInterpretRequest) -> V1Envelope:
     try:
@@ -246,11 +286,12 @@ def interpret_multimodal(project_id: str, request: MultimodalInterpretRequest) -
     return _ok(result, project_id)
 
 @router.post("/projects/{project_id}/multimodal/confirm", dependencies=[Depends(_auth)])
-def confirm_multimodal(project_id: str, request: MultimodalConfirmRequest) -> V1Envelope:
+def confirm_multimodal(project_id: str, request: MultimodalConfirmRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
     try:
         result = confirm_multimodal_candidate(request.candidate, request.actor)
     except ValueError as exc:
         _error({"code": str(exc), "message": str(exc)}, project_id)
+    repo.add_event(Event(None, datetime.now(timezone.utc).isoformat(), project_id, "MULTIMODAL_INPUT_CONFIRMED", {"candidate": result, "modality": result.get("provenance", {}).get("modality"), "decision_created": False}, request.actor, "multimodal"))
     return _ok({"adopted_input": result, "decision_created": False, "human_authority": True}, project_id)
 
 
@@ -284,6 +325,7 @@ def gdi_operations(project_id: str, request: CanonicalWriteRequest, repo: SQLite
         _error({"code": "HUMAN_CONFIRMATION_REQUIRED", "message": "Human-confirmed intent is required"}, project_id)
     knowledge = payload.get("knowledge", {})
     result = explore_design_space(str(payload.get("base_alternative_id", "UPAO-001-A")), adopted, knowledge, payload)
+    repo.add_event(Event(None, datetime.now(timezone.utc).isoformat(), project_id, "DESIGN_OPERATION_APPLIED", {"alternative_id": result.get("derived_alternative", {}).get("alternative_id"), "parent_alternative_id": payload.get("base_alternative_id", "UPAO-001-A"), "candidate": result.get("derived_alternative"), "operation": result.get("operation"), "intent": adopted, "decision_created": False}, "system", "gdi"))
     return _ok(result, project_id)
 
 
