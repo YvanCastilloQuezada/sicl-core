@@ -622,9 +622,35 @@ When a future implementation is explicitly authorized, update only the relevant 
 
 Do not delete historical frozen intent because part of an order was implemented. The document must distinguish `ALREADY_IMPLEMENTED` from `FROZEN_REMAINDER` after every authorized change.
 
-## 18. Candidate additional frozen future orders
+## 18. FFO-13 — Design Knowledge Generative Patterns
 
-No additional FFO is added by this consolidation. The source order permits candidates only when a clearly documented approved/frozen order already exists. No sufficiently independent additional order was identified without broad repository auditing. Product Owner decision is required before any FFO-13 or later identifier is created.
+**FFO_ID:** `DESIGN-KNOWLEDGE-GENERATIVE-PATTERNS-01`
+
+**TITLE:** Design Knowledge — Generative Patterns
+
+**STATUS:** REGISTERED / FROZEN
+
+### Purpose
+
+Generate new candidate architectural patterns through traceable synthesis, recombination, contradiction, gap detection, and evidence derived from existing Design Knowledge and project experience.
+
+### Constitutional invariants
+
+- `GENERATED_PATTERN != ESTABLISHED_PATTERN`.
+- `GENERATED_PATTERN != FACT`.
+- `GENERATED_PATTERN != REQUIREMENT`.
+- `GENERATED_PATTERN != DECISION`.
+- `ALEXANDER_PATTERN != SIMS_DEI_PATTERN`.
+- `INSPIRATION != AUTHORSHIP`.
+- `COMPUTATIONAL_VALIDATION != REAL_WORLD_VALIDATION`.
+- `REPEATED_CORRELATION != CAUSATION`.
+- `PATTERN_ACCEPTANCE = HUMAN AUTHORITY`.
+- `PROVENANCE = REQUIRED`.
+- `CONTRADICTORY_EVIDENCE = PRESERVED`.
+
+### Frozen remainder
+
+No generative-pattern entity, generator, recombination engine, contradiction engine, gap detector, acceptance workflow, endpoint, database schema, dependency, or UI is activated by this registration. The existing Design Knowledge pilot remains a contextual knowledge-matching capability only.
 
 ## 19. Operational exclusions
 
