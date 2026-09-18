@@ -5,7 +5,7 @@ from hashlib import sha256
 import json
 from typing import Any
 
-from .design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery
+from .design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery, list_sources
 from .domain import SpatialScope
 from .spatial_evaluation import spatial_metrics
 from .spatial_generator import UPAO001SpatialGenerator, generate_upao001_alternatives
@@ -42,6 +42,7 @@ def query_design_knowledge_for_intent(adopted_intent: dict[str, Any], *, regulat
     ))
     items = response.applicable_items
     patterns = response.applicable_patterns
+    source_map = {source["source_id"]: source for source in list_sources()}
     links = [{
         "intent_ids": [item.get("intent_id") for item in adopted_intent.get("adopted_intents", [])],
         "knowledge_item_id": item.get("knowledge_item_id"),
@@ -67,6 +68,7 @@ def query_design_knowledge_for_intent(adopted_intent: dict[str, Any], *, regulat
         "links": links,
         "applicable_items": items,
         "applicable_patterns": patterns,
+        "sources": [source_map[source_id] for source_id in response.source_ids if source_id in source_map],
         "possible_effects": [effect for link in links for effect in link.get("possible_effect", [])],
         "possible_tradeoffs": [tradeoff for link in links for tradeoff in link.get("possible_tradeoff", [])],
         "decision_created": False,
