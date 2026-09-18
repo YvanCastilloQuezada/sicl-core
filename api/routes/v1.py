@@ -88,6 +88,7 @@ from sicl.spatial_synthesis import build_spatial_graph, demo_program, generate_s
 from sicl.design_memory import direction_event, explain_design, project_memory, query_memory, replay
 from sicl.advanced_evolution import advanced_evolution, cross_branch, design_distance, search_by_example
 from sicl.multiscale_generative import capability_matrix, cross_scale_context, resolve_generative_capabilities
+from sicl.multi_agent_design import multi_agent_exploration
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -1857,4 +1858,18 @@ def create_multiscale_context(project_id: str, request: CanonicalWriteRequest, r
     except (KeyError, ValueError) as exc:
         _error({"code": str(exc), "message": str(exc)}, project_id)
     repo.add_event(Event(None, datetime.now(timezone.utc).isoformat(), project_id, "CROSS_SCALE_CONTEXT_LINKED", result, request.actor, "multiscale-p7"))
+    return _ok(result, project_id)
+
+
+@router.post("/projects/{project_id}/gdi/multi-agent-exploration", dependencies=[Depends(_auth)])
+def gdi_multi_agent_exploration(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    payload = request.payload
+    alternative = payload.get("alternative") or payload.get("parent")
+    if not isinstance(alternative, dict):
+        _error({"code": "ALTERNATIVE_REQUIRED", "message": "A canonical alternative is required"}, project_id)
+    try:
+        result = multi_agent_exploration(alternative, str(payload.get("spatial_scope", "edificacion")), payload.get("active_agents"), payload.get("intent"))
+    except (KeyError, ValueError, TypeError) as exc:
+        _error({"code": str(exc), "message": str(exc)}, project_id)
+    repo.add_event(Event(None, datetime.now(timezone.utc).isoformat(), project_id, "MULTI_AGENT_EXPLORATION_REQUESTED", {"alternative_id": alternative.get("alternative_id"), "spatial_scope": payload.get("spatial_scope", "edificacion"), "agents": payload.get("active_agents"), "result": result, "decision_created": False}, request.actor, "gdi-p8"))
     return _ok(result, project_id)
