@@ -567,6 +567,10 @@ class SQLiteRepository:
             elif event.type == "SPATIAL_LOCATION_SUPERSEDED" and "location_id" in payload:
                 location = SpatialLocation.from_dict(payload)
                 p.spatial_locations[location.location_id] = location
+            elif event.type in {"REGISTRATION_PROPOSED", "REGISTRATION_CONFIRMED", "REGISTRATION_LOCKED", "REGISTRATION_RECALIBRATED"} and "registration_id" in payload:
+                from .spatial_registration import SpatialRegistration
+                registration = SpatialRegistration.from_dict(payload)
+                p.spatial_registrations[registration.registration_id] = registration
         return p
 
     def list_projects(self) -> list[Project]:

@@ -78,6 +78,7 @@ from sicl.design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery, li
 from sicl.bim import BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelSnapshot, BIMReviewState, build_preview_change_set, change_set_to_dict, snapshot_to_dict as bim_snapshot_to_dict
 from sicl.ifc_adapter import parse_ifc_file
 from sicl.spatial_location import SpatialLocation, LocationStatus, AcquisitionMethod, LocationProvenance
+from sicl.spatial_registration import SpatialRegistration, propose_registration, registration_transition
 from sicl.georeferenced_site import normalize_reference_point, parse_kml, polygon_metrics, validate_polygon, local_project_frame, site_intelligence, site_fit, terrain_query, context_query
 from sicl.multiscale_spatial_evidence import evidence_view, multiscale_summary, surface_conflicts, validate_observation
 from sicl.external_spatial_context import query_external_context
@@ -1792,6 +1793,58 @@ def current_project_location(project_id: str, repo: SQLiteRepository = Depends(g
         _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
     current = _confirmed_location(project)
     return _ok({"location": current.to_dict() if current else None}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/spatial-registrations", dependencies=[Depends(_auth)])
+def propose_spatial_registration(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    payload = request.payload
+    actor = str(payload.get("actor", "api"))
+    registration_id = str(payload.get("registration_id") or f"REG-{uuid.uuid4().hex[:12]}")
+    if registration_id in project.spatial_registrations:
+        _error({"code": "REGISTRATION_ALREADY_EXISTS", "message": registration_id}, project_id)
+    try:
+        registration = propose_registration(project_id, payload, registration_id=registration_id, actor=actor)
+    except ValueError as exc:
+        _error({"code": "INVALID_SPATIAL_REGISTRATION", "message": str(exc)}, project_id)
+    project.version += 1
+    project.spatial_registrations[registration.registration_id] = registration
+    repo.save(project)
+    repo.add_event(CLI(repo, actor=actor)._event(project_id, "REGISTRATION_PROPOSED", registration.to_dict()))
+    return _ok({"registration": registration.to_dict(), "decision_created": False}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/spatial-registrations", dependencies=[Depends(_auth)])
+def list_spatial_registrations(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"registrations": [item.to_dict() for item in project.spatial_registrations.values()]}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/spatial-registrations/{registration_id}/transition", dependencies=[Depends(_auth)])
+def transition_spatial_registration(project_id: str, registration_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    registration = project.spatial_registrations.get(registration_id)
+    if registration is None:
+        _error({"code": "REGISTRATION_NOT_FOUND", "message": registration_id}, project_id)
+    payload = request.payload
+    actor = str(payload.get("actor", "api"))
+    action = str(payload.get("action", ""))
+    try:
+        updated = registration_transition(registration, action, actor=actor, side_confirmation=payload.get("site_side_confirmation"))
+    except ValueError as exc:
+        _error({"code": "INVALID_REGISTRATION_TRANSITION", "message": str(exc)}, project_id)
+    project.version += 1
+    project.spatial_registrations[registration_id] = updated
+    repo.save(project)
+    event_type = {"CONFIRM": "REGISTRATION_CONFIRMED", "LOCK": "REGISTRATION_LOCKED", "UNLOCK": "REGISTRATION_RECALIBRATED", "RECALIBRATE": "REGISTRATION_RECALIBRATED"}[action]
+    repo.add_event(CLI(repo, actor=actor)._event(project_id, event_type, updated.to_dict()))
+    return _ok({"registration": updated.to_dict(), "decision_created": False, "human_authority": True}, project_id, project.version)
 
 
 @router.post("/projects/{project_id}/georeferenced-site/parse", dependencies=[Depends(_auth)])
