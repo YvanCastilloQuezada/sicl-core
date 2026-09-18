@@ -1727,7 +1727,7 @@ def review_spatial_evidence(project_id: str, evidence_id: str, request: Canonica
         _error({"code": "INVALID_INPUTS", "message": "status must be APPROVED, REJECTED or PENDING"}, project_id)
     review = HumanReview(f"REV-{uuid.uuid4().hex[:10]}", project_id, actor, datetime.now(timezone.utc).isoformat(), str(payload.get("review", "")), str(payload.get("reason", "")), authority, status)
     project.human_reviews[review.review_id] = review; project.version += 1
-    repo.insert_entity_and_event("INSERT INTO human_reviews VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (review.review_id, project_id, review.actor, review.timestamp, review.review, review.reason, review.authority, review.status, review.version), project, CLI(repo, actor=actor)._event(project_id, "SPATIAL_EVIDENCE_REVIEWED", {"evidence_id": evidence_id, **asdict(review), "decision_created": False}))
+    repo.insert_entity_and_event("INSERT INTO human_reviews VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (review.review_id, project_id, review.actor, review.timestamp, review.review, review.reason, review.authority, review.status, review.version), project, CLI(repo, actor=actor)._event(project_id, "SPATIAL_EVIDENCE_REVIEWED", {"evidence_id": evidence_id, **asdict(review), "review_action": payload.get("review_action", "CONFIRM"), "corrected_value": payload.get("corrected_value"), "corrected_description": payload.get("corrected_description"), "original_ai_proposal_preserved": payload.get("original_ai_proposal_preserved", True), "decision_created": False}))
     return _ok({"review": asdict(review), "evidence_id": evidence_id, "decision_created": False}, project_id, project.version)
 
 
