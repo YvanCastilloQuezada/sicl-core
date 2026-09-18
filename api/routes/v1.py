@@ -87,6 +87,7 @@ from sicl.gdi import evolve_from_candidate, explore_design_space, multi_agent_ch
 from sicl.spatial_synthesis import build_spatial_graph, demo_program, generate_space_layout, synthesize_form_space
 from sicl.design_memory import direction_event, explain_design, project_memory, query_memory, replay
 from sicl.advanced_evolution import advanced_evolution, cross_branch, design_distance, search_by_example
+from sicl.multiscale_generative import capability_matrix, cross_scale_context, resolve_generative_capabilities
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -1834,3 +1835,26 @@ def get_example_capability(
         code = message.split(":", 1)[0]
         _error({"code": code, "message": message}, example_id)
     return _ok(result.to_dict(), example_id)
+
+
+@router.get("/multiscale/generative-capabilities", dependencies=[Depends(_auth)])
+def get_multiscale_generative_capabilities(spatial_scope: str | None = Query(default=None), typology: str | None = None, stage: str | None = None, data: str | None = None) -> V1Envelope:
+    try:
+        if spatial_scope:
+            result = resolve_generative_capabilities(spatial_scope, typology, stage, [item for item in (data or "").split(",") if item])
+        else:
+            result = {"scopes": capability_matrix(), "exact_scope_count": 11, "truthful": True}
+        return _ok(result)
+    except ValueError as exc:
+        _error({"code": str(exc), "message": str(exc)})
+
+
+@router.post("/projects/{project_id}/multiscale/context", dependencies=[Depends(_auth)])
+def create_multiscale_context(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    payload = request.payload
+    try:
+        result = cross_scale_context(payload["source_scope"], payload["source_alternative_id"], payload["target_scope"], payload.get("target_alternative_id"))
+    except (KeyError, ValueError) as exc:
+        _error({"code": str(exc), "message": str(exc)}, project_id)
+    repo.add_event(Event(None, datetime.now(timezone.utc).isoformat(), project_id, "CROSS_SCALE_CONTEXT_LINKED", result, request.actor, "multiscale-p7"))
+    return _ok(result, project_id)
