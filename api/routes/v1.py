@@ -90,6 +90,7 @@ from sicl.advanced_evolution import advanced_evolution, cross_branch, design_dis
 from sicl.candidate_normalization import normalize_design_candidate
 from sicl.multiscale_generative import capability_matrix, cross_scale_context, resolve_generative_capabilities
 from sicl.multi_agent_design import multi_agent_exploration
+from sicl.semantic_reasoning import build_semantic_reasoning
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -241,6 +242,25 @@ def confirm_design_intent(project_id: str, request: DesignIntentConfirmRequest, 
     event = Event(None, datetime.now(timezone.utc).isoformat(), project_id, event_payload["type"], event_payload["payload"], request.actor, event_payload["source"])
     repo.add_event(event)
     return _ok({"adopted_intent": adopted, "event_type": event.type, "decision_created": False, "human_authority": True}, project_id, project.version)
+
+@router.post("/projects/{project_id}/gdi/semantic-reasoning", dependencies=[Depends(_auth)])
+def gdi_semantic_reasoning(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    payload = request.payload.get("payload", request.payload)
+    adopted_intent = payload.get("adopted_intent")
+    if not isinstance(adopted_intent, dict) or adopted_intent.get("adoption") != "HUMAN_CONFIRMED":
+        _error({"code": "HUMAN_CONFIRMATION_REQUIRED", "message": "A human-confirmed intent is required"}, project_id)
+    try:
+        result = build_semantic_reasoning(
+            adopted_intent,
+            payload.get("knowledge") if isinstance(payload.get("knowledge"), dict) else {},
+            payload.get("alternative") if isinstance(payload.get("alternative"), dict) else None,
+            spatial_scope=payload.get("spatial_scope"),
+            context=str(payload.get("context", "")),
+        )
+    except (TypeError, ValueError, KeyError) as exc:
+        _error({"code": "SEMANTIC_REASONING_ERROR", "message": str(exc)}, project_id)
+    repo.add_event(Event(None, datetime.now(timezone.utc).isoformat(), project_id, "SEMANTIC_REASONING_PROJECTED", result, request.actor, "gdi-semantic-depth"))
+    return _ok(result, project_id)
 
 @router.get("/projects/{project_id}/design-memory", dependencies=[Depends(_auth)])
 def get_design_memory(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
