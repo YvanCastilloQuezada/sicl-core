@@ -21,12 +21,13 @@ if not _database_path:
 if _database_path != ":memory:":
     Path(_database_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
 
-_repository = SQLiteRepository(_database_path, check_same_thread=False)
-
-
 def get_repository() -> Generator[SQLiteRepository, None, None]:
-    yield _repository
+    repository = SQLiteRepository(_database_path, check_same_thread=False)
+    try:
+        yield repository
+    finally:
+        repository.close()
 
 
 def get_interpreter(repository: SQLiteRepository = None, actor: str = "api") -> CLI:
-    return CLI(repository or _repository, actor=actor)
+    return CLI(repository or SQLiteRepository(_database_path, check_same_thread=False), actor=actor)
