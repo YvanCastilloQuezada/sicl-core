@@ -91,6 +91,7 @@ from sicl.candidate_normalization import normalize_design_candidate
 from sicl.multiscale_generative import capability_matrix, cross_scale_context, resolve_generative_capabilities
 from sicl.multi_agent_design import multi_agent_exploration
 from sicl.semantic_reasoning import build_semantic_reasoning
+from sicl.design_contribution_trace import build_design_contribution_trace
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -260,6 +261,32 @@ def gdi_semantic_reasoning(project_id: str, request: CanonicalWriteRequest, repo
     except (TypeError, ValueError, KeyError) as exc:
         _error({"code": "SEMANTIC_REASONING_ERROR", "message": str(exc)}, project_id)
     repo.add_event(Event(None, datetime.now(timezone.utc).isoformat(), project_id, "SEMANTIC_REASONING_PROJECTED", result, request.actor, "gdi-semantic-depth"))
+    return _ok(result, project_id)
+
+@router.post("/projects/{project_id}/gdi/design-contribution-trace", dependencies=[Depends(_auth)])
+def gdi_design_contribution_trace(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    """Return a structured before/after trace without creating a winner or decision."""
+    payload = request.payload.get("payload", request.payload)
+    intent = payload.get("adopted_intent")
+    knowledge = payload.get("knowledge") if isinstance(payload.get("knowledge"), dict) else {}
+    hypotheses = payload.get("hypotheses") if isinstance(payload.get("hypotheses"), list) else []
+    if not isinstance(intent, dict) or intent.get("adoption") != "HUMAN_CONFIRMED":
+        _error({"code": "HUMAN_CONFIRMATION_REQUIRED", "message": "A human-confirmed intent is required"}, project_id)
+    if not hypotheses:
+        _error({"code": "HYPOTHESES_REQUIRED", "message": "At least one confirmed hypothesis is required"}, project_id)
+    explorations = []
+    try:
+        reasoning = build_semantic_reasoning(intent, knowledge, spatial_scope=payload.get("spatial_scope"), context=str(payload.get("context", "")))
+        for hypothesis in hypotheses:
+            if not isinstance(hypothesis, dict) or hypothesis.get("human_confirmed") is not True:
+                _error({"code": "HUMAN_CONFIRMATION_REQUIRED", "message": "Every explored hypothesis must be explicitly human-confirmed"}, project_id)
+            adopted_variant = dict(intent)
+            adopted_variant["adopted_intents"] = [hypothesis.get("statement", "")]
+            explorations.append(controlled_exploration(str(hypothesis.get("base_alternative_id", "UPAO-001-A")), adopted_variant, knowledge))
+        result = build_design_contribution_trace(project_id=project_id, intent=intent, knowledge=knowledge, hypotheses=hypotheses, explorations=explorations, semantic_reasoning=reasoning, human_confirmed=True)
+    except (TypeError, ValueError, KeyError) as exc:
+        _error({"code": "DESIGN_TRACE_ERROR", "message": str(exc)}, project_id)
+    repo.add_event(Event(None, datetime.now(timezone.utc).isoformat(), project_id, "DESIGN_CONTRIBUTION_TRACE_GENERATED", result, request.actor, "gdi-causal-design-trace"))
     return _ok(result, project_id)
 
 @router.get("/projects/{project_id}/design-memory", dependencies=[Depends(_auth)])
