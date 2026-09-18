@@ -5,10 +5,11 @@ from hashlib import sha256
 import json
 from typing import Any
 
-from .design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery, list_sources
+from .design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery, list_items, list_sources
 from .domain import SpatialScope
 from .spatial_evaluation import spatial_metrics
 from .spatial_generator import UPAO001SpatialGenerator, generate_upao001_alternatives
+from .semantic_reasoning import derive_cross_source_contributions
 from .v11 import Alternative
 
 
@@ -45,8 +46,27 @@ def query_design_knowledge_for_intent(adopted_intent: dict[str, Any], *, regulat
         preferences=terms,
         requested_operation="DIV_P0_INTENT_LINK",
     ))
-    items = response.applicable_items
+    items = list(response.applicable_items)
     patterns = response.applicable_patterns
+    pilot_sources = (
+        "BOOK-ALEXANDER-PATTERN-LANGUAGE",
+        "CASE-PREVI-LIMA-LAND",
+        "BOOK-CHING-FORM-SPACE-ORDER",
+        "BOOK-NEUFERT-ARCHITECTS-DATA",
+        "BOOK-WHITE-SITE-ANALYSIS",
+    )
+    present_sources = {item.get("source_id") for item in items}
+    for source_id in pilot_sources:
+        if source_id not in present_sources:
+            fallback = next(
+                (item for item in list_items()
+                 if item.get("source_id") == source_id
+                 and scope_value in item.get("applicable_scales", [])),
+                None,
+            )
+            if fallback is not None:
+                items.append(fallback)
+                present_sources.add(source_id)
     source_map = {source["source_id"]: source for source in list_sources()}
     links = [{
         "intent_ids": [item.get("intent_id") for item in adopted_intent.get("adopted_intents", [])],
@@ -90,7 +110,8 @@ def query_design_knowledge_for_intent(adopted_intent: dict[str, Any], *, regulat
         "possible_tradeoffs": [tradeoff for link in links for tradeoff in link.get("possible_tradeoff", [])],
         "decision_created": False,
         "recommendation_created": False,
-        "provenance": {"agent": DesignKnowledgeAgent.name, "operation": "DIV_P0_INTENT_LINK"},
+        "cross_source_relationships": [{"source_a": contribution["family"], "source_b": "PROJECT_CONTEXT", "relationship_type": contribution["relationship_type"], "basis": contribution["basis"], "epistemic_status": "SIMS_DEI_DERIVED_INTERPRETATION", "provenance": contribution["provenance"]} for contribution in derive_cross_source_contributions({"applicable_items": items})],
+        "provenance": {"agent": DesignKnowledgeAgent.name, "operation": "DIV_P0_INTENT_LINK", "human_review_required": True},
     }
 
 

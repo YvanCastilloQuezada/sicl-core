@@ -123,6 +123,45 @@ def derive_forces(
     return forces
 
 
+def derive_cross_source_contributions(knowledge: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Classify source-family contributions without speaking for authors."""
+    family_by_source = {
+        "BOOK-ALEXANDER-TIMELESS-WAY": "PATTERN_RELATIONAL",
+        "BOOK-ALEXANDER-PATTERN-LANGUAGE": "PATTERN_RELATIONAL",
+        "BOOK-ALEXANDER-OREGON-EXPERIMENT": "PATTERN_RELATIONAL",
+        "CASE-PREVI-LIMA-LAND": "PRECEDENT_CASE",
+        "CASE-HOUSES-GENERATED-BY-PATTERNS": "PRECEDENT_CASE",
+        "BOOK-CHING-FORM-SPACE-ORDER": "FORM_SPACE_ORDER",
+        "BOOK-NEUFERT-ARCHITECTS-DATA": "DIMENSIONAL_FUNCTIONAL",
+        "BOOK-WHITE-SITE-ANALYSIS": "SITE_ANALYSIS",
+    }
+    grouped: dict[str, list[str]] = {}
+    for item in (knowledge or {}).get("applicable_items", []):
+        source_id = str(item.get("source_id", ""))
+        family = family_by_source.get(source_id)
+        if family:
+            grouped.setdefault(family, []).append(str(item.get("knowledge_item_id")))
+    contributions = []
+    labels = {
+        "PATTERN_RELATIONAL": "relational/process question",
+        "FORM_SPACE_ORDER": "form, space and organization question",
+        "DIMENSIONAL_FUNCTIONAL": "dimensional/functional reference question",
+        "PRECEDENT_CASE": "precedent context question",
+        "SITE_ANALYSIS": "site/context analysis question",
+    }
+    for family, item_ids in sorted(grouped.items()):
+        contributions.append({
+            "family": family,
+            "item_ids": item_ids,
+            "contribution": labels[family],
+            "epistemic_status": "SOURCE_METADATA_ONLY" if family == "DIMENSIONAL_FUNCTIONAL" else "SOURCE_DERIVED_OR_STRUCTURED_INTERPRETATION",
+            "relationship_type": "COMPLEMENTS",
+            "basis": "shared contextual retrieval; not authorial consensus",
+            "provenance": {"source": "DESIGN_KNOWLEDGE_RETRIEVAL", "human_review_required": True},
+        })
+    return contributions
+
+
 def derive_tensions(forces: list[ArchitecturalForce], *, spatial_scope: str, context: str = "") -> list[ArchitecturalTension]:
     ids = {force.force_id for force in forces}
     tensions: list[ArchitecturalTension] = []
@@ -216,12 +255,14 @@ def build_semantic_reasoning(
     forces = derive_forces(adopted_intent, knowledge, spatial_scope=scope)
     tensions = derive_tensions(forces, spatial_scope=scope, context=context)
     relationships = derive_spatial_relationships(alternative, forces, spatial_scope=scope)
+    cross_source_contributions = derive_cross_source_contributions(knowledge)
     hypotheses = generate_hypotheses(forces, tensions, relationships, spatial_scope=scope, parent_alternative_id=(alternative or {}).get("alternative_id"))
     return {
         "spatial_scope": scope,
         "forces": [asdict(item) for item in forces],
         "tensions": [asdict(item) for item in tensions],
         "spatial_relationships": [asdict(item) for item in relationships],
+        "cross_source_contributions": cross_source_contributions,
         "hypotheses": [asdict(item) for item in hypotheses],
         "human_confirmation_required": True,
         "decision_created": False,
@@ -230,4 +271,4 @@ def build_semantic_reasoning(
     }
 
 
-__all__ = ["ArchitecturalForce", "ArchitecturalTension", "SpatialRelationship", "DesignHypothesis", "build_semantic_reasoning", "derive_forces", "derive_tensions", "derive_spatial_relationships", "generate_hypotheses"]
+__all__ = ["ArchitecturalForce", "ArchitecturalTension", "SpatialRelationship", "DesignHypothesis", "build_semantic_reasoning", "derive_forces", "derive_tensions", "derive_spatial_relationships", "generate_hypotheses", "derive_cross_source_contributions"]
