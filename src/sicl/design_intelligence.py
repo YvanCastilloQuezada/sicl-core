@@ -26,6 +26,11 @@ def _intent_terms(adopted_intent: dict[str, Any]) -> list[str]:
     return list(dict.fromkeys(term for term in terms if len(term) > 2))
 
 
+def _match_state(item: dict[str, Any], terms: list[str]) -> str:
+    haystack = f"{item.get('title', '')} {item.get('statement', '')}".casefold()
+    return "MATCH" if any(term.casefold() in haystack for term in terms) else "POSSIBLE_MATCH"
+
+
 def query_design_knowledge_for_intent(adopted_intent: dict[str, Any], *, regulations: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     scope_value = adopted_intent.get("spatial_scope") or adopted_intent.get("provenance", {}).get("spatial_scope") or "edificacion"
     try:
@@ -47,6 +52,12 @@ def query_design_knowledge_for_intent(adopted_intent: dict[str, Any], *, regulat
         "intent_ids": [item.get("intent_id") for item in adopted_intent.get("adopted_intents", [])],
         "knowledge_item_id": item.get("knowledge_item_id"),
         "source_id": item.get("source_id"),
+        "match_state": _match_state(item, terms),
+        "why_relevant": item.get("statement"),
+        "applicable_scales": item.get("applicable_scales", []),
+        "matched_project_context": terms,
+        "limitations": item.get("limitations", []),
+        "design_direction": item.get("outputs", []),
         "possible_effect": item.get("outputs", []),
         "possible_tradeoff": item.get("limitations", []),
         "knowledge_match": True,
@@ -57,6 +68,12 @@ def query_design_knowledge_for_intent(adopted_intent: dict[str, Any], *, regulat
         "intent_ids": [item.get("intent_id") for item in adopted_intent.get("adopted_intents", [])],
         "pattern_id": pattern.get("pattern_id"),
         "source_ids": pattern.get("source_ids", []),
+        "match_state": "POSSIBLE_MATCH",
+        "why_relevant": pattern.get("problem", {}),
+        "applicable_scales": pattern.get("applicable_scales", []),
+        "matched_project_context": terms,
+        "limitations": pattern.get("consequences", {}).get("negative", []),
+        "design_direction": pattern.get("solution_family", {}),
         "possible_effect": pattern.get("consequences", {}).get("positive", []),
         "possible_tradeoff": pattern.get("consequences", {}).get("negative", []),
         "knowledge_match": True,
