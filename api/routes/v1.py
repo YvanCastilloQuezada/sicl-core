@@ -76,6 +76,7 @@ from sicl.design_knowledge import DesignKnowledgeAgent, DesignKnowledgeQuery, li
 from sicl.bim import BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelSnapshot, BIMReviewState, build_preview_change_set, change_set_to_dict, snapshot_to_dict as bim_snapshot_to_dict
 from sicl.ifc_adapter import parse_ifc_file
 from sicl.spatial_location import SpatialLocation, LocationStatus, AcquisitionMethod, LocationProvenance
+from sicl.georeferenced_site import normalize_reference_point, parse_kml, polygon_metrics, validate_polygon, local_project_frame, site_intelligence, site_fit, terrain_query, context_query
 from sicl.spatial_generator import UPAO001SpatialGenerator, generate_upao001_alternatives
 from sicl.spatial_evaluation import build_upao001_dataset
 from sicl.environmental import EnvironmentalAnalysisError, EnvironmentalLocation, build_solar_analysis
@@ -1658,6 +1659,95 @@ def current_project_location(project_id: str, repo: SQLiteRepository = Depends(g
         _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
     current = _confirmed_location(project)
     return _ok({"location": current.to_dict() if current else None}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/georeferenced-site/parse", dependencies=[Depends(_auth)])
+async def parse_georeferenced_site(project_id: str, file: UploadFile = File(...), repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    """Preview a KML/KMZ as untrusted input; parsing never confirms a boundary."""
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    try:
+        data = await file.read()
+        if len(data) > 20 * 1024 * 1024:
+            _error({"code": "INVALID_LOCATION", "message": "site file exceeds 20 MiB"}, project_id)
+        result = parse_kml(data, file.filename or "site.kml")
+    except (ValueError, UnicodeError) as exc:
+        _error({"code": "INVALID_LOCATION", "message": str(exc)}, project_id)
+    result["human_confirmation_required"] = result["classification"] in {"VALID_SINGLE_POLYGON", "MULTIPLE_POLYGONS", "AMBIGUOUS_SITE_BOUNDARY"}
+    result["project_id"] = project_id
+    return _ok({"site_preview": result, "confirmed": False, "decision_created": False}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/georeferenced-site/confirm", dependencies=[Depends(_auth)])
+def confirm_georeferenced_site(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    """Confirm a validated point/polygon into the existing SpatialLocation state."""
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    payload = request.payload
+    actor = str(payload.get("actor", "api"))
+    if payload.get("human_confirmed") is not True or payload.get("confirm") is not True:
+        _error({"code": "HUMAN_CONFIRMATION_REQUIRED", "message": "georeferenced site requires explicit human confirmation"}, project_id)
+    geometry = payload.get("geometry")
+    if not isinstance(geometry, dict) or geometry.get("type") not in {"Point", "Polygon"}:
+        _error({"code": "INVALID_LOCATION", "message": "Point or Polygon GeoJSON geometry required"}, project_id)
+    crs = str(payload.get("crs", "EPSG:4326"))
+    validation = {"state": "VALID"}
+    metrics = None
+    frame = None
+    if geometry["type"] == "Point":
+        try:
+            coords = geometry["coordinates"]
+            point = normalize_reference_point(float(coords[0]), float(coords[1]), crs=crs, elevation=payload.get("elevation"), source=payload.get("source", "USER_INPUT"), accuracy=payload.get("accuracy"), actor_id=actor)
+        except (ValueError, IndexError, TypeError) as exc:
+            _error({"code": "INVALID_LOCATION", "message": str(exc)}, project_id)
+        validation = {"state": "VALID", "boundary_state": "UNKNOWN"}
+    else:
+        coordinates = geometry.get("coordinates", [])
+        if len(coordinates) != 1 or not isinstance(coordinates[0], list):
+            _error({"code": "INVALID_LOCATION", "message": "Only a single Polygon ring can be confirmed in this phase"}, project_id)
+        validation = validate_polygon(coordinates[0], crs)
+        if validation["state"] != "VALID":
+            _error({"code": "INVALID_LOCATION", "message": validation}, project_id)
+        metrics = polygon_metrics(coordinates[0], crs)
+        frame = local_project_frame(coordinates[0], crs=crs)
+    try:
+        location = SpatialLocation(location_id=payload.get("location_id") or f"LOC-{uuid.uuid4().hex[:12]}", project_id=project_id, spatial_scope=SpatialScope.PARCELA_SITIO, geometry_type=geometry["type"], geometry=geometry, crs=crs, place_label=payload.get("place_label"), acquisition_method=AcquisitionMethod(payload.get("acquisition_method", "USER_INPUT")), provenance=LocationProvenance(payload.get("provenance", "USER_DECLARED")), status=LocationStatus.CONFIRMED, actor_id=actor, authority=payload.get("authority", "project_owner"), version=max((item.version for item in project.spatial_locations.values()), default=0) + 1, supersedes_location_id=payload.get("supersedes_location_id"))
+    except (ValueError, KeyError) as exc:
+        _error({"code": "INVALID_LOCATION", "message": str(exc)}, project_id)
+    project.spatial_locations[location.location_id] = location
+    project.version += 1
+    repo.save(project)
+    repo.add_event(CLI(repo, actor=actor)._event(project_id, "GEOREFERENCED_SITE_CONFIRMED", {"location": location.to_dict(), "validation": validation, "metrics": metrics, "local_project_frame": frame, "terrain": "UNKNOWN", "context": "UNKNOWN", "human_confirmed": True}))
+    return _ok({"location": location.to_dict(), "validation": validation, "metrics": metrics, "local_project_frame": frame, "site_intelligence": site_intelligence(), "decision_created": False}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/georeferenced-site/analyze", dependencies=[Depends(_auth)])
+def analyze_georeferenced_site(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    """Analyze confirmed site geometry without turning context into a decision."""
+    project = repo.get_project(project_id)
+    if project is None and project_id != "UPAO-001":
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    payload = request.payload
+    geometry = payload.get("site_geometry") or payload.get("geometry")
+    if not isinstance(geometry, dict):
+        _error({"code": "INVALID_LOCATION", "message": "site_geometry is required"}, project_id)
+    crs = str(payload.get("crs", "EPSG:4326"))
+    metrics = polygon_metrics(geometry.get("coordinates", [[]])[0], crs) if geometry.get("type") == "Polygon" else {"status": "UNKNOWN"}
+    frame = local_project_frame(geometry.get("coordinates", [[]])[0], crs=crs) if geometry.get("type") == "Polygon" else {"status": "UNKNOWN"}
+    alternative_id = payload.get("alternative_id", "UPAO-001-A")
+    site_fit_result: dict[str, Any] = {"state": "UNKNOWN", "reason": "NO_SPATIAL_ALTERNATIVE_SUPPLIED"}
+    if project_id == "UPAO-001":
+        alternative = next((item for item in generate_upao001_alternatives() if item.alternative_id == alternative_id), None)
+        if alternative is not None:
+            representation = UPAO001SpatialGenerator().generate(alternative).to_dict()
+            footprint = next((item["geometry"] for item in representation["elements"] if item["element_type"] == "BuildingFootprint"), None)
+            if footprint is not None:
+                site_fit_result = site_fit(geometry, footprint) if crs == "LOCAL_PROJECT_METRIC" else {"state": "UNKNOWN", "reason": "SITE_AND_DESIGN_CRS_MISMATCH"}
+    terrain = terrain_query(site_geometry=geometry)
+    context = context_query(site_geometry=geometry, extent=str(payload.get("context_extent", "IMMEDIATE")))
+    return _ok({"site_geometry": geometry, "crs": crs, "metrics": metrics, "local_project_frame": frame, "site_fit": site_fit_result, "terrain": terrain, "context": context, "provenance": {"site": payload.get("site_provenance", "USER_CONFIRMED_OR_EXTERNAL"), "metrics": "DERIVED_COMPUTATION", "terrain": terrain.get("provider"), "context": context.get("source_type")}, "unknowns": ["Regulatory compliance", "setbacks", "legal ownership", "legal access", "buildability"], "decision_created": False}, project_id, project.version if project else None)
 
 
 @router.get("/projects/{project_id}/missing-data", dependencies=[Depends(_auth)])
