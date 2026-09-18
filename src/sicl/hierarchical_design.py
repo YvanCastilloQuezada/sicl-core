@@ -63,4 +63,22 @@ def propagate_upstream_change(parent_state: dict[str, Any], child_state: dict[st
     return {"changed_level": changed, "affected_nodes": affected, "recomputed": affected, "preserved": [node["id"] for node in child_state.get("nodes", []) if node["id"] not in affected], "invalidated": [], "requires_human_review": bool(affected), "unknown": ["Real-world performance and regulatory consequences remain unknown."], "status": "RECOMPUTED" if affected else "PRESERVED"}
 
 
-__all__ = ["derive_hierarchical_state", "hierarchical_compare", "propagate_upstream_change"]
+def propagate_space_geometry_change(parent_state: dict[str, Any], child_state: dict[str, Any], changed_node_id: str, changed_parameters: dict[str, Any]) -> dict[str, Any]:
+    """Propagate a lower block/mass geometry change into dependent spaces.
+
+    The function never silently preserves stale space state. It recomputes
+    dependent spaces when they are represented, preserves unrelated nodes, and
+    marks relationships for human review because geometric relationship
+    satisfaction is not claimed without a validated spatial solver.
+    """
+    nodes = child_state.get("nodes", [])
+    changed = next((node for node in nodes if node.get("id") == changed_node_id), None)
+    if changed is None:
+        return {"status": "UNKNOWN", "changed_node_id": changed_node_id, "affected_nodes": [], "recomputed": [], "preserved": [node.get("id") for node in nodes], "invalidated": [], "requires_human_review": True, "unknown": ["Changed node is not represented in the derived state."]}
+    dependent_space_ids = [node.get("id") for node in nodes if node.get("kind") == "SPACE" and (changed_node_id in node.get("depends_on", []) or changed.get("kind") in {"MASS", "BUILDING"})]
+    affected_relationships = list(child_state.get("relationships", [])) if dependent_space_ids else []
+    preserved = [node.get("id") for node in nodes if node.get("id") not in dependent_space_ids and node.get("id") != changed_node_id]
+    return {"status": "REQUIRES_HUMAN_REVIEW" if affected_relationships else "RECOMPUTED", "changed_node_id": changed_node_id, "changed_level": changed.get("kind"), "changed_parameters": dict(changed_parameters), "affected_nodes": dependent_space_ids, "recomputed": dependent_space_ids, "preserved": [changed_node_id, *preserved], "invalidated": [], "relationships_requiring_review": affected_relationships, "requires_human_review": bool(affected_relationships), "unknown": ["Adjacency, connectivity and functional performance are not recomputed as validated architectural facts."]}
+
+
+__all__ = ["derive_hierarchical_state", "hierarchical_compare", "propagate_upstream_change", "propagate_space_geometry_change"]

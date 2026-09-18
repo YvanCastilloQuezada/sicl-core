@@ -5,13 +5,14 @@ from math import sqrt
 from typing import Any
 
 from .gdi import apply_design_operation, design_dna
-from .hierarchical_design import derive_hierarchical_state
+from .hierarchical_design import derive_hierarchical_state, propagate_space_geometry_change
 from .spatial_generator import UPAO001SpatialGenerator
 from .spatial_evaluation import spatial_metrics
 from .v11 import Alternative
 
 INTENSITIES = tuple(range(0, 101, 10))
 MUTABLE = {"footprint_ratio", "courtyard_ratio", "mass_separation", "floors"}
+NEAR_DUPLICATE_AGGREGATE_TOLERANCE = 0.02  # PROPOSED / REQUIRES VALIDATION; computational, not quality.
 
 
 def _alt(value: dict[str, Any]) -> Alternative:
@@ -22,6 +23,88 @@ def _vector(value: dict[str, Any]) -> dict[str, float]:
     source = value.get("alternative", value)
     p = source.get("parameters", {}) if isinstance(source, dict) else {}
     return {key: float(p[key]) for key in MUTABLE if key in p and isinstance(p[key], (int, float))}
+
+
+def _comparison_source(value: dict[str, Any]) -> dict[str, Any]:
+    return value.get("alternative", value) if isinstance(value.get("alternative", value), dict) else value
+
+
+def _bbox(geometry: dict[str, Any] | None) -> tuple[float, float, float, float] | None:
+    if not isinstance(geometry, dict):
+        return None
+    coords = geometry.get("coordinates", [])
+    points: list[tuple[float, float]] = []
+    def collect(node: Any) -> None:
+        if isinstance(node, (list, tuple)) and len(node) >= 2 and all(isinstance(item, (int, float)) for item in node[:2]):
+            points.append((float(node[0]), float(node[1])))
+        elif isinstance(node, (list, tuple)):
+            for item in node: collect(item)
+    collect(coords)
+    if not points: return None
+    xs, ys = zip(*points)
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _bbox_area(box: tuple[float, float, float, float] | None) -> float:
+    return max(0.0, (box[2] - box[0]) * (box[3] - box[1])) if box else 0.0
+
+
+def _bbox_iou(left: tuple[float, float, float, float] | None, right: tuple[float, float, float, float] | None) -> float | None:
+    if not left or not right: return None
+    ix = max(0.0, min(left[2], right[2]) - max(left[0], right[0]))
+    iy = max(0.0, min(left[3], right[3]) - max(left[1], right[1]))
+    intersection = ix * iy
+    union = _bbox_area(left) + _bbox_area(right) - intersection
+    return intersection / union if union else 1.0
+
+
+def _geometry_summary(value: dict[str, Any]) -> dict[str, Any] | None:
+    representation = value.get("representation")
+    if not isinstance(representation, dict): return None
+    elements = representation.get("elements", [])
+    footprints = [item for item in elements if str(item.get("element_type", "")).upper() == "BUILDINGFOOTPRINT"]
+    masses = [item for item in elements if str(item.get("element_type", "")).upper() == "BUILDINGMASS"]
+    footprint = _bbox(footprints[0].get("geometry")) if footprints else None
+    mass_boxes = [_bbox(item.get("geometry")) for item in masses]
+    mass_boxes = [box for box in mass_boxes if box]
+    heights = [float(item.get("metadata", {}).get("height", 0.0)) for item in masses if isinstance(item.get("metadata", {}).get("height", 0.0), (int, float))]
+    return {"footprint_bbox": footprint, "footprint_area": _bbox_area(footprint), "mass_count": len(masses), "mass_boxes": mass_boxes, "height": max(heights, default=0.0), "mass_area": sum(_bbox_area(box) for box in mass_boxes)}
+
+
+def _metric_summary(value: dict[str, Any]) -> dict[str, float]:
+    metrics = value.get("metrics", {})
+    return {key: float(metrics[key]) for key in ("site_area", "footprint_area", "gross_massing_area", "open_site_area") if isinstance(metrics.get(key), (int, float))}
+
+
+def _relationship_signature(value: dict[str, Any]) -> set[tuple[str, str, str]] | None:
+    state = value.get("hierarchical_state")
+    if not isinstance(state, dict): return None
+    result = set()
+    for item in state.get("dependencies", []):
+        result.add(("DEPENDENCY", "", str(item.get("type"))))
+    for item in state.get("relationships", []):
+        result.add(("PROGRAM", "", str(item.get("relationship_type", item.get("type")))))
+    return result
+
+
+def _hierarchy_signature(value: dict[str, Any]) -> dict[str, int] | None:
+    state = value.get("hierarchical_state")
+    if not isinstance(state, dict): return None
+    return {kind: sum(1 for node in state.get("nodes", []) if node.get("kind") == kind) for kind in ("SITE", "BUILDING", "MASS", "SPACE")}
+
+
+def _space_geometry_distance(left: dict[str, Any], right: dict[str, Any]) -> float | None:
+    left_nodes = [node for node in left.get("nodes", []) if node.get("kind") == "SPACE"]
+    right_nodes = [node for node in right.get("nodes", []) if node.get("kind") == "SPACE"]
+    if not left_nodes or not right_nodes or len(left_nodes) != len(right_nodes): return None
+    distances = []
+    for left_node, right_node in zip(left_nodes, right_nodes):
+        lb, rb = _bbox(left_node.get("geometry")), _bbox(right_node.get("geometry"))
+        if not lb or not rb: return None
+        left_center = ((lb[0] + lb[2]) / 2.0, (lb[1] + lb[3]) / 2.0)
+        right_center = ((rb[0] + rb[2]) / 2.0, (rb[1] + rb[3]) / 2.0)
+        distances.append(sqrt((left_center[0] - right_center[0]) ** 2 + (left_center[1] - right_center[1]) ** 2) / max(1.0, _bbox_area(lb) ** 0.5, _bbox_area(rb) ** 0.5))
+    return round(sum(distances) / len(distances), 4)
 
 
 def inheritance_profile(parent: dict[str, Any], inherit: list[str] | None = None, mutable: list[str] | None = None, bounds: dict[str, dict[str, float]] | None = None) -> dict[str, Any]:
@@ -65,10 +148,38 @@ def directed_mutation(parent: dict[str, Any], profile: dict[str, Any], target: s
 def design_distance(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
     a, b = _vector(left), _vector(right)
     keys = sorted(set(a) | set(b))
-    components = {key: round(abs(a.get(key, 0.0) - b.get(key, 0.0)), 4) for key in keys}
-    raw = sqrt(sum(value * value for value in components.values()))
-    normalized = round(raw / max(1.0, len(keys)), 4)
-    return {"left": left.get("alternative_id") or left.get("alternative", {}).get("alternative_id"), "right": right.get("alternative_id") or right.get("alternative", {}).get("alternative_id"), "distance": normalized, "components": components, "is_quality_score": False, "explanation": "Parameter difference only; distance is not quality."}
+    parameter_components = {}
+    for key in keys:
+        denominator = 1.0 if key in {"footprint_ratio", "courtyard_ratio"} else max(1.0, abs(a.get(key, 0.0)), abs(b.get(key, 0.0)))
+        parameter_components[key] = round(abs(a.get(key, 0.0) - b.get(key, 0.0)) / denominator, 4)
+    parameter_distance = round(sum(parameter_components.values()) / max(1, len(parameter_components)), 4)
+    left_geo, right_geo = _geometry_summary(left), _geometry_summary(right)
+    geometry_details: dict[str, Any] = {"status": "UNKNOWN"}
+    geometry_distance: float | None = None
+    if left_geo and right_geo:
+        iou = _bbox_iou(left_geo["footprint_bbox"], right_geo["footprint_bbox"])
+        area_diff = abs(left_geo["footprint_area"] - right_geo["footprint_area"]) / max(1.0, left_geo["footprint_area"], right_geo["footprint_area"])
+        count_diff = abs(left_geo["mass_count"] - right_geo["mass_count"]) / max(1, left_geo["mass_count"], right_geo["mass_count"])
+        height_diff = abs(left_geo["height"] - right_geo["height"]) / max(1.0, left_geo["height"], right_geo["height"])
+        geometry_distance = round(sum((area_diff, 1.0 - (iou if iou is not None else 0.0), count_diff, height_diff)) / 4.0, 4)
+        geometry_details = {"status": "AVAILABLE", "footprint_area_difference": round(area_diff, 4), "footprint_bbox_iou": round(iou, 4) if iou is not None else None, "mass_count_difference": round(count_diff, 4), "height_difference": round(height_diff, 4), "normalization": "observed project geometry domain; computational tolerance only"}
+    left_metrics, right_metrics = _metric_summary(left), _metric_summary(right)
+    metric_keys = sorted(set(left_metrics) | set(right_metrics))
+    metric_components = {key: round(abs(left_metrics.get(key, 0.0) - right_metrics.get(key, 0.0)) / max(1.0, abs(left_metrics.get(key, 0.0)), abs(right_metrics.get(key, 0.0))), 4) for key in metric_keys}
+    metric_distance = round(sum(metric_components.values()) / max(1, len(metric_components)), 4) if metric_keys else None
+    left_rel, right_rel = _relationship_signature(left), _relationship_signature(right)
+    relationship_distance = None if left_rel is None or right_rel is None else round(len(left_rel.symmetric_difference(right_rel)) / max(1, len(left_rel | right_rel)), 4)
+    left_h, right_h = _hierarchy_signature(left), _hierarchy_signature(right)
+    left_state, right_state = left.get("hierarchical_state"), right.get("hierarchical_state")
+    space_geometry_distance = _space_geometry_distance(left_state, right_state) if isinstance(left_state, dict) and isinstance(right_state, dict) else None
+    hierarchy_count_distance = None if left_h is None or right_h is None else round(sum(abs(left_h[k] - right_h[k]) for k in left_h) / max(1, sum(max(left_h[k], right_h[k]) for k in left_h)), 4)
+    hierarchy_values = [value for value in (hierarchy_count_distance, space_geometry_distance) if value is not None]
+    hierarchy_distance = round(sum(hierarchy_values) / len(hierarchy_values), 4) if hierarchy_values else None
+    available = [value for value in (parameter_distance, geometry_distance, metric_distance, relationship_distance, hierarchy_distance) if value is not None]
+    aggregate = round(sum(available) / max(1, len(available)), 4)
+    same_state = parameter_distance == 0 and (geometry_distance in (None, 0.0)) and (metric_distance in (None, 0.0)) and (relationship_distance in (None, 0.0)) and (hierarchy_distance in (None, 0.0))
+    classification = "EXACT_DUPLICATE" if same_state else ("NEAR_DUPLICATE" if aggregate < NEAR_DUPLICATE_AGGREGATE_TOLERANCE else "MEANINGFULLY_DISTINCT")
+    return {"left": _comparison_source(left).get("alternative_id"), "right": _comparison_source(right).get("alternative_id"), "distance": aggregate, "classification": classification, "components": {"parameter_distance": parameter_distance, "geometry_distance": geometry_distance, "metric_distance": metric_distance, "relationship_distance": relationship_distance, "hierarchical_distance": hierarchy_distance}, "component_details": {"parameter": parameter_components, "geometry": geometry_details, "metrics": metric_components, "relationships": "AVAILABLE" if relationship_distance is not None else "UNKNOWN", "hierarchy": {"count_distance": hierarchy_count_distance, "space_geometry_distance": space_geometry_distance} if hierarchy_distance is not None else "UNKNOWN"}, "is_quality_score": False, "explanation": "Explainable design difference; distance is not quality. Unsupported components remain UNKNOWN."}
 
 
 def cross_branch(parent_a: dict[str, Any], parent_b: dict[str, Any], inherit_a: list[str], inherit_b: list[str]) -> dict[str, Any]:
@@ -150,6 +261,8 @@ def bounded_diverse_exploration(parent: dict[str, Any], payload: dict[str, Any])
     base = _alt(parent["alternative"] if "alternative" in parent else parent)
     specs = (_direction_specs(direction) * ((budget_limit // len(_direction_specs(direction))) + 1))[:budget_limit]
     generator = UPAO001SpatialGenerator()
+    parent_representation = generator.generate(base).to_dict()
+    parent_hierarchical_state = derive_hierarchical_state(asdict(base), parent_representation, payload.get("space_layout"), downstream_state="PRESERVED")
     internal: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     for index, (operation_type, parameters) in enumerate(specs):
@@ -158,15 +271,19 @@ def bounded_diverse_exploration(parent: dict[str, Any], payload: dict[str, Any])
             representation = generator.generate(child)
             dna = design_dna(child)
             hierarchical_state = derive_hierarchical_state(asdict(child), representation.to_dict(), payload.get("space_layout"), downstream_state="RECOMPUTED")
-            record = {"alternative": asdict(child), "operation": asdict(operation), "representation": representation.to_dict(), "hierarchical_state": hierarchical_state, "metrics": spatial_metrics(representation, generator), "design_dna": dna, "parent_alternative_id": base.alternative_id, "direction": direction, "candidate_index": index, "traceable": True, "representative": False, "representative_reason": None, "automatic_winner": False, "recommendation_created": False, "decision_created": False}
+            changed_mass = next((node for node in hierarchical_state["nodes"] if node["kind"] == "MASS"), None)
+            propagation = propagate_space_geometry_change(parent_hierarchical_state, hierarchical_state, changed_mass["id"], parameters) if changed_mass else {"status": "UNKNOWN", "unknown": ["No mass node is currently represented."]}
+            record = {"alternative": asdict(child), "operation": asdict(operation), "representation": representation.to_dict(), "hierarchical_state": hierarchical_state, "space_propagation": propagation, "metrics": spatial_metrics(representation, generator), "design_dna": dna, "parent_alternative_id": base.alternative_id, "direction": direction, "candidate_index": index, "traceable": True, "representative": False, "representative_reason": None, "automatic_winner": False, "recommendation_created": False, "decision_created": False}
             record["design_contribution_trace"] = {"parent_alternative_id": base.alternative_id, "exploration_request": {"direction": direction, "budget": budget, "controls": controls, "human_confirmed": True}, "operation_sequence": [asdict(operation)], "target_spatial_scope": payload.get("target_spatial_scope", "edificacion"), "candidate_alternative_id": child.alternative_id, "knowledge_refs": list(payload.get("knowledge_refs", [])), "intent_refs": list(payload.get("intent_refs", [])), "expected_effect": "Explore a bounded spatial direction; no performance claim.", "observed_effect": {"metrics": record["metrics"], "hierarchical_state": record["hierarchical_state"], "design_dna": dna}, "uncertainty": ["Synthetic geometry; real-world performance remains unknown."]}
-            duplicate = next((item for item in internal if item["alternative"]["parameters"] == record["alternative"]["parameters"]), None)
-            if duplicate:
-                rejected.append({"candidate_index": index, "status": "EXACT_DUPLICATE", "duplicate_of": duplicate["alternative"]["alternative_id"]})
+            comparison = next(((item, design_distance(item, record)) for item in internal if design_distance(item, record)["classification"] == "EXACT_DUPLICATE"), None)
+            if comparison:
+                duplicate, evidence = comparison
+                rejected.append({"candidate_index": index, "status": "EXACT_DUPLICATE", "duplicate_of": duplicate["alternative"]["alternative_id"], "evidence": evidence})
                 continue
-            near = next((item for item in internal if design_distance(item, record)["distance"] < 0.02), None)
+            near = next(((item, design_distance(item, record)) for item in internal if design_distance(item, record)["classification"] == "NEAR_DUPLICATE"), None)
             if near:
-                rejected.append({"candidate_index": index, "status": "NEAR_DUPLICATE", "near_duplicate_of": near["alternative"]["alternative_id"], "distance": design_distance(near, record)})
+                near_item, evidence = near
+                rejected.append({"candidate_index": index, "status": "NEAR_DUPLICATE", "near_duplicate_of": near_item["alternative"]["alternative_id"], "distance": evidence})
                 continue
             internal.append(record)
         except (ValueError, Exception) as exc:
@@ -187,8 +304,10 @@ def bounded_diverse_exploration(parent: dict[str, Any], payload: dict[str, Any])
             break
         if item in representatives:
             continue
-        nearest = min((design_distance(item, selected)["distance"] for selected in representatives), default=0.0)
-        if nearest >= 0.05:
+        comparisons = [design_distance(item, selected) for selected in representatives]
+        distinct_from_all = all(comparison["classification"] == "MEANINGFULLY_DISTINCT" for comparison in comparisons)
+        nearest = min((comparison["distance"] for comparison in comparisons), default=0.0)
+        if distinct_from_all:
             item["representative"] = True
             item["representative_reason"] = "structural distance coverage"
             item["distance_from_representatives"] = nearest
@@ -199,7 +318,8 @@ def bounded_diverse_exploration(parent: dict[str, Any], payload: dict[str, Any])
     status = "OK" if representatives else "NO_VALID_CANDIDATES"
     if len(representatives) < 2 and internal:
         status = "INSUFFICIENT_DIVERSITY_WITHIN_CURRENT_BOUNDS"
-    return {"status": status, "request": {"project_id": base.project_id, "parent_alternative_id": base.alternative_id, "direction": direction, "budget": budget, "controls": controls, "human_confirmed": True, "authorized_operations": sorted({item["operation"]["operation_type"] for item in internal})}, "internal_candidate_count": len(specs), "valid_candidate_count": len(internal), "rejected_candidates": rejected, "candidates": internal, "representatives": representatives, "presented_count": len(representatives), "design_families": families, "automatic_winner": False, "recommendation_created": False, "decision_created": False, "provenance": "P6 bounded deterministic exploration over existing GDI operations"}
+    clusters = [{"cluster_id": f"CLUSTER-{index + 1}", "representative_id": item["alternative"]["alternative_id"], "member_ids": [item["alternative"]["alternative_id"]], "classification": "MEANINGFULLY_DISTINCT", "evidence": "No near-duplicate members retained in this cluster."} for index, item in enumerate(representatives)]
+    return {"status": status, "request": {"project_id": base.project_id, "parent_alternative_id": base.alternative_id, "direction": direction, "budget": budget, "controls": controls, "human_confirmed": True, "authorized_operations": sorted({item["operation"]["operation_type"] for item in internal})}, "internal_candidate_count": len(specs), "valid_candidate_count": len(internal), "rejected_candidates": rejected, "candidates": internal, "representatives": representatives, "presented_count": len(representatives), "design_families": families, "near_duplicate_clusters": clusters, "near_duplicate_tolerance": {"aggregate": NEAR_DUPLICATE_AGGREGATE_TOLERANCE, "classification": "PROPOSED / REQUIRES_VALIDATION", "meaning": "computational tolerance only; not architectural significance or quality"}, "automatic_winner": False, "recommendation_created": False, "decision_created": False, "provenance": "P6 bounded deterministic exploration over existing GDI operations"}
 
 
 __all__ = ["DIRECTIONS", "bounded_diverse_exploration", "DesignOperation", "advanced_evolution", "cross_branch", "design_distance", "design_dna", "directed_mutation", "extreme_exploration", "inheritance_profile", "search_by_example"]

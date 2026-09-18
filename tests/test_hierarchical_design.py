@@ -1,4 +1,4 @@
-from sicl.hierarchical_design import derive_hierarchical_state, hierarchical_compare, propagate_upstream_change
+from sicl.hierarchical_design import derive_hierarchical_state, hierarchical_compare, propagate_space_geometry_change, propagate_upstream_change
 from sicl.spatial_generator import UPAO001SpatialGenerator, generate_upao001_alternatives
 from sicl.spatial_synthesis import build_spatial_graph, demo_program, generate_space_layout
 
@@ -36,3 +36,14 @@ def test_hierarchical_compare_is_multilevel_and_never_selects_winner():
     assert result["no_winner"] is True
     assert result["recommendation_created"] is False
     assert result["decision_created"] is False
+
+
+def test_mass_geometry_change_recomputes_dependent_spaces_and_requires_review():
+    state = _state(generate_upao001_alternatives()[0])
+    mass = next(node for node in state["nodes"] if node["kind"] == "MASS")
+    result = propagate_space_geometry_change(state, state, mass["id"], {"footprint_ratio": 0.36, "mass_separation": 8.0})
+    assert result["status"] == "REQUIRES_HUMAN_REVIEW"
+    assert result["recomputed"]
+    assert result["requires_human_review"] is True
+    assert result["invalidated"] == []
+    assert result["unknown"]
