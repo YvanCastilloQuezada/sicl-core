@@ -60,7 +60,7 @@ from api.schemas import (
     V1Envelope,
 )
 from sicl.cli import CLI
-from sicl.domain import Evidence, EvidenceType, Event, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, Source, SourceType, SpatialScope
+from sicl.domain import Evidence, EvidenceType, Event, HumanReview, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, Source, SourceType, SpatialScope
 from sicl.actors import actor_to_dict, position_to_dict
 from sicl.temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
@@ -77,6 +77,7 @@ from sicl.bim import BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelS
 from sicl.ifc_adapter import parse_ifc_file
 from sicl.spatial_location import SpatialLocation, LocationStatus, AcquisitionMethod, LocationProvenance
 from sicl.georeferenced_site import normalize_reference_point, parse_kml, polygon_metrics, validate_polygon, local_project_frame, site_intelligence, site_fit, terrain_query, context_query
+from sicl.multiscale_spatial_evidence import evidence_view, multiscale_summary, surface_conflicts, validate_observation
 from sicl.spatial_generator import UPAO001SpatialGenerator, generate_upao001_alternatives
 from sicl.spatial_evaluation import build_upao001_dataset
 from sicl.environmental import EnvironmentalAnalysisError, EnvironmentalLocation, build_solar_analysis
@@ -1595,6 +1596,76 @@ def list_evidence(project_id: str, repo: SQLiteRepository = Depends(get_reposito
     if project is None:
         _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
     return _ok({"evidence": [asdict(item) for item in repo.list_evidence(project_id)]}, project_id, project.version)
+
+
+@router.post("/projects/{project_id}/spatial-evidence", dependencies=[Depends(_auth)])
+def add_spatial_evidence(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    """Add a manual/external/photo-backed observation using canonical Evidence."""
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    payload = request.payload
+    statement = str(payload.get("statement", "")).strip()
+    if not statement:
+        _error({"code": "INVALID_ARGUMENT", "message": "statement is required"}, project_id)
+    try:
+        observation = validate_observation(payload)
+        evidence_type = EvidenceType(str(payload.get("evidence_type", "OBSERVATION")).upper())
+    except (ValueError, KeyError) as exc:
+        _error({"code": "INVALID_INPUTS", "message": str(exc)}, project_id)
+    evidence_id = str(payload.get("evidence_id") or f"EVD-{uuid.uuid4().hex[:12]}")
+    if repo.get_evidence(project_id, evidence_id) is not None:
+        _error({"code": "CONFLICT", "message": f"evidence already exists: {evidence_id}"}, project_id)
+    actor = str(payload.get("actor", "api"))
+    captured_at_text = payload.get("captured_at") or datetime.now(timezone.utc).isoformat()
+    try:
+        captured_at = datetime.fromisoformat(str(captured_at_text).replace("Z", "+00:00"))
+    except ValueError as exc:
+        _error({"code": "INVALID_INPUTS", "message": "captured_at must be an ISO timestamp"}, project_id)
+    evidence_state = str(payload.get("evidence_state", "OBSERVED"))
+    evidence = Evidence(evidence_id=evidence_id, project_id=project_id, source_id=payload.get("source_id"), statement=statement, evidence_type=evidence_type, captured_at=captured_at, method_version=str(payload.get("method_version", "SPATIAL-EVIDENCE/1")), evidence_url=payload.get("evidence_url"), evidence_hash=payload.get("evidence_hash") or hashlib.sha256(statement.encode("utf-8")).hexdigest(), state=evidence_state)
+    project.evidence[evidence_id] = evidence
+    project.version += 1
+    metadata = {"evidence_id": evidence_id, "statement": statement, "spatial_scope": observation["spatial_scope"], "observation_type": payload.get("observation_type", "MANUAL_OBSERVATION"), "value": payload.get("value"), "unit": observation["unit"], "qualifier": observation["qualifier"], "epistemic_state": observation["epistemic_state"], "relevance": observation["relevance"], "source_kind": payload.get("source_kind", "USER / FIELD_OBSERVATION"), "actor": actor, "observed_at": payload.get("observed_at"), "captured_at": captured_at.isoformat(), "retrieved_at": payload.get("retrieved_at"), "observation_point": payload.get("observation_point"), "photo_reference": payload.get("photo_reference"), "photo_direction": payload.get("photo_direction", "UNKNOWN"), "specific_object": payload.get("specific_object", "UNKNOWN"), "unknowns": payload.get("unknowns", []), "human_confirmed": False, "decision_created": False}
+    repo.insert_evidence_and_event(evidence, project, CLI(repo, actor=actor)._event(project_id, "SPATIAL_EVIDENCE_ADDED", metadata))
+    return _ok({"evidence": metadata, "decision_created": False}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/spatial-evidence", dependencies=[Depends(_auth)])
+def list_spatial_evidence(project_id: str, spatial_scope: str | None = None, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    try:
+        records = evidence_view(repo, project_id, spatial_scope)
+    except ValueError as exc:
+        _error({"code": "INVALID_SCOPE", "message": str(exc)}, project_id)
+    return _ok({"evidence": records, "conflicts": surface_conflicts(records), "spatial_scope": spatial_scope, "decision_created": False}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/spatial-evidence/multiscale", dependencies=[Depends(_auth)])
+def multiscale_spatial_evidence(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok(multiscale_summary(repo, project_id), project_id, project.version)
+
+
+@router.post("/projects/{project_id}/spatial-evidence/{evidence_id}/review", dependencies=[Depends(_auth)])
+def review_spatial_evidence(project_id: str, evidence_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    if repo.get_evidence(project_id, evidence_id) is None:
+        _error({"code": "EVIDENCE_NOT_FOUND", "message": evidence_id}, project_id)
+    payload = request.payload
+    actor = str(payload.get("actor", "human")); authority = str(payload.get("authority", "project_owner")); status = str(payload.get("status", "APPROVED")).upper()
+    if status not in {"APPROVED", "REJECTED", "PENDING"}:
+        _error({"code": "INVALID_INPUTS", "message": "status must be APPROVED, REJECTED or PENDING"}, project_id)
+    review = HumanReview(f"REV-{uuid.uuid4().hex[:10]}", project_id, actor, datetime.now(timezone.utc).isoformat(), str(payload.get("review", "")), str(payload.get("reason", "")), authority, status)
+    project.human_reviews[review.review_id] = review; project.version += 1
+    repo.insert_entity_and_event("INSERT INTO human_reviews VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (review.review_id, project_id, review.actor, review.timestamp, review.review, review.reason, review.authority, review.status, review.version), project, CLI(repo, actor=actor)._event(project_id, "SPATIAL_EVIDENCE_REVIEWED", {"evidence_id": evidence_id, **asdict(review), "decision_created": False}))
+    return _ok({"review": asdict(review), "evidence_id": evidence_id, "decision_created": False}, project_id, project.version)
 
 
 @router.get("/projects/{project_id}/evidence/{evidence_id}", dependencies=[Depends(_auth)])
