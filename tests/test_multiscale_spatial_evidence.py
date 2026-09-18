@@ -29,6 +29,29 @@ def test_conflicts_are_surfaced_without_source_ranking():
     assert conflict["resolution"] == "NONE"
 
 
+def test_cross_scale_queries_do_not_promote_local_or_aggregate_facts():
+    records = [
+        {"evidence_id": "BUILDING-8", "spatial_scope": "edificacion", "observation_type": "floor_count", "value": 8},
+        {"evidence_id": "DISTRICT-AVG", "spatial_scope": "distrito_ciudad", "observation_type": "density_observation", "value": 120},
+    ]
+    assert [item["evidence_id"] for item in records if item["spatial_scope"] == "zona_barrio_sector"] == []
+    assert not any(item["spatial_scope"] == "parcela_sitio" for item in records)
+    assert records[0]["spatial_scope"] != "zona_barrio_sector"
+    assert records[1]["spatial_scope"] != "parcela_sitio"
+
+
+def test_observation_regulation_photo_and_ai_semantics_remain_separate():
+    records = [
+        {"evidence_id": "OBS-HEIGHT", "spatial_scope": "edificacion", "observation_type": "observed_height", "value": 5, "epistemic_state": "USER_OBSERVED"},
+        {"evidence_id": "REG-HEIGHT", "spatial_scope": "edificacion", "observation_type": "permitted_height", "value": 4, "epistemic_state": "EXTERNAL_SOURCE"},
+        {"evidence_id": "PHOTO", "spatial_scope": "edificacion", "observation_type": "PHOTO", "photo_reference": "photo://synthetic"},
+        {"evidence_id": "AI", "spatial_scope": "edificacion", "observation_type": "floor_count", "value": 6, "epistemic_state": "AI_PROPOSED"},
+    ]
+    assert records[0]["observation_type"] != records[1]["observation_type"]
+    assert records[2].get("statement") is None
+    assert records[3]["epistemic_state"] == "AI_PROPOSED"
+
+
 def test_http_multiscale_evidence_and_review_do_not_create_decision(tmp_path, monkeypatch):
     repo = SQLiteRepository(tmp_path / "multiscale-evidence.sqlite", check_same_thread=False)
     monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
