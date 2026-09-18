@@ -87,6 +87,7 @@ from sicl.gdi import evolve_from_candidate, explore_design_space, multi_agent_ch
 from sicl.spatial_synthesis import build_spatial_graph, demo_program, generate_space_layout, synthesize_form_space
 from sicl.design_memory import direction_event, explain_design, project_memory, query_memory, replay
 from sicl.advanced_evolution import advanced_evolution, cross_branch, design_distance, search_by_example
+from sicl.candidate_normalization import normalize_design_candidate
 from sicl.multiscale_generative import capability_matrix, cross_scale_context, resolve_generative_capabilities
 from sicl.multi_agent_design import multi_agent_exploration
 
@@ -287,12 +288,13 @@ def gdi_advanced_evolution(project_id: str, request: CanonicalWriteRequest, repo
     if not isinstance(parent, dict):
         _error({"code": "PARENT_REQUIRED", "message": "A parent historical alternative is required"}, project_id)
     try:
+        parent = normalize_design_candidate(parent, project_id)
         if payload.get("mode") == "DISTANCE":
-            result = design_distance(parent, payload["other"])
+            result = design_distance(parent, normalize_design_candidate(payload["other"], project_id))
         elif payload.get("mode") == "SEARCH":
-            result = search_by_example(parent, payload.get("candidates", []), payload.get("search_mode", "SIMILAR"))
+            result = search_by_example(parent, [normalize_design_candidate(item, project_id) for item in payload.get("candidates", [])], payload.get("search_mode", "SIMILAR"))
         elif payload.get("mode") == "CROSS_BRANCH":
-            result = cross_branch(parent, payload["other"], payload.get("inherit", []), payload.get("other_inherit", []))
+            result = cross_branch(parent, normalize_design_candidate(payload["other"], project_id), payload.get("inherit", []), payload.get("other_inherit", []))
         else:
             result = advanced_evolution(parent, payload)
     except (KeyError, ValueError) as exc:
@@ -1868,6 +1870,7 @@ def gdi_multi_agent_exploration(project_id: str, request: CanonicalWriteRequest,
     if not isinstance(alternative, dict):
         _error({"code": "ALTERNATIVE_REQUIRED", "message": "A canonical alternative is required"}, project_id)
     try:
+        alternative = normalize_design_candidate(alternative, project_id)
         result = multi_agent_exploration(alternative, str(payload.get("spatial_scope", "edificacion")), payload.get("active_agents"), payload.get("intent"))
     except (KeyError, ValueError, TypeError) as exc:
         _error({"code": str(exc), "message": str(exc)}, project_id)
