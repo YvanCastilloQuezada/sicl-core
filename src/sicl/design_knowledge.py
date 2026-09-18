@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Iterable
 
+from .apl253_catalog import APL253_RECORDS, APL253_RELATION_SOURCE, APL253_SOURCE_COMMIT, APL253_SOURCE_LOCATOR
 from .domain import SpatialScope
 
 
@@ -208,6 +209,52 @@ SOURCES: tuple[DesignKnowledgeSource, ...] = (
     DesignKnowledgeSource("RNE-CORPUS-RFC025", "Reglamento Nacional de Edificaciones — controlled corpus", ["Ministerio de Vivienda, Construcción y Saneamiento"], SourceClass.LEGAL_REGULATORY, "CORPUS", "es", 2026, "MVCS", jurisdiction="PE", license_status=LicenseStatus.UNKNOWN, bibliographic_reference="RFC-025 controlled RNE corpus", review_status=ReviewStatus.UNDER_REVIEW),
 )
 
+
+def _apl_scopes(number: int) -> list[SpatialScope]:
+    if number <= 94:
+        return _scopes("pais", "macro_region", "region", "provincia_metropoli", "distrito_ciudad", "zona_barrio_sector")
+    if number <= 204:
+        return _scopes("parcela_sitio", "edificacion", "sistema", "espacio")
+    return _scopes("edificacion", "sistema", "espacio", "objeto")
+
+
+def _apl_items() -> tuple[DesignKnowledgeItem, ...]:
+    return tuple(
+        DesignKnowledgeItem(
+            knowledge_item_id=f"ITEM-APL-{number:03d}",
+            source_id="BOOK-ALEXANDER-PATTERN-LANGUAGE",
+            item_type=KnowledgeItemType.PATTERN_REFERENCE,
+            title=title,
+            statement=f"Registro metadata-only del patrón APL {number}: {title}. La descripción estructurada de SiMS-DeI queda pendiente de evidencia y revisión de fuente.",
+            epistemic_status="SOURCE_METADATA_ONLY",
+            authority_level=AuthorityLevel.THEORETICAL,
+            applicable_scales=_apl_scopes(number),
+            outputs=["design_question"],
+            citation_locator=f"APL pattern {number}; public index locator: {APL253_SOURCE_LOCATOR}#pattern-{number}",
+            review_status=ReviewStatus.UNDER_REVIEW,
+            limitations=[
+                "No se ingirió ni reprodujo texto protegido.",
+                "El nombre y número provienen de un índice público secundario; requiere verificación bibliográfica independiente.",
+                "No constituye requisito, restricción, recomendación ni decisión.",
+            ],
+            conditions={
+                "apl_number": number,
+                "canonical_label": title,
+                "source_provenance": "SOURCE_METADATA",
+                "source_commit": APL253_SOURCE_COMMIT,
+                "rights_status": LicenseStatus.LICENSE_REVIEW_REQUIRED.value,
+                "verification_status": "PARTIALLY_VERIFIED",
+                "p3_applicability": "REQUIRES_EVIDENCE",
+                "p6_applicability": "REQUIRES_EVIDENCE",
+                "p8_applicability": "REQUIRES_EVIDENCE",
+                "relationship_source": "SOURCE_DERIVED",
+                "relationship_locator": APL253_RELATION_SOURCE,
+            },
+            related_item_ids=[f"ITEM-APL-{related:03d}" for related in related_numbers],
+        )
+        for number, title, related_numbers in APL253_RECORDS
+    )
+
 ITEMS: tuple[DesignKnowledgeItem, ...] = (
     DesignKnowledgeItem("ITEM-ALEXANDER-TIMELESS-PATTERN-RELATION-001", "BOOK-ALEXANDER-TIMELESS-WAY", KnowledgeItemType.DESIGN_PRINCIPLE, "Relación entre patrón y proceso de diseño", "La fuente se registra como una referencia teórica para explorar relaciones entre patrones, proceso y forma construida; este piloto conserva la afirmación como orientación interpretativa y no como regla universal.", "THEORY", AuthorityLevel.THEORETICAL, _scopes("edificacion", "espacio", "objeto"), outputs=["design_question", "process_direction"], criteria=["traceable_exploration"], citation_locator="Bibliographic metadata only; content locator pending", review_status=ReviewStatus.UNDER_REVIEW, limitations=["No se extrajo texto de la obra.", "No constituye doctrina ni requisito." ], related_item_ids=["ITEM-ALEXANDER-PUBLIC-PRIVATE-001", "ITEM-OREGON-PROCESS-CASE-001"]),
     DesignKnowledgeItem("ITEM-CHING-SPATIAL-HIERARCHY-001", "BOOK-CHING-FORM-SPACE-ORDER", KnowledgeItemType.DESIGN_PRINCIPLE, "Jerarquía espacial", "La jerarquía espacial puede expresarse mediante diferencias de posición, escala, luz, forma o accesibilidad.", "THEORY", AuthorityLevel.THEORETICAL, _scopes("distrito_ciudad", "zona_barrio_sector", "edificacion", "espacio", "objeto"), criteria=["spatial_legibility", "wayfinding"], outputs=["hierarchy_strategy"], citation_locator="Conceptual extraction; page locator pending", limitations=["No es una exigencia normativa."]),
@@ -216,7 +263,7 @@ ITEMS: tuple[DesignKnowledgeItem, ...] = (
     DesignKnowledgeItem("ITEM-OREGON-PROCESS-CASE-001", "BOOK-ALEXANDER-OREGON-EXPERIMENT", KnowledgeItemType.METHOD, "Proceso y relaciones de campus", "La fuente se conserva como referencia de un proceso de planificación y organización espacial aplicado al campus de la Universidad de Oregon; puede formular preguntas de proceso, pero no prescribe una solución.", "PRECEDENT_CONTEXT", AuthorityLevel.THEORETICAL, _scopes("zona_barrio_sector", "distrito_ciudad", "edificacion"), outputs=["process_question", "relationship_question"], criteria=["phasing", "spatial_relationships"], citation_locator="Bibliographic and institutional metadata; content locator pending", review_status=ReviewStatus.UNDER_REVIEW, limitations=["No se extrae ni se reproduce el contenido del libro.", "La aplicabilidad al proyecto debe ser confirmada por el arquitecto."], related_item_ids=["ITEM-ALEXANDER-TIMELESS-PATTERN-RELATION-001", "ITEM-HOUSES-PATTERNS-PROCESS-001"]),
     DesignKnowledgeItem("ITEM-PREVI-EXPERIMENTAL-HOUSING-CASE-001", "CASE-PREVI-LIMA-LAND", KnowledgeItemType.PRECEDENT, "PREVI como caso experimental de vivienda", "PREVI se registra como un caso documentado de vivienda experimental en Lima que puede aportar preguntas comparativas sobre organización de masas, espacios comunes y relación entre proceso y aplicación.", "CASE_METADATA", AuthorityLevel.EXPERIENTIAL, _scopes("parcela_sitio", "edificacion", "espacio"), outputs=["case_comparison", "open_space_question", "common_space_question"], criteria=["site_openness", "common_space", "spatial_relationships"], citation_locator="Publisher metadata; no plan or image extracted", review_status=ReviewStatus.UNDER_REVIEW, limitations=["No se afirma que una característica concreta de PREVI derive de un patrón específico.", "El caso no es una norma ni una solución transferible automáticamente."], related_item_ids=["ITEM-ALEXANDER-PUBLIC-PRIVATE-001", "ITEM-HOUSES-PATTERNS-PROCESS-001"]),
     DesignKnowledgeItem("ITEM-HOUSES-PATTERNS-PROCESS-001", "CASE-HOUSES-GENERATED-BY-PATTERNS", KnowledgeItemType.PRECEDENT, "Proceso experimental de vivienda y patrones", "La fuente se registra como un caso histórico de proceso experimental de vivienda asociado a patrones; puede apoyar una pregunta de exploración sobre cómo una relación espacial se traduce en una alternativa visible.", "CASE_METADATA", AuthorityLevel.EXPERIENTIAL, _scopes("parcela_sitio", "edificacion", "espacio"), outputs=["design_process_question", "alternative_comparison"], criteria=["mass_organization", "transition", "spatial_hierarchy"], citation_locator="CES archive metadata; no PDF or image extracted", review_status=ReviewStatus.UNDER_REVIEW, limitations=["La fuente no se ingirió y el enlace público no se trató como permiso de copia.", "No se presenta como evidencia de desempeño real."], related_item_ids=["ITEM-OREGON-PROCESS-CASE-001", "ITEM-PREVI-EXPERIMENTAL-HOUSING-CASE-001"]),
-)
+) + _apl_items()
 
 PATTERNS: tuple[DesignPattern, ...] = (
     DesignPattern("PATTERN-PUBLIC-PRIVATE-GRADIENT-001", ["BOOK-ALEXANDER-PATTERN-LANGUAGE"], "Gradiente público-privado", {"title": "Transición abrupta entre ámbitos", "question": "¿Cómo se gradúa el acceso?"}, ["usos públicos y privados", "necesidad de control gradual"], ["seguridad", "orientación", "privacidad", "interacción social"], {"steps": ["introducir espacios intermedios", "graduar visibilidad", "organizar secuencias de acceso"]}, {"positive": ["mejor legibilidad", "privacidad graduada"], "negative": ["mayor complejidad de circulación"]}, _scopes("distrito_ciudad", "zona_barrio_sector", "edificacion", "espacio"), inputs=["access_points", "user_groups", "public_private_program"], outputs=["access_hierarchy", "transition_sequence"], positive_indicators=["privacy", "legibility"], negative_indicators=["barriers", "inaccessibility"], regulatory_dependencies=["accessibility", "fire_safety"]),
