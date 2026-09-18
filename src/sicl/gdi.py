@@ -13,7 +13,7 @@ from .v11 import Alternative
 SUPPORTED_OPERATIONS = {
     "COMPACT", "COURTYARD", "MULTI_BLOCK", "ARTICULATED",
     "CREATE_COURTYARD", "RESIZE_COURTYARD", "MODIFY_OPEN_SPACE",
-    "CHANGE_HEIGHT", "SCALE", "SPLIT", "ARTICULATE",
+    "CHANGE_HEIGHT", "SCALE", "SPLIT", "SET_GAP", "ARTICULATE",
 }
 BUDGETS = {"QUICK": 3, "STANDARD": 5, "DEEP": 6}
 
@@ -77,9 +77,9 @@ def apply_design_operation(base: Alternative, operation_type: str, parameters: d
         next_parameters["strategy"] = "courtyard"
         next_parameters["courtyard_ratio"] = float(parameters.get("courtyard_ratio", 0.30))
         next_parameters["footprint_ratio"] = float(parameters.get("footprint_ratio", 0.48))
-    elif operation in {"MULTI_BLOCK", "SPLIT"}:
+    elif operation in {"MULTI_BLOCK", "SPLIT", "SET_GAP"}:
         next_parameters["strategy"] = "articulated"
-        next_parameters["mass_separation"] = float(parameters.get("mass_separation", 6.0))
+        next_parameters["mass_separation"] = float(parameters.get("mass_separation", parameters.get("distance", 6.0)))
         next_parameters["footprint_ratio"] = float(parameters.get("footprint_ratio", 0.36))
     elif operation == "ARTICULATE":
         next_parameters["strategy"] = "articulated"

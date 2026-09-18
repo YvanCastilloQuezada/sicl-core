@@ -92,6 +92,8 @@ from sicl.multiscale_generative import capability_matrix, cross_scale_context, r
 from sicl.multi_agent_design import multi_agent_exploration
 from sicl.semantic_reasoning import build_semantic_reasoning
 from sicl.design_contribution_trace import build_design_contribution_trace
+from sicl.spatial_operations import execute_operation, execute_sequence, operation_capabilities, propose_operation
+from sicl.v11 import Alternative
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -287,6 +289,42 @@ def gdi_design_contribution_trace(project_id: str, request: CanonicalWriteReques
     except (TypeError, ValueError, KeyError) as exc:
         _error({"code": "DESIGN_TRACE_ERROR", "message": str(exc)}, project_id)
     repo.add_event(Event(None, datetime.now(timezone.utc).isoformat(), project_id, "DESIGN_CONTRIBUTION_TRACE_GENERATED", result, request.actor, "gdi-causal-design-trace"))
+    return _ok(result, project_id)
+
+@router.get("/projects/{project_id}/gdi/spatial-operations/capabilities", dependencies=[Depends(_auth)])
+def gdi_spatial_operation_capabilities(project_id: str) -> V1Envelope:
+    return _ok({"capabilities": operation_capabilities(), "spatial_scopes": ["edificacion", "parcela_sitio"], "new_canonical_entities": 0}, project_id)
+
+@router.post("/projects/{project_id}/gdi/spatial-operations/preview", dependencies=[Depends(_auth)])
+def gdi_spatial_operation_preview(project_id: str, request: CanonicalWriteRequest) -> V1Envelope:
+    payload = request.payload.get("payload", request.payload)
+    alternative = payload.get("alternative")
+    if not isinstance(alternative, dict):
+        _error({"code": "ALTERNATIVE_REQUIRED", "message": "A canonical alternative is required"}, project_id)
+    try:
+        normalized = Alternative(**normalize_design_candidate(alternative, project_id))
+        result = propose_operation(normalized, str(payload.get("operation_type", "")), payload.get("parameters", {}), intent_linkage=payload.get("intent_linkage", []), knowledge_linkage=payload.get("knowledge_linkage", []), controls=payload.get("controls", {}))
+    except (KeyError, TypeError, ValueError) as exc:
+        _error({"code": "SPATIAL_OPERATION_PREVIEW_ERROR", "message": str(exc)}, project_id)
+    return _ok(result, project_id)
+
+@router.post("/projects/{project_id}/gdi/spatial-operations/execute", dependencies=[Depends(_auth)])
+def gdi_spatial_operation_execute(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    payload = request.payload.get("payload", request.payload)
+    alternative = payload.get("alternative")
+    if not isinstance(alternative, dict):
+        _error({"code": "ALTERNATIVE_REQUIRED", "message": "A canonical alternative is required"}, project_id)
+    if payload.get("human_confirmed") is not True:
+        _error({"code": "HUMAN_CONFIRMATION_REQUIRED", "message": "Explicit human confirmation is required before execution"}, project_id)
+    try:
+        normalized = Alternative(**normalize_design_candidate(alternative, project_id))
+        if isinstance(payload.get("operations"), list):
+            result = execute_sequence(normalized, payload["operations"], human_confirmed=True)
+        else:
+            result = execute_operation(normalized, str(payload.get("operation_type", "")), payload.get("parameters", {}), intent_linkage=payload.get("intent_linkage", []), knowledge_linkage=payload.get("knowledge_linkage", []), controls=payload.get("controls", {}), human_confirmed=True)
+    except (KeyError, TypeError, ValueError) as exc:
+        _error({"code": "SPATIAL_OPERATION_EXECUTION_ERROR", "message": str(exc)}, project_id)
+    repo.add_event(Event(None, datetime.now(timezone.utc).isoformat(), project_id, "SPATIAL_OPERATION_EXECUTED", result, request.actor, "gdi-spatial-operations-p0"))
     return _ok(result, project_id)
 
 @router.get("/projects/{project_id}/design-memory", dependencies=[Depends(_auth)])
