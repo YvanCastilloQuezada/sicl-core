@@ -5,6 +5,7 @@ from math import sqrt
 from typing import Any
 
 from .gdi import apply_design_operation, design_dna
+from .hierarchical_design import derive_hierarchical_state
 from .spatial_generator import UPAO001SpatialGenerator
 from .spatial_evaluation import spatial_metrics
 from .v11 import Alternative
@@ -156,8 +157,9 @@ def bounded_diverse_exploration(parent: dict[str, Any], payload: dict[str, Any])
             child, operation = apply_design_operation(base, operation_type, parameters, _operation_controls(operation_type, controls), payload.get("intent_refs", []), payload.get("knowledge_refs", []))
             representation = generator.generate(child)
             dna = design_dna(child)
-            record = {"alternative": asdict(child), "operation": asdict(operation), "representation": representation.to_dict(), "metrics": spatial_metrics(representation, generator), "design_dna": dna, "parent_alternative_id": base.alternative_id, "direction": direction, "candidate_index": index, "traceable": True, "representative": False, "representative_reason": None, "automatic_winner": False, "recommendation_created": False, "decision_created": False}
-            record["design_contribution_trace"] = {"parent_alternative_id": base.alternative_id, "exploration_request": {"direction": direction, "budget": budget, "controls": controls, "human_confirmed": True}, "operation_sequence": [asdict(operation)], "candidate_alternative_id": child.alternative_id, "knowledge_refs": list(payload.get("knowledge_refs", [])), "intent_refs": list(payload.get("intent_refs", [])), "expected_effect": "Explore a bounded spatial direction; no performance claim.", "observed_effect": {"metrics": record["metrics"], "design_dna": dna}, "uncertainty": ["Synthetic geometry; real-world performance remains unknown."]}
+            hierarchical_state = derive_hierarchical_state(asdict(child), representation.to_dict(), payload.get("space_layout"), downstream_state="RECOMPUTED")
+            record = {"alternative": asdict(child), "operation": asdict(operation), "representation": representation.to_dict(), "hierarchical_state": hierarchical_state, "metrics": spatial_metrics(representation, generator), "design_dna": dna, "parent_alternative_id": base.alternative_id, "direction": direction, "candidate_index": index, "traceable": True, "representative": False, "representative_reason": None, "automatic_winner": False, "recommendation_created": False, "decision_created": False}
+            record["design_contribution_trace"] = {"parent_alternative_id": base.alternative_id, "exploration_request": {"direction": direction, "budget": budget, "controls": controls, "human_confirmed": True}, "operation_sequence": [asdict(operation)], "target_spatial_scope": payload.get("target_spatial_scope", "edificacion"), "candidate_alternative_id": child.alternative_id, "knowledge_refs": list(payload.get("knowledge_refs", [])), "intent_refs": list(payload.get("intent_refs", [])), "expected_effect": "Explore a bounded spatial direction; no performance claim.", "observed_effect": {"metrics": record["metrics"], "hierarchical_state": record["hierarchical_state"], "design_dna": dna}, "uncertainty": ["Synthetic geometry; real-world performance remains unknown."]}
             duplicate = next((item for item in internal if item["alternative"]["parameters"] == record["alternative"]["parameters"]), None)
             if duplicate:
                 rejected.append({"candidate_index": index, "status": "EXACT_DUPLICATE", "duplicate_of": duplicate["alternative"]["alternative_id"]})
