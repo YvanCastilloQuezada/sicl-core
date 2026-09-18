@@ -61,7 +61,7 @@ def validate_observation(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _metadata_from_event(event: Any) -> dict[str, Any] | None:
-    if event.type != "SPATIAL_EVIDENCE_ADDED":
+    if event.type not in {"SPATIAL_EVIDENCE_ADDED", "EXTERNAL_SPATIAL_EVIDENCE_ADDED"}:
         return None
     data = dict(event.payload)
     data.setdefault("event_timestamp", event.timestamp)

@@ -78,6 +78,7 @@ from sicl.ifc_adapter import parse_ifc_file
 from sicl.spatial_location import SpatialLocation, LocationStatus, AcquisitionMethod, LocationProvenance
 from sicl.georeferenced_site import normalize_reference_point, parse_kml, polygon_metrics, validate_polygon, local_project_frame, site_intelligence, site_fit, terrain_query, context_query
 from sicl.multiscale_spatial_evidence import evidence_view, multiscale_summary, surface_conflicts, validate_observation
+from sicl.external_spatial_context import query_external_context
 from sicl.spatial_generator import UPAO001SpatialGenerator, generate_upao001_alternatives
 from sicl.spatial_evaluation import build_upao001_dataset
 from sicl.environmental import EnvironmentalAnalysisError, EnvironmentalLocation, build_solar_analysis
@@ -1819,6 +1820,32 @@ def analyze_georeferenced_site(project_id: str, request: CanonicalWriteRequest, 
     terrain = terrain_query(site_geometry=geometry)
     context = context_query(site_geometry=geometry, extent=str(payload.get("context_extent", "IMMEDIATE")))
     return _ok({"site_geometry": geometry, "crs": crs, "metrics": metrics, "local_project_frame": frame, "site_fit": site_fit_result, "terrain": terrain, "context": context, "provenance": {"site": payload.get("site_provenance", "USER_CONFIRMED_OR_EXTERNAL"), "metrics": "DERIVED_COMPUTATION", "terrain": terrain.get("provider"), "context": context.get("source_type")}, "unknowns": ["Regulatory compliance", "setbacks", "legal ownership", "legal access", "buildability"], "decision_created": False}, project_id, project.version if project else None)
+
+
+@router.post("/projects/{project_id}/external-context/query", dependencies=[Depends(_auth)])
+def query_external_spatial_context(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    """Query bounded public context and optionally record normalized features as external evidence."""
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    try:
+        result = query_external_context(request.payload)
+    except (ValueError, KeyError) as exc:
+        _error({"code": "INVALID_CONTEXT_QUERY", "message": str(exc)}, project_id)
+    persisted: list[str] = []
+    if bool(request.payload.get("persist", False)) and result.get("features"):
+        scope = str(request.payload["spatial_scope"])
+        actor = str(request.payload.get("actor", "external-context"))
+        for feature in result["features"][:100]:
+            properties = feature.get("properties") or {}
+            evidence_id = f"EXT-{uuid.uuid4().hex[:12]}"
+            statement = f"External {properties.get('category', 'feature')} {properties.get('external_id', 'unknown')}"
+            evidence = Evidence(evidence_id, project_id, None, statement, EvidenceType.REFERENCE, datetime.now(timezone.utc), "EXTERNAL-CONTEXT/1", None, hashlib.sha256(statement.encode()).hexdigest(), "EXTERNAL_SOURCE")
+            project.evidence[evidence_id] = evidence; project.version += 1
+            metadata = {"evidence_id": evidence_id, "spatial_scope": scope, "observation_type": properties.get("category", "external_feature"), "value": feature.get("geometry"), "qualifier": "UNKNOWN", "unit": None, "epistemic_state": "EXTERNAL_SOURCE", "source_kind": "OpenStreetMap / Overpass", "external_id": properties.get("external_id"), "provider": properties.get("provider"), "dataset": properties.get("dataset"), "source_attributes": properties.get("source_attributes", {}), "retrieved_at": properties.get("retrieved_at"), "geometry": feature.get("geometry"), "unknowns": ["legal_access", "verified_building_condition", "regulatory_status"], "decision_created": False}
+            repo.insert_evidence_and_event(evidence, project, CLI(repo, actor=actor)._event(project_id, "EXTERNAL_SPATIAL_EVIDENCE_ADDED", metadata, source="EXTERNAL_PROVIDER"))
+            persisted.append(evidence_id)
+    return _ok({"context": result, "persisted_evidence_ids": persisted, "decision_created": False}, project_id, project.version)
 
 
 @router.get("/projects/{project_id}/missing-data", dependencies=[Depends(_auth)])
