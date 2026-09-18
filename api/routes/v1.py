@@ -86,6 +86,7 @@ from sicl.design_intelligence import controlled_exploration, query_design_knowle
 from sicl.gdi import evolve_from_candidate, explore_design_space, multi_agent_challenge, multiobjective_search
 from sicl.spatial_synthesis import build_spatial_graph, demo_program, generate_space_layout, synthesize_form_space
 from sicl.design_memory import direction_event, explain_design, project_memory, query_memory, replay
+from sicl.advanced_evolution import advanced_evolution, cross_branch, design_distance, search_by_example
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
@@ -276,6 +277,27 @@ def record_design_direction(project_id: str, request: CanonicalWriteRequest, rep
     event = Event(None, datetime.now(timezone.utc).isoformat(), project_id, event_payload["type"], event_payload["payload"], request.actor, event_payload["source"])
     repo.add_event(event)
     return _ok({"status": event_payload["payload"]["status"], "alternative_id": event_payload["payload"]["alternative_id"], "human_reason": event_payload["payload"]["human_reason"], "decision_created": False}, project_id)
+
+@router.post("/projects/{project_id}/gdi/advanced-evolution", dependencies=[Depends(_auth)])
+def gdi_advanced_evolution(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    payload = request.payload
+    parent = payload.get("parent") or payload.get("candidate")
+    if not isinstance(parent, dict):
+        _error({"code": "PARENT_REQUIRED", "message": "A parent historical alternative is required"}, project_id)
+    try:
+        if payload.get("mode") == "DISTANCE":
+            result = design_distance(parent, payload["other"])
+        elif payload.get("mode") == "SEARCH":
+            result = search_by_example(parent, payload.get("candidates", []), payload.get("search_mode", "SIMILAR"))
+        elif payload.get("mode") == "CROSS_BRANCH":
+            result = cross_branch(parent, payload["other"], payload.get("inherit", []), payload.get("other_inherit", []))
+        else:
+            result = advanced_evolution(parent, payload)
+    except (KeyError, ValueError) as exc:
+        _error({"code": str(exc), "message": str(exc)}, project_id)
+    alternative = result.get("alternative", {}) if isinstance(result, dict) else {}
+    repo.add_event(Event(None, datetime.now(timezone.utc).isoformat(), project_id, "ADVANCED_EVOLUTION_EXPLORED", {"alternative_id": alternative.get("alternative_id"), "parent_alternative_id": parent.get("alternative_id") or parent.get("alternative", {}).get("alternative_id"), "advanced_evolution": result, "decision_created": False}, request.actor, "gdi-p6"))
+    return _ok(result, project_id)
 
 @router.post("/projects/{project_id}/multimodal/interpret", dependencies=[Depends(_auth)])
 def interpret_multimodal(project_id: str, request: MultimodalInterpretRequest) -> V1Envelope:
