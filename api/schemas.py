@@ -374,3 +374,14 @@ class DesignIntentConfirmRequest(BaseModel):
     interpretation: dict[str, Any]
     approved_ids: list[str] = Field(min_length=1)
     actor: str = Field(min_length=1)
+
+
+class MultimodalInterpretRequest(BaseModel):
+    modality: str = Field(min_length=1)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    input_id: str = Field(default="MMI-LOCAL", min_length=1)
+
+
+class MultimodalConfirmRequest(BaseModel):
+    candidate: dict[str, Any]
+    actor: str = Field(min_length=1)

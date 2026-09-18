@@ -53,6 +53,8 @@ from api.schemas import (
     DesignKnowledgeQueryRequest,
     DesignIntentInterpretRequest,
     DesignIntentConfirmRequest,
+    MultimodalInterpretRequest,
+    MultimodalConfirmRequest,
     BIMSnapshotCreateRequest,
     BIMChangeSetCreateRequest,
     V1Envelope,
@@ -79,6 +81,7 @@ from sicl.spatial_evaluation import build_upao001_dataset
 from sicl.environmental import EnvironmentalAnalysisError, EnvironmentalLocation, build_solar_analysis
 from sicl.capabilities import resolve_example_capability
 from sicl.design_intent import confirm_intent, interpret_intent
+from sicl.multimodal import confirm_multimodal_candidate, interpret_multimodal_input
 from sicl.design_intelligence import controlled_exploration, query_design_knowledge_for_intent
 from sicl.gdi import evolve_from_candidate, explore_design_space, multi_agent_challenge, multiobjective_search
 from sicl.spatial_synthesis import build_spatial_graph, demo_program, generate_space_layout, synthesize_form_space
@@ -233,6 +236,22 @@ def confirm_design_intent(project_id: str, request: DesignIntentConfirmRequest, 
     event = Event(None, datetime.now(timezone.utc).isoformat(), project_id, event_payload["type"], event_payload["payload"], request.actor, event_payload["source"])
     repo.add_event(event)
     return _ok({"adopted_intent": adopted, "event_type": event.type, "decision_created": False, "human_authority": True}, project_id, project.version)
+
+@router.post("/projects/{project_id}/multimodal/interpret", dependencies=[Depends(_auth)])
+def interpret_multimodal(project_id: str, request: MultimodalInterpretRequest) -> V1Envelope:
+    try:
+        result = interpret_multimodal_input(project_id, request.modality, request.payload, input_id=request.input_id)
+    except ValueError as exc:
+        _error({"code": str(exc), "message": str(exc)}, project_id)
+    return _ok(result, project_id)
+
+@router.post("/projects/{project_id}/multimodal/confirm", dependencies=[Depends(_auth)])
+def confirm_multimodal(project_id: str, request: MultimodalConfirmRequest) -> V1Envelope:
+    try:
+        result = confirm_multimodal_candidate(request.candidate, request.actor)
+    except ValueError as exc:
+        _error({"code": str(exc), "message": str(exc)}, project_id)
+    return _ok({"adopted_input": result, "decision_created": False, "human_authority": True}, project_id)
 
 
 @router.post("/projects/{project_id}/design-intelligence/knowledge", dependencies=[Depends(_auth)])
