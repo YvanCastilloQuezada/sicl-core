@@ -67,8 +67,8 @@ def make_model():
         run(model,'geometry.assign_representation',product=door,representation=rep)
         run(model,'geometry.edit_object_placement',product=door,matrix=placement(x,y,z))
         run(model,'spatial.assign_container',products=[door],relating_structure=storey); doors.append(door)
-        model.create_entity('IfcRelVoidsElement',GlobalId=ifcopenshell.guid.new(),RelatingBuildingElement=walls[(i-1)%len(walls)],RelatedOpeningElement=opening)
-        model.create_entity('IfcRelFillsElement',GlobalId=ifcopenshell.guid.new(),RelatingOpeningElement=opening,RelatedBuildingElement=door)
+        run(model,'feature.add_feature',feature=opening,element=walls[(i-1)%len(walls)])
+        run(model,'feature.add_filling',opening=opening,element=door)
     windows=[]
     window_positions=[(n1,0,.3,3),(n1,0,9.7,3),(n1,0,3,9.7),(n2,2.8,.3,3),(n2,2.8,9.7,3),(n2,2.8,3,9.7)]
     for i,(storey,z,x,y) in enumerate(window_positions,1):
@@ -81,8 +81,8 @@ def make_model():
         run(model,'geometry.assign_representation',product=win,representation=rep)
         run(model,'geometry.edit_object_placement',product=win,matrix=placement(x,y,z+.9))
         run(model,'spatial.assign_container',products=[win],relating_structure=storey); windows.append(win)
-        model.create_entity('IfcRelVoidsElement',GlobalId=ifcopenshell.guid.new(),RelatingBuildingElement=walls[(i+2)%len(walls)],RelatedOpeningElement=opening)
-        model.create_entity('IfcRelFillsElement',GlobalId=ifcopenshell.guid.new(),RelatingOpeningElement=opening,RelatedBuildingElement=win)
+        run(model,'feature.add_feature',feature=opening,element=walls[(i+2)%len(walls)])
+        run(model,'feature.add_filling',opening=opening,element=win)
     # Spaces with real footprint solids and quantities.
     for name,longname,x,y,w,h,storey in [('Sala','Sala principal',.4,.4,4.2,4.2,n1),('Cocina','Cocina y comedor',5.2,.4,4.4,4.2,n1),('Dormitorio','Dormitorio principal',.4,5.2,4.2,4.4,n2),('Patio','Patio interior descubierto',5.2,5.2,4.4,4.4,n2)]:
         space=run(model,'root.create_entity',ifc_class='IfcSpace',name=name); space.LongName=longname; space.Description=f'AREA={w*h:.2f} m2'
