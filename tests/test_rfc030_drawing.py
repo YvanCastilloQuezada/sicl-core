@@ -64,3 +64,28 @@ def test_no_decision_created_automatically(tmp_path):
     ds=compose_drawing_set('X',snap(tmp_path)); assert not hasattr(ds,'decisions')
 def test_bim_snapshot_not_modified(tmp_path):
     s=snap(tmp_path); before=copy.deepcopy(s.to_dict()); compose_drawing_set('X',s); assert s.to_dict()==before
+
+
+def _single_view(ds, index):
+    return DrawingSet(f'ONE-{index}', ds.project_id, ds.mode, [ds.sheets[index]])
+
+def test_plan_vs_section_differ(tmp_path):
+    ds=compose_drawing_set('X',snap(tmp_path)); a=tmp_path/'plan.pdf'; b=tmp_path/'section.pdf'; export_drawing_set(_single_view(ds,0),a); export_drawing_set(_single_view(ds,2),b); assert a.read_bytes()!=b.read_bytes()
+def test_plan_vs_elevation_differ(tmp_path):
+    ds=compose_drawing_set('X',snap(tmp_path)); a=tmp_path/'plan.pdf'; b=tmp_path/'elevation.pdf'; export_drawing_set(_single_view(ds,0),a); export_drawing_set(_single_view(ds,4),b); assert a.read_bytes()!=b.read_bytes()
+def test_section_has_stacked_levels(tmp_path):
+    view=compose_drawing_set('X',snap(tmp_path)).sheets[2].views[0]; levels=next(x['levels'] for x in view.annotations if x.get('type')=='stacked_levels'); assert levels==['NPT +0.00','NPT +2.80','NPT +5.60']
+def test_elevation_has_facade_elements(tmp_path):
+    view=compose_drawing_set('X',snap(tmp_path)).sheets[4].views[0]; facade=next(x for x in view.annotations if x.get('type')=='facade'); assert set(['windows','doors','eaves']).issubset(facade['elements'])
+def test_plan_has_dimension_numbers(tmp_path):
+    view=compose_drawing_set('X',snap(tmp_path)).sheets[0].views[0]; d=next(x for x in view.annotations if x.get('type')=='dimensions'); assert len(d['partial'])+len(d['between_axes'])+1>=5
+def test_plan_has_double_dimension_ring(tmp_path):
+    view=compose_drawing_set('X',snap(tmp_path)).sheets[0].views[0]; d=next(x for x in view.annotations if x.get('type')=='dimensions'); assert d['rings']==2 and d['partial'] and d['total']==10.0
+def test_walls_have_hatch_pattern(tmp_path):
+    view=compose_drawing_set('X',snap(tmp_path)).sheets[0].views[0]; h=[x for x in view.annotations if x.get('type')=='wall_hatch']; assert len(h)>=8 and all(x['pattern'].startswith('diagonal_') for x in h)
+def test_windows_have_symbol_on_plan(tmp_path):
+    view=compose_drawing_set('X',snap(tmp_path)).sheets[0].views[0]; symbols=[x for x in view.annotations if x.get('type')=='window_symbol']; assert {'V-1','V-2'}.issubset({x['id'] for x in symbols}) and all('geometry' in x for x in symbols)
+def test_doors_have_full_symbol(tmp_path):
+    view=compose_drawing_set('X',snap(tmp_path)).sheets[0].views[0]; symbols=[x for x in view.annotations if x.get('type')=='door_symbol']; assert symbols and all(x['geometry']=='arc90+leaf+opening_axis' for x in symbols)
+def test_ifc_synthetic_has_minimum_entities(tmp_path):
+    s=snap(tmp_path); f=ifcopenshell.open(s.source_path); assert len(list(f))>=20; assert len(f.by_type('IfcWall'))>=8 and len(f.by_type('IfcGridAxis'))>=7
