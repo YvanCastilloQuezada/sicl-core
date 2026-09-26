@@ -13,7 +13,7 @@ Los motores externos son maestros temporales. Se utilizan para producir ground t
 
 > El motor externo enseña. ARKI aprende, replica, mejora y finalmente trabaja por sí mismo.
 
-## 2. Cinco principios constitucionales DAM
+## 2. Seis principios constitucionales DAM
 
 ### Principio 1 — Todo motor es maestro, no dependencia
 
@@ -34,6 +34,16 @@ El motor propio no será una copia ni una suma mecánica de motores externos. AR
 ### Principio 5 — Solo el motor propio corre en producción
 
 Los maestros pueden existir en entrenamiento, benchmarking y validación. En runtime, ARKI debe dibujar, calcular, simular, optimizar, analizar y decidir mediante sus propios motores nativos.
+
+### Principio 6 — Vigilancia y depuración continua
+
+Toda rama que haya absorbido conocimiento de maestros externos debe ejecutar una Vigilancia Semanal de Maestros (VSM). El ciclo es:
+
+```text
+DETECTAR → EVALUAR → ABSORBER | DESCARTAR → PURGAR → REGISTRAR
+```
+
+Las nuevas versiones no se adoptan automáticamente. Una mejora relevante debe reproducir el ground truth y superar o igualar la versión anterior. Una regresión se conserva documentada y no se adopta. Si una regla propia se demuestra incorrecta, se elimina del código, los datos y los tests relacionados; no se deja comentada ni como código muerto. El procedimiento completo está en [`RFC-037.1-WEEKLY-MASTER-SURVEILLANCE.md`](RFC-037.1-WEEKLY-MASTER-SURVEILLANCE.md).
 
 ## 3. Ramas cubiertas
 
@@ -150,4 +160,7 @@ EXTERNAL_ENGINE_RUNTIME_DEPENDENCY = NO
 KNOWLEDGE_WITHOUT_SOURCE = FORBIDDEN
 UNSUPPORTED_ENGINE_CLAIMS = FORBIDDEN
 MAX_PARALLEL_DAM_BRANCHES = 2
+WEEKLY_MASTER_SURVEILLANCE = REQUIRED
+AUTO_ABSORPTION = FORBIDDEN
+INCORRECT_RULES_MUST_BE_PURGED = TRUE
 ```
