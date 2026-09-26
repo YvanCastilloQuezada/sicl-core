@@ -1,0 +1,10 @@
+{
+  "id": "ISO128_NTE_PERU",
+  "standard": "ISO 128 + NTE Perú",
+  "rules": {
+    "line_weights": [0.18, 0.35, 0.5, 0.7],
+    "hatches": {"concrete": "gray30", "masonry": "gray50", "partition": "gray70"},
+    "scales": ["1:50", "1:25"],
+    "colors": {"background": "#FFFFFF", "line": "#000000", "iso_red": "#FF0000", "iso_blue": "#0000FF"}
+  }
+}

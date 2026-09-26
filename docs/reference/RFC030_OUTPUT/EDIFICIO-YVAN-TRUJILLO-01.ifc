@@ -1,0 +1,13 @@
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');
+FILE_NAME('','2026-09-26T19:31:55',(''),(''),'IfcOpenShell 0.8.5-1c5b825','IfcOpenShell 0.8.5-1c5b825','');
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+#1=IFCPROJECT('3wT0gUhOX9mOMpYvlqzJ0g',$,'EDIFICIO-YVAN-TRUJILLO-01',$,$,$,$,$,$);
+#2=IFCSITE('1w_9D9hwX4W9f7u8$I1G_P',$,'SITE',$,$,$,$,$,$,$,$,$,$,$);
+#3=IFCBUILDING('05dzUxVev6b9pdFGVCw0lR',$,'BUILDING',$,$,$,$,$,$,$,$,$);
+#4=IFCBUILDINGSTOREY('21L$3Fl$z2zvRJYA6PiIdc',$,'N1',$,$,$,$,$,$,0.);
+ENDSEC;
+END-ISO-10303-21;
