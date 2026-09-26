@@ -50,4 +50,21 @@ def validate_ifc(path: str | Path) -> tuple[bool, list[str]]:
 def import_ifc_snapshot(project_id: str, path: str | Path) -> BIMModelSnapshot:
     valid, errors = validate_ifc(path)
     if not valid: raise ValueError(f"invalid IFC: {errors}")
-    return BIMModelSnapshot(f"BIM-{project_id}-001", project_id, str(path), synthetic_elements())
+    model = ifcopenshell.open(str(path))
+    elements=[]
+    for e in model.by_type('IfcWall'):
+        elements.append({"type":"IfcWall","id":e.Name or f"W-{e.id()}","thickness_m":0.20 if 'CONCRETE' in (e.Description or '') else 0.15,"material":"concrete" if 'CONCRETE' in (e.Description or '') else "masonry"})
+    for e in model.by_type('IfcDoor'):
+        elements.append({"type":"IfcDoor","id":e.Name or f"P-{e.id()}","width_m":float(e.OverallWidth or 0),"height_m":float(e.OverallHeight or 0),"swing":"LEFT"})
+    for e in model.by_type('IfcWindow'):
+        elements.append({"type":"IfcWindow","id":e.Name or f"V-{e.id()}","width_m":float(e.OverallWidth or 0),"height_m":float(e.OverallHeight or 0)})
+    for e in model.by_type('IfcSlab'): elements.append({"type":"IfcSlab","id":e.Name or f"SLAB-{e.id()}","level":e.Name})
+    for e in model.by_type('IfcSpace'):
+        desc=e.Description or ''; area=float(desc.split('=')[1].split()[0]) if '=' in desc else 0.0
+        elements.append({"type":"IfcSpace","id":e.Name or f"SPACE-{e.id()}","Name":e.Name,"LongName":e.LongName,"area_m2":area})
+    for e in model.by_type('IfcStair'): elements.append({"type":"IfcStair","id":e.Name or f"STAIR-{e.id()}","steps":14})
+    for e in model.by_type('IfcGrid'):
+        axes = list(e.UAxes or []) + list(e.VAxes or []) + list(e.WAxes or [])
+        elements.append({"type":"IfcGrid","id":e.Name or f"GRID-{e.id()}","axes":[a.AxisTag for a in axes]})
+    for e in model.by_type('IfcBuildingStorey'): elements.append({"type":"IfcBuildingStorey","id":e.Name,"Name":e.Name,"Elevation":e.Elevation})
+    return BIMModelSnapshot(f"BIM-{project_id}-001", project_id, str(path), tuple(elements))

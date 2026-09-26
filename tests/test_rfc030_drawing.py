@@ -1,7 +1,6 @@
 from pathlib import Path
 import copy
 import ifcopenshell
-from reportlab.pdfbase.pdfmetrics import stringWidth
 from sicl.drawing import *
 from sicl.drawing.annotation import grid_axes, double_dimension_rings, npt_level, room_label
 from sicl.drawing.symbols import door_symbol, window_symbol
@@ -39,7 +38,6 @@ def test_elevation_projection_direction(tmp_path):
     v=compose_drawing_set('X',snap(tmp_path)).sheets[4].views[0]; assert v.view_type=='ELEVATION' and v.direction=='SOUTH'
 def test_roof_plan_generation(tmp_path):
     assert compose_drawing_set('X',snap(tmp_path)).sheets[1].views[0].view_type=='ROOF_PLAN'
-
 def test_scale_real_label(tmp_path): assert all(v.scale=='1:50' for s in compose_drawing_set('X',snap(tmp_path)).sheets for v in s.views)
 def test_grid_axes_naming(): assert grid_axes()['horizontal']==['A',"A'",'B',"B'",'C'] and grid_axes()['vertical']==[str(i) for i in range(1,10)]
 def test_double_dimension_rings(): assert double_dimension_rings([1],[2],3)['rings']==2
@@ -55,7 +53,6 @@ def test_layout_modes_both_produce_valid_pdf(tmp_path):
     s=snap(tmp_path)
     for mode, pages in [('SINGLE_VIEW_PER_SHEET',5),('PROFESSIONAL_LAYOUT',2)]:
         out=tmp_path/f'{mode}.pdf'; export_drawing_set(compose_drawing_set('X',s,mode),out); assert out.stat().st_size>1000; assert len(ifcopenshell.by_type if False else [1])==1
-
 def test_drawing_set_append_only(tmp_path):
     ds=compose_drawing_set('X',snap(tmp_path)); before=len(ds.sheets); ds.append_sheet(ds.sheets[0]); assert len(ds.sheets)==before+1
 def test_review_requires_actor_and_authority(tmp_path):
@@ -64,11 +61,7 @@ def test_no_decision_created_automatically(tmp_path):
     ds=compose_drawing_set('X',snap(tmp_path)); assert not hasattr(ds,'decisions')
 def test_bim_snapshot_not_modified(tmp_path):
     s=snap(tmp_path); before=copy.deepcopy(s.to_dict()); compose_drawing_set('X',s); assert s.to_dict()==before
-
-
-def _single_view(ds, index):
-    return DrawingSet(f'ONE-{index}', ds.project_id, ds.mode, [ds.sheets[index]])
-
+def _single_view(ds, index): return DrawingSet(f'ONE-{index}', ds.project_id, ds.mode, [ds.sheets[index]])
 def test_plan_vs_section_differ(tmp_path):
     ds=compose_drawing_set('X',snap(tmp_path)); a=tmp_path/'plan.pdf'; b=tmp_path/'section.pdf'; export_drawing_set(_single_view(ds,0),a); export_drawing_set(_single_view(ds,2),b); assert a.read_bytes()!=b.read_bytes()
 def test_plan_vs_elevation_differ(tmp_path):
@@ -89,3 +82,16 @@ def test_doors_have_full_symbol(tmp_path):
     view=compose_drawing_set('X',snap(tmp_path)).sheets[0].views[0]; symbols=[x for x in view.annotations if x.get('type')=='door_symbol']; assert symbols and all(x['geometry']=='arc90+leaf+opening_axis' for x in symbols)
 def test_ifc_synthetic_has_minimum_entities(tmp_path):
     s=snap(tmp_path); f=ifcopenshell.open(s.source_path); assert len(list(f))>=20; assert len(f.by_type('IfcWall'))>=8 and len(f.by_type('IfcGridAxis'))>=7
+def test_wall_hatch_only_in_wall_polygon(tmp_path):
+    view=compose_drawing_set('X',snap(tmp_path)).sheets[0].views[0]; h=[x for x in view.annotations if x.get('type')=='wall_hatch']
+    area=lambda p: abs(sum(p[i][0]*p[(i+1)%len(p)][1]-p[(i+1)%len(p)][0]*p[i][1] for i in range(len(p)))/2)
+    assert h and sum(area(x['polygon']) for x in h)/100.0 <= .20
+def test_longitudinal_vs_transversal_differ(tmp_path):
+    ds=compose_drawing_set('X',snap(tmp_path)); a=tmp_path/'long.pdf'; b=tmp_path/'trans.pdf'; export_drawing_set(_single_view(ds,2),a); export_drawing_set(_single_view(ds,3),b); assert a.read_bytes()!=b.read_bytes()
+def test_section_has_walls_in_cut(tmp_path):
+    for idx in (2,3):
+        view=compose_drawing_set('X',snap(tmp_path)).sheets[idx].views[0]; assert len([x for x in view.annotations if x.get('type')=='section_wall_cut']) >= 4
+def test_elevation_has_door_and_alero(tmp_path):
+    view=compose_drawing_set('X',snap(tmp_path)).sheets[4].views[0]; doors=next(x for x in view.annotations if x.get('type')=='door_facade_symbol'); eaves=[x for x in view.annotations if x.get('type')=='eave']; assert doors['ids'] and doors['width_m']==.90 and doors['height_m']==2.10 and len(eaves)>=2
+def test_roof_plan_has_drains_and_slope(tmp_path):
+    view=compose_drawing_set('X',snap(tmp_path)).sheets[1].views[0]; assert len([x for x in view.annotations if x.get('type')=='drain'])>=2; assert len([x for x in view.annotations if x.get('type')=='roof_slope' and x.get('arrow')])>=2
