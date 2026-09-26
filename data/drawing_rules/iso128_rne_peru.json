@@ -1,0 +1,51 @@
+{
+  "id": "ISO128_RNE_PERU",
+  "standard": "ISO 128 + RNE Perú",
+  "version": "1.0",
+  "scope": "Representación gráfica arquitectónica para planos conceptuales técnicos ARKI",
+  "rules": {
+    "line_weights": {
+      "construction": 0.18,
+      "secondary": 0.35,
+      "cut": 0.50,
+      "profile": 0.70,
+      "unit": "mm"
+    },
+    "hatches": {
+      "concrete": {"pattern": "diagonal_30", "gray_percent": 30, "angle_deg": 45, "spacing_mm": 2.0},
+      "masonry": {"pattern": "diagonal_50", "gray_percent": 50, "angle_deg": 45, "spacing_mm": 3.0},
+      "partition": {"pattern": "diagonal_70", "gray_percent": 70, "angle_deg": 45, "spacing_mm": 4.0}
+    },
+    "wall_thickness": {
+      "concrete": 0.20,
+      "masonry": 0.15,
+      "partition": 0.10,
+      "unit": "m"
+    },
+    "symbols": {
+      "door": {"geometry": "arc90+leaf+opening_axis", "swing_arc_degrees": 90, "leaf": true, "opening_axis": true},
+      "window": {"geometry": "double_parallel_lines+frame+sill", "parallel_lines": 2, "frame": true, "sill": true},
+      "stair": {"geometry": "steps+up_arrow", "steps": 14, "direction_arrow": true, "width_m": 1.00},
+      "npt": {"geometry": "triangle+level_text", "marker": "triangle"},
+      "grid_axis": {"geometry": "circle_8mm", "diameter_mm": 8}
+    },
+    "dimensions": {
+      "rings": 2,
+      "ring_1": "partial_dimensions_between_axes",
+      "ring_2": "overall_dimensions",
+      "unit": "m",
+      "precision_decimals": 2,
+      "stair": {"show_riser_tread": true, "show_total_rise": true},
+      "height": {"show_floor_to_floor": true, "show_clear_height": true}
+    },
+    "levels": {
+      "npt": true,
+      "symbol": "triangle",
+      "format": "NPT {value:+.2f}",
+      "required": ["NPT +0.00", "NPT +2.80", "NPT +5.60"]
+    },
+    "scales": ["1:50", "1:25"],
+    "colors": {"background": "#FFFFFF", "line": "#000000", "hatch_30": "#B3B3B3", "hatch_50": "#808080", "hatch_70": "#4D4D4D"},
+    "sheet": {"format": "A3", "title_block_width_mm": 180, "title_block_height_mm": 60, "graphic_scale": true, "north_arrow": true}
+  }
+}
