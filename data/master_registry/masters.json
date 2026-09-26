@@ -1,0 +1,908 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-26",
+  "masters": [
+    {
+      "id": "ifcopenshell",
+      "name": "IfcOpenShell",
+      "ramas": [
+        "dibujo",
+        "bim"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "ifcopenshell"
+        },
+        {
+          "type": "github",
+          "repo": "IfcOpenShell/IfcOpenShell"
+        }
+      ],
+      "version_actual": "0.8.5",
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "absorbido"
+    },
+    {
+      "id": "freecad",
+      "name": "FreeCAD + TechDraw",
+      "ramas": [
+        "dibujo",
+        "estructuras"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "FreeCAD/FreeCAD"
+        },
+        {
+          "type": "pip",
+          "package": "freecad"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_instalado"
+    },
+    {
+      "id": "blenderbim",
+      "name": "BlenderBIM / Bonsai",
+      "ramas": [
+        "dibujo",
+        "bim"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "ThatOpen/engine_components"
+        },
+        {
+          "type": "github",
+          "repo": "IfcOpenShell/IfcOpenShell"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_instalado"
+    },
+    {
+      "id": "ezdxf",
+      "name": "ezdxf",
+      "ramas": [
+        "dibujo"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "ezdxf"
+        },
+        {
+          "type": "github",
+          "repo": "mozman/ezdxf"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_instalado"
+    },
+    {
+      "id": "librecad",
+      "name": "LibreCAD",
+      "ramas": [
+        "dibujo"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "LibreCAD/LibreCAD"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_instalado"
+    },
+    {
+      "id": "opensees",
+      "name": "OpenSees",
+      "ramas": [
+        "estructuras"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "openseespy"
+        },
+        {
+          "type": "github",
+          "repo": "OpenSees/OpenSees"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "pynite",
+      "name": "PyNite",
+      "ramas": [
+        "estructuras"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "PyniteFE"
+        },
+        {
+          "type": "github",
+          "repo": "JWock82/Pynite"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "anastruct",
+      "name": "anastruct",
+      "ramas": [
+        "estructuras"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "anastruct"
+        },
+        {
+          "type": "github",
+          "repo": "ritchie46/anaStruct"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "ftool",
+      "name": "Ftool",
+      "ramas": [
+        "estructuras"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "flaviorb/ftool"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "sap2000_api",
+      "name": "SAP2000 API",
+      "ramas": [
+        "estructuras"
+      ],
+      "fuentes_version": [],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "etabs_api",
+      "name": "ETABS API",
+      "ramas": [
+        "estructuras"
+      ],
+      "fuentes_version": [],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "epanet",
+      "name": "EPANET",
+      "ramas": [
+        "hidraulica"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "USEPA/EPANET"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "swmm",
+      "name": "SWMM",
+      "ramas": [
+        "hidraulica"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "USEPA/Stormwater-Management-Model"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "hec_ras",
+      "name": "HEC-RAS",
+      "ramas": [
+        "hidraulica"
+      ],
+      "fuentes_version": [],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "openfoam",
+      "name": "OpenFOAM",
+      "ramas": [
+        "dinamica_fluidos"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "OpenFOAM/OpenFOAM-dev"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "su2",
+      "name": "SU2",
+      "ramas": [
+        "dinamica_fluidos"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "su2code/SU2"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "fenics",
+      "name": "FEniCS",
+      "ramas": [
+        "dinamica_fluidos"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "fenics-dolfinx"
+        },
+        {
+          "type": "github",
+          "repo": "FEniCS/dolfinx"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "fipy",
+      "name": "FiPy",
+      "ramas": [
+        "dinamica_fluidos"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "fipy"
+        },
+        {
+          "type": "github",
+          "repo": "usnistgov/fipy"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "gempy",
+      "name": "GemPy",
+      "ramas": [
+        "geologia"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "gempy"
+        },
+        {
+          "type": "github",
+          "repo": "gempy-project/gempy"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "pygslib",
+      "name": "PyGSLIB",
+      "ramas": [
+        "geologia"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "pygslib"
+        },
+        {
+          "type": "github",
+          "repo": "GSLIB-Arrays/pygslib"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "plaxis_api",
+      "name": "Plaxis API",
+      "ramas": [
+        "geologia"
+      ],
+      "fuentes_version": [],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "geostudio",
+      "name": "GeoStudio",
+      "ramas": [
+        "geologia"
+      ],
+      "fuentes_version": [],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "energyplus",
+      "name": "EnergyPlus",
+      "ramas": [
+        "energia"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "NREL/EnergyPlus"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "openstudio",
+      "name": "OpenStudio",
+      "ramas": [
+        "energia"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "NREL/OpenStudio"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "radiance",
+      "name": "Radiance",
+      "ramas": [
+        "energia"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "NREL/Radiance"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "ladybug_tools",
+      "name": "Ladybug Tools",
+      "ramas": [
+        "energia"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "ladybug-core"
+        },
+        {
+          "type": "github",
+          "repo": "ladybug-tools/lbt-grasshopper"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "trnsys",
+      "name": "TRNSYS",
+      "ramas": [
+        "energia"
+      ],
+      "fuentes_version": [],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "pyroomacoustics",
+      "name": "Pyroomacoustics",
+      "ramas": [
+        "acustica"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "pyroomacoustics"
+        },
+        {
+          "type": "github",
+          "repo": "LCAV/pyroomacoustics"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "isimpa",
+      "name": "I-Simpa",
+      "ramas": [
+        "acustica"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "I-Simpa/I-Simpa"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "salib",
+      "name": "SALib",
+      "ramas": [
+        "simulacion"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "SALib"
+        },
+        {
+          "type": "github",
+          "repo": "SALib/SALib"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "pymc",
+      "name": "PyMC",
+      "ramas": [
+        "simulacion"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "pymc"
+        },
+        {
+          "type": "github",
+          "repo": "pymc-devs/pymc"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "openturns",
+      "name": "OpenTURNS",
+      "ramas": [
+        "simulacion"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "openturns"
+        },
+        {
+          "type": "github",
+          "repo": "openturns/openturns"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "chaospy",
+      "name": "Chaospy",
+      "ramas": [
+        "simulacion"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "chaospy"
+        },
+        {
+          "type": "github",
+          "repo": "jonasson/chaospy"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "scipy_stats",
+      "name": "scipy.stats",
+      "ramas": [
+        "simulacion"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "scipy"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "ortools",
+      "name": "OR-Tools",
+      "ramas": [
+        "optimizacion"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "ortools"
+        },
+        {
+          "type": "github",
+          "repo": "google/or-tools"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "pyomo",
+      "name": "Pyomo",
+      "ramas": [
+        "optimizacion"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "pyomo"
+        },
+        {
+          "type": "github",
+          "repo": "Pyomo/pyomo"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "pulp",
+      "name": "PuLP",
+      "ramas": [
+        "optimizacion"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "PuLP"
+        },
+        {
+          "type": "github",
+          "repo": "coin-or/pulp"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "cvxpy",
+      "name": "CVXPY",
+      "ramas": [
+        "optimizacion"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "cvxpy"
+        },
+        {
+          "type": "github",
+          "repo": "cvxpy/cvxpy"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "pymoo",
+      "name": "pymoo",
+      "ramas": [
+        "optimizacion"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "pymoo"
+        },
+        {
+          "type": "github",
+          "repo": "anyoptimization/pymoo"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "deap",
+      "name": "DEAP",
+      "ramas": [
+        "optimizacion"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "deap"
+        },
+        {
+          "type": "github",
+          "repo": "DEAP/deap"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "gdal",
+      "name": "GDAL",
+      "ramas": [
+        "gis"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "GDAL"
+        },
+        {
+          "type": "github",
+          "repo": "OSGeo/gdal"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "shapely",
+      "name": "Shapely",
+      "ramas": [
+        "gis"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "shapely"
+        },
+        {
+          "type": "github",
+          "repo": "shapely/shapely"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "geopandas",
+      "name": "GeoPandas",
+      "ramas": [
+        "gis"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "geopandas"
+        },
+        {
+          "type": "github",
+          "repo": "geopandas/geopandas"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "postgis",
+      "name": "PostGIS",
+      "ramas": [
+        "gis"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "postgis/postgis"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "qgis_api",
+      "name": "QGIS API",
+      "ramas": [
+        "gis"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "qgis/QGIS"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "xbim",
+      "name": "xBIM",
+      "ramas": [
+        "bim"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "xBimTeam/XbimEssentials"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "web_ifc",
+      "name": "web-ifc",
+      "ramas": [
+        "bim"
+      ],
+      "fuentes_version": [
+        {
+          "type": "npm",
+          "package": "web-ifc"
+        },
+        {
+          "type": "github",
+          "repo": "ThatOpen/engine_web-ifc"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "brightway2",
+      "name": "Brightway2",
+      "ramas": [
+        "lca"
+      ],
+      "fuentes_version": [
+        {
+          "type": "pip",
+          "package": "bw2data"
+        },
+        {
+          "type": "github",
+          "repo": "brightway-lca/brightway2-data"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "openlca",
+      "name": "OpenLCA",
+      "ramas": [
+        "lca"
+      ],
+      "fuentes_version": [
+        {
+          "type": "github",
+          "repo": "GreenDelta/openLCA"
+        }
+      ],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "no_iniciado"
+    },
+    {
+      "id": "costos_arki",
+      "name": "Motor propio de costos ARKI",
+      "ramas": [
+        "costos"
+      ],
+      "fuentes_version": [],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "oportunidad_propia"
+    },
+    {
+      "id": "programacion_arki",
+      "name": "Motor propio de programación ARKI",
+      "ramas": [
+        "programacion_arquitectonica"
+      ],
+      "fuentes_version": [],
+      "version_actual": null,
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "oportunidad_propia"
+    },
+    {
+      "id": "sitio_arki",
+      "name": "Motor propio de análisis de sitio ARKI",
+      "ramas": [
+        "analisis_sitio"
+      ],
+      "fuentes_version": [],
+      "version_actual": "propio-no-iniciado",
+      "fecha_ultima_revision": "2026-09-26",
+      "estado": "oportunidad_propia"
+    }
+  ]
+}
