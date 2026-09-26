@@ -19,6 +19,8 @@ def _hatch_rect(c,x,y,w,h,step=3*mm):
     c.restoreState()
 def _wall_hatch(c,x,y,w,h,dense=True):
     c.setLineWidth(.35); c.rect(x,y,w,h,stroke=1,fill=0); _hatch_rect(c,x,y,w,h,2*mm if dense else 4*mm)
+def _npt_marker(c,x,y,label):
+    c.setLineWidth(.35); p=c.beginPath(); p.moveTo(x,y); p.lineTo(x+3*mm,y+5*mm); p.lineTo(x+6*mm,y); p.close(); c.drawPath(p,stroke=1,fill=0); c.setFont('Helvetica',6); c.drawString(x+8*mm,y+1*mm,label)
 def _plan(c,x0,y0,x1,y1):
     W=x1-x0; H=y1-y0; c.setLineWidth(1.4); c.rect(x0,y0,W,H); c.setLineWidth(.9); c.rect(x0+3*mm,y0+3*mm,W-6*mm,H-6*mm)
     xm=x0+W*.48; ym=y0+H*.52; c.setLineWidth(.55); c.line(xm,y0+3*mm,xm,y1-3*mm); c.line(x0+3*mm,ym,x1-3*mm,ym); c.line(x0+3*mm,y0+H*.25,xm,y0+H*.25); c.line(xm,y0+H*.76,x1-3*mm,y0+H*.76)
@@ -31,7 +33,7 @@ def _plan(c,x0,y0,x1,y1):
     c.setFont('Helvetica-Bold',7)
     for text,x,y in [('SALA\n24.00 m²',x0+28*mm,ym+25*mm),('COMEDOR\n18.00 m²',x0+28*mm,ym-25*mm),('COCINA\n12.00 m²',xm+28*mm,ym+25*mm),('DORMITORIO 01\n14.00 m²',xm+28*mm,ym-25*mm)]:
         for i,line in enumerate(text.split('\n')): c.drawCentredString(x,y-i*3*mm,line)
-    c.setFont('Helvetica',6); c.drawString(x0+5*mm,y0+5*mm,'NPT ±0.00'); c.drawString(x1-27*mm,y0+5*mm,'P-1'); c.drawString(x0+5*mm,y1-8*mm,'V-1 1.20'); c.drawString(x1-20*mm,y1-8*mm,'V-2 1.20')
+    _npt_marker(c,x0+5*mm,y0+5*mm,'NPT ±0.00'); c.setFont('Helvetica',6); c.drawString(x1-27*mm,y0+5*mm,'P-1'); c.drawString(x0+5*mm,y1-8*mm,'V-1 1.20'); c.drawString(x1-20*mm,y1-8*mm,'V-2 1.20')
 def _roof(c,x0,y0,x1,y1):
     W=x1-x0; H=y1-y0; c.setLineWidth(1.2); c.rect(x0,y0,W,H); c.setLineWidth(.8); c.line(x0,y0,x1,y1); c.line(x0,y1,x1,y0); c.setLineWidth(.5); c.line(x0,y0+8*mm,x1,y0+8*mm); c.line(x0,y1-8*mm,x1,y1-8*mm)
     c.setFont('Helvetica-Bold',9); c.drawCentredString((x0+x1)/2,(y0+y1)/2,'CUBIERTA · PENDIENTE 5%'); c.setFont('Helvetica',7); c.drawString(x0+10*mm,y0+10*mm,'D-1'); c.drawString(x1-35*mm,y1-10*mm,'D-2'); c.drawString(x1-55*mm,y0+10*mm,'CANALETA PERIMETRAL'); c.drawString(x1-35*mm,y1-22*mm,'ALERO 0.60 m')
@@ -39,7 +41,7 @@ def _roof(c,x0,y0,x1,y1):
 def _section(c,x0,y0,x1,y1,direction):
     W=x1-x0; H=y1-y0; c.setLineWidth(1.2); c.rect(x0,y0,W,H); c.setLineWidth(.7)
     for z in (0,.42,.84):
-        yy=y0+H*z; c.line(x0,yy,x1,yy); _wall_hatch(c,x0+8*mm,yy-2*mm,18*mm,4*mm,True); _wall_hatch(c,x1-26*mm,yy-2*mm,18*mm,4*mm,True); c.setFont('Helvetica-Bold',8); c.drawString(x1+5*mm,yy-1*mm,{0:'NPT +0.00',.42:'NPT +2.80',.84:'NPT +5.60'}[z])
+        yy=y0+H*z; c.line(x0,yy,x1,yy); _wall_hatch(c,x0+8*mm,yy-2*mm,18*mm,4*mm,True); _wall_hatch(c,x1-26*mm,yy-2*mm,18*mm,4*mm,True); _npt_marker(c,x1+5*mm,yy-1*mm,{0:'NPT +0.00',.42:'NPT +2.80',.84:'NPT +5.60'}[z])
     # Four cut walls, wall openings, visible walls, and a 14-step stair.
     wall_positions = [x0+45*mm,x0+100*mm,x0+W-100*mm,x0+W-45*mm] if direction=='LONGITUDINAL' else [x0+65*mm,x0+145*mm,x0+W-145*mm,x0+W-65*mm]
     for wx in wall_positions: _wall_hatch(c,wx,y0+4*mm,5*mm,H-8*mm,True)
