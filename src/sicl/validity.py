@@ -47,11 +47,17 @@ class DerivationValidity:
     source_checks: tuple[str, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
-        """Garantiza que la trazabilidad no se degrade a caracteres individuales."""
-        if isinstance(self.source_checks, str):
-            raise TypeError("source_checks must be tuple[str, ...], not str")
-        if any(not isinstance(check, str) or len(check) <= 1 for check in self.source_checks):
-            raise ValueError("source_checks entries must be non-empty names longer than one character")
+        """Garantiza que la trazabilidad conserve nombres completos de checks."""
+        if not isinstance(self.source_checks, tuple):
+            raise TypeError("source_checks must be tuple[str, ...]")
+        prefix = "integrity_checks_"
+        if any(
+            not isinstance(check, str)
+            or not check.startswith(prefix)
+            or len(check) <= len(prefix)
+            for check in self.source_checks
+        ):
+            raise ValueError("source_checks entries must be integrity_checks_<derivation_id> names")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -117,6 +123,10 @@ class ValidityReport:
             "analysisMetadata": self.analysis_metadata,
             "readOnly": self.read_only,
         }
+
+    def canonical_dict(self) -> dict[str, Any]:
+        """Representación pública estable para comparaciones deterministas."""
+        return self.to_dict()
 
 
 # ──────────────────────────────────────────────

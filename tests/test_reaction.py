@@ -1,4 +1,5 @@
 """Tests TDD para H-004 Reaction Planning."""
+import json
 import pytest
 from sicl.derivation import (
     DerivationLedger, DerivationRecord, VersionedRef, TypedRelation,
@@ -242,3 +243,16 @@ def test_h004_cycle_reason_names_blocked_artifacts(planner):
     assert all(action.action_type == ActionType.ESCALATE for action in actions)
     assert all("Dependency cycle detected:" in action.reason for action in actions)
     assert all(action.blocked_by for action in actions)
+
+
+def test_h003_h004_canonical_dicts_are_deterministic(planner):
+    """RT-87: los reportes públicos de H-003/H-004 son reproducibles."""
+    report = ValidityReport()
+    first_report = json.dumps(report.canonical_dict(), sort_keys=True, separators=(",", ":"))
+    second_report = json.dumps(report.canonical_dict(), sort_keys=True, separators=(",", ":"))
+    assert first_report == second_report
+
+    first_plan = planner.plan_reaction(report)
+    first_plan_json = json.dumps(first_plan.canonical_dict(), sort_keys=True, separators=(",", ":"))
+    second_plan_json = json.dumps(planner.plan_reaction(report).canonical_dict(), sort_keys=True, separators=(",", ":"))
+    assert first_plan_json == second_plan_json

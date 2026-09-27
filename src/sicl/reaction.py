@@ -68,6 +68,10 @@ class ReactionPlan:
             "readOnly": self.read_only,
         }
 
+    def canonical_dict(self) -> dict[str, Any]:
+        """Representación pública estable para comparaciones deterministas."""
+        return self.to_dict()
+
 
 class ReactionPlanner:
     """H-004: transforma estados de validez en acciones planificadas.

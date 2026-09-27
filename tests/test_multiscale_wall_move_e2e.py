@@ -52,6 +52,19 @@ class MemoryStore:
         return [item for item in self.items if project_id is None or item.project_id == project_id]
 
 
+def current_refs_from_ledger(ledger, project_id, updates, omit=()):
+    """Construye el snapshot actual desde el ledger y aplica solo cambios observados."""
+    refs = {}
+    for derivation in ledger.list(project_id):
+        refs[derivation.output.key()] = derivation.output
+        for input_ref in derivation.inputs:
+            refs[input_ref.key()] = input_ref
+    refs.update(updates)
+    for key in omit:
+        refs.pop(key, None)
+    return refs
+
+
 def test_multiscale_wall_move_e2e():
     """
     Prueba E2E: mover muro W-14 +0.80m debe impactar 8 escalas.
@@ -134,6 +147,18 @@ def test_multiscale_wall_move_e2e():
     ledger.record(project_id, record("D-PARTI", parti_v1, [p03_v1, parti_evidence_v1],
                                      relation_type="DERIVED_FROM", domain="ARCHITECTURAL"))
 
+    recorded = {item.id: item for item in ledger.list(project_id)}
+    assert any(
+        relation.relation_type == "SUPPORTED_BY"
+        and relation.relation_domain == "EPISTEMIC"
+        and relation.to_ref.entity_id == "RNE-A010"
+        for relation in recorded["D-RNE-P03"].relations
+    )
+    assert all(
+        relation.relation_domain == "ARCHITECTURAL"
+        for relation in recorded["D-PARTI"].relations
+    )
+
     # ──────────────────────────────────────────────
     # EJECUCIÓN: Impact Analysis (H-002)
     # ──────────────────────────────────────────────
@@ -169,18 +194,23 @@ def test_multiscale_wall_move_e2e():
     # ──────────────────────────────────────────────
     validity_analyzer = ValidityAnalyzer(ledger)
 
-    # Estado actual: todas las versiones nuevas
-    current_refs = {
-        ("Wall", "W-14"): w14_v2,
-        ("Space", "H-07"): h07_v2,
-        ("Space", "P-03"): p03_v2,
-        ("Quantity", "PISO-H07"): ref("Quantity", "PISO-H07", 2, "9" * 64),
-        ("Quantity", "PISO-P03"): ref("Quantity", "PISO-P03", 2, "a" * 64),
-        ("Quantity", "PINTURA"): ref("Quantity", "PINTURA", 2, "b" * 64),
-        ("Cost", "COSTO"): ref("Cost", "COSTO", 2, "c" * 64),
-        ("Route", "R-2"): ref("Route", "R-2", 2, "d" * 64),
-        ("Window", "V-22"): ref("Window", "V-22", 2, "e" * 64),
-    }
+    # Estado actual: snapshot derivado del ledger + cambios observados.
+    current_refs = current_refs_from_ledger(
+        ledger,
+        project_id,
+        {
+            ("Wall", "W-14"): w14_v2,
+            ("Space", "H-07"): h07_v2,
+            ("Space", "P-03"): p03_v2,
+            ("Quantity", "PISO-H07"): ref("Quantity", "PISO-H07", 2, "9" * 64),
+            ("Quantity", "PISO-P03"): ref("Quantity", "PISO-P03", 2, "a" * 64),
+            ("Quantity", "PINTURA"): ref("Quantity", "PINTURA", 2, "b" * 64),
+            ("Cost", "COSTO"): ref("Cost", "COSTO", 2, "c" * 64),
+            ("Route", "R-2"): ref("Route", "R-2", 2, "d" * 64),
+            ("Window", "V-22"): ref("Window", "V-22", 2, "e" * 64),
+        },
+        omit=(("Regulation", "RNE-A010"), ("DesignEvidence", "PARTI-EVIDENCE")),
+    )
 
     validity_report = validity_analyzer.evaluate_validity(project_id, current_refs)
 
@@ -199,6 +229,11 @@ def test_multiscale_wall_move_e2e():
     p03_validity = next(av for av in validity_report.artifact_validities if av.artifact_ref.entity_id == "P-03")
     assert p03_validity.state == "REQUIRES_HUMAN_REVIEW"
     assert p03_validity.recommendation["requiresHumanAuthority"] is True
+    assert any(
+        discrepancy["code"] == "MISSING_DEPENDENCY"
+        for derivation in p03_validity.derivation_validities
+        for discrepancy in derivation.discrepancies
+    )
 
     # PARTI debe ser REQUIRES_HUMAN_REVIEW (decisión arquitectónica comprometida)
     parti_validity = next(av for av in validity_report.artifact_validities
@@ -224,3 +259,35 @@ def test_multiscale_wall_move_e2e():
     print(f"   - COSTO: FULLY_STALE → RECOMPUTE")
     print(f"   - P-03: REQUIRES_HUMAN_REVIEW (violación normativa)")
     print(f"   - PARTI: REQUIRES_HUMAN_REVIEW (decisión arquitectónica)")
+
+
+def test_e2e_unrelated_branch_not_impacted():
+    """RT-44: una rama no relacionada no entra en el impacto."""
+    ledger = DerivationLedger(MemoryStore())
+    project_id = "unrelated-branch"
+    wall = ref("Wall", "W-14", 1, "a" * 64)
+    area = ref("Space", "H-07", 1, "b" * 64)
+    other_wall = ref("Wall", "W-99", 1, "c" * 64)
+    other_area = ref("Space", "S-99", 1, "d" * 64)
+    ledger.record(project_id, record("D-H07", area, [wall]))
+    ledger.record(project_id, record("D-S99", other_area, [other_wall]))
+    report = ImpactAnalyzer(ledger).analyze_change(
+        project_id,
+        ImpactChange(wall, ref("Wall", "W-14", 1, "e" * 64), ChangeKind.CONTENT_CHANGED),
+    )
+    assert {item.ref.entity_id for item in report.impacted_artifacts} == {"H-07"}
+
+
+def test_e2e_unknown_dependency_wall_opening_is_reported_as_incomplete():
+    """RT-45/RT-52: unregistered consequences remain unknown, never silently absent."""
+    ledger = DerivationLedger(MemoryStore())
+    project_id = "unknown-opening"
+    wall = ref("Wall", "W-14", 1, "a" * 64)
+    area = ref("Space", "H-07", 1, "b" * 64)
+    ledger.record(project_id, record("D-H07", area, [wall]))
+    report = ImpactAnalyzer(ledger).analyze_change(
+        project_id,
+        ImpactChange(wall, ref("Wall", "W-14", 1, "e" * 64), ChangeKind.CONTENT_CHANGED),
+    )
+    assert all(item.ref.entity_id != "O-1" for item in report.impacted_artifacts)
+    assert report.coverage_warning == "GRAPH_MAY_BE_INCOMPLETE"

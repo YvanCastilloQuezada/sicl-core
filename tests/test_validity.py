@@ -276,6 +276,29 @@ class TestValidityAnalyzer_V06:
         assert artifact_validity.recommendation["action"] == "RECOMPUTE"
         assert artifact_validity.recommendation["requiresHumanAuthority"] is False
 
+    def test_fully_stale_recompute_without_authority(self, ledger, analyzer):
+        """La política FULLY_STALE=False queda anclada por un test propio."""
+        project_id = "fully-stale-policy"
+        record = DerivationRecord(
+            id="R-FS",
+            output=VersionedRef("Area", "A-FS", 1),
+            inputs=(VersionedRef("Geometry", "G-FS", 1),),
+            method="M1", method_version="1",
+            relations=(TypedRelation(
+                from_ref=VersionedRef("Area", "A-FS", 1),
+                to_ref=VersionedRef("Geometry", "G-FS", 1),
+                relation_type="COMPUTED_FROM", relation_domain="COMPUTATIONAL"
+            ),)
+        )
+        ledger.record(project_id, record)
+        report = analyzer.evaluate_validity(
+            project_id,
+            {("Geometry", "G-FS"): VersionedRef("Geometry", "G-FS", 2)},
+        )
+        recommendation = report.artifact_validities[0].recommendation
+        assert recommendation["action"] == "RECOMPUTE"
+        assert recommendation["requiresHumanAuthority"] is False
+
 
 class TestValidityAnalyzer_V08:
     """V-08: READ-ONLY"""
@@ -333,6 +356,16 @@ class TestValidityAnalyzer_V08:
         assert source_checks == ("integrity_checks_R1",)
         assert all(isinstance(check, str) and len(check) > 1 for check in source_checks)
         assert report.derivation_validities[0].to_dict()["sourceChecks"] == ["integrity_checks_R1"]
+
+    def test_source_checks_invariant_rejects_string_and_chunks(self):
+        """RT-84: ni string ni chunks con apariencia de nombres son válidos."""
+        artifact = VersionedRef("Area", "A1", 1)
+        with pytest.raises(TypeError, match=r"tuple\[str, \.\.\.\]"):
+            from sicl.validity import DerivationValidity
+            DerivationValidity("R1", artifact, "VALID", source_checks="integrity_checks_R1")
+        with pytest.raises(ValueError, match="integrity_checks"):
+            from sicl.validity import DerivationValidity
+            DerivationValidity("R1", artifact, "VALID", source_checks=("integrity_checks_", "R1"))
 
 
 class TestValidityAnalyzer_Integration:
