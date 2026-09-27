@@ -125,6 +125,10 @@ class ValidityReport:
 
 class ValidityAnalyzer:
     """
+    Política explícita: FULLY_STALE se recomienda para RECOMPUTE sin
+    autoridad humana adicional. Esto no ejecuta ni invalida el artefacto.
+    """
+    """
     H-003: Evalúa la validez de derivaciones y artefactos.
 
     Reglas contractuales:
@@ -133,7 +137,7 @@ class ValidityAnalyzer:
       V-03: UNCERTAIN → REQUIRES_HUMAN_REVIEW
       V-04: INVALID → REQUIRES_HUMAN_REVIEW
       V-05: PARTIALLY_VALID → REVIEW (requires human authority)
-      V-06: FULLY_STALE → RECOMMEND_RECOMPUTE
+      V-06: FULLY_STALE → RECOMMEND_RECOMPUTE, sin autoridad humana adicional
       V-07: HUMAN AUTHORITY REQUIRED FOR INVALIDATION
       V-08: READ-ONLY
     """
@@ -291,7 +295,7 @@ class ValidityAnalyzer:
           V-03: UNCERTAIN → REQUIRES_HUMAN_REVIEW
           V-04: INVALID → REQUIRES_HUMAN_REVIEW
           V-05: PARTIALLY_VALID → REVIEW (requires human authority)
-          V-06: FULLY_STALE → RECOMMEND_RECOMPUTE
+          V-06: FULLY_STALE → RECOMMEND_RECOMPUTE, sin autoridad humana adicional
         """
         counts = {
             "VALID": sum(1 for dv in dvs if dv.state == "VALID"),
@@ -321,7 +325,7 @@ class ValidityAnalyzer:
 
         Reglas:
           V-05: PARTIALLY_VALID → REVIEW (requires human authority)
-          V-06: FULLY_STALE → RECOMMEND_RECOMPUTE
+          V-06: FULLY_STALE → RECOMMEND_RECOMPUTE, sin autoridad humana adicional
           V-03/V-04: REQUIRES_HUMAN_REVIEW → REQUIRES_HUMAN_AUTHORITY
         """
         if state == "FULLY_VALID":

@@ -161,6 +161,8 @@ def test_multiscale_wall_move_e2e():
 
     # coverageWarning debe estar presente
     assert impact_report.coverage_warning == "GRAPH_MAY_BE_INCOMPLETE"
+    assert impact_report.partial is False
+    assert impact_report.partial_depth is None
 
     # ──────────────────────────────────────────────
     # EJECUCIÓN: Validity Analysis (H-003)
@@ -191,6 +193,7 @@ def test_multiscale_wall_move_e2e():
     assert costo_validity.state == "FULLY_STALE"
     assert costo_validity.recommendation["action"] == "RECOMPUTE"
     assert costo_validity.recommendation["requiresHumanAuthority"] is False
+    assert costo_validity.derivation_validities[0].source_checks == ("integrity_checks_D-COSTO",)
 
     # P-03 debe ser REQUIRES_HUMAN_REVIEW (porque viola normativa)
     p03_validity = next(av for av in validity_report.artifact_validities if av.artifact_ref.entity_id == "P-03")
@@ -207,6 +210,7 @@ def test_multiscale_wall_move_e2e():
     h07_validity = next(av for av in validity_report.artifact_validities if av.artifact_ref.entity_id == "H-07")
     assert h07_validity.state == "FULLY_STALE"
     assert h07_validity.recommendation["action"] == "RECOMPUTE"
+    assert h07_validity.recommendation["requiresHumanAuthority"] is False
 
     # ──────────────────────────────────────────────
     # VERIFICACIÓN: Read-only guarantee

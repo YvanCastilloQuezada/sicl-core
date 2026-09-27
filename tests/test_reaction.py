@@ -218,3 +218,27 @@ def test_h004_malformed_discrepancy_escalates(planner):
     assert action.action_type == ActionType.ESCALATE
     assert action.reason == "MALFORMED_DISCREPANCY"
     assert action.requires_human_authority is True
+
+
+def test_h004_cycle_reason_names_blocked_artifacts(planner):
+    """RT-77: el bloqueo de ciclo debe ser explicable y trazable."""
+    area = VersionedRef("Area", "A1", 1)
+    quantity = VersionedRef("Quantity", "Q1", 1)
+    a_derivation = DerivationValidity(
+        "RA", area, "FULLY_STALE",
+        discrepancies=({"reference": quantity.to_dict(), "code": "VERSION_MISMATCH"},),
+    )
+    q_derivation = DerivationValidity(
+        "RQ", quantity, "FULLY_STALE",
+        discrepancies=({"reference": area.to_dict(), "code": "VERSION_MISMATCH"},),
+    )
+    report = ValidityReport(artifact_validities=(
+        ArtifactValidity(area, "FULLY_STALE", (a_derivation,), {}, {"action": "RECOMPUTE"}),
+        ArtifactValidity(quantity, "FULLY_STALE", (q_derivation,), {}, {"action": "RECOMPUTE"}),
+    ))
+    actions = planner.plan_reaction(report).planned_actions
+    assert len(actions) == 2
+    assert all(action.status == ActionStatus.BLOCKED for action in actions)
+    assert all(action.action_type == ActionType.ESCALATE for action in actions)
+    assert all("Dependency cycle detected:" in action.reason for action in actions)
+    assert all(action.blocked_by for action in actions)

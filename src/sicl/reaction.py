@@ -70,7 +70,12 @@ class ReactionPlan:
 
 
 class ReactionPlanner:
-    """H-004: transforma estados de validez en acciones planificadas."""
+    """H-004: transforma estados de validez en acciones planificadas.
+
+    Política explícita: FULLY_STALE se planifica como RECOMPUTE sin
+    autorización humana adicional; los estados inciertos, inválidos,
+    parciales y discrepancias malformadas sí escalan a revisión.
+    """
 
     def plan_reaction(self, validity_report: ValidityReport) -> ReactionPlan:
         actions = [
@@ -175,12 +180,11 @@ class ReactionPlanner:
             for derivation_validity in artifact_validity.derivation_validities:
                 for discrepancy in derivation_validity.discrepancies:
                     raw = discrepancy.get("reference", {})
-                    try:
-                        dependency = VersionedRef(
-                            raw["entityType"], raw["entityId"], raw["version"]
-                        )
-                    except (KeyError, TypeError, ValueError):
+                    if not isinstance(raw, dict) or not _REFERENCE_KEYS.issubset(raw):
                         continue
+                    dependency = VersionedRef(
+                        raw["entityType"], raw["entityId"], raw["version"]
+                    )
                     if dependency in action_by_ref and dependency != output:
                         dependencies[output].add(dependency)
 
@@ -233,7 +237,13 @@ class ReactionPlanner:
                         action_type=ActionType.ESCALATE,
                         status=ActionStatus.BLOCKED,
                         priority=_BLOCKED_PRIORITY,
-                        reason="Dependency cycle detected",
+                        reason=(
+                            "Dependency cycle detected: "
+                            + ",".join(
+                                f"{item.entity_type}:{item.entity_id}@{item.version}"
+                                for item in (ref, *cycle_deps)
+                            )
+                        ),
                         requires_human_authority=True,
                         blocked_by=cycle_deps,
                     )
