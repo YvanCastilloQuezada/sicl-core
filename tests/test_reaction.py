@@ -4,7 +4,12 @@ from sicl.derivation import (
     DerivationLedger, DerivationRecord, VersionedRef, TypedRelation,
     DerivationValidationError
 )
-from sicl.validity import ValidityAnalyzer
+from sicl.validity import (
+    ArtifactValidity,
+    DerivationValidity,
+    ValidityAnalyzer,
+    ValidityReport,
+)
 from sicl.reaction import ReactionPlanner, ActionType, ActionStatus
 from sicl.domain import Event
 
@@ -86,7 +91,7 @@ class TestReactionPlanner_R02:
         assert len(plan.planned_actions) == 1
         action = plan.planned_actions[0]
         assert action.action_type == ActionType.RECOMPUTE
-        assert action.requires_human_authority is False
+        assert action.requires_human_authority is True
         assert action.status == ActionStatus.PLANNED
 
 
@@ -174,3 +179,42 @@ class TestReactionPlanner_R09:
         planner.plan_reaction(validity_report)
         ledger_after = ledger.list(project_id)
         assert ledger_after == ledger_before
+
+
+@pytest.mark.parametrize("state", ["FULLY_STALE", "PARTIALLY_VALID"])
+def test_h003_h004_agree_on_human_authority_per_state(planner, state):
+    artifact = VersionedRef("Area", "A1", 1)
+    derivation = DerivationValidity("R1", artifact, state)
+    artifact_validity = ArtifactValidity(
+        artifact_ref=artifact,
+        state=state,
+        derivation_validities=(derivation,),
+        summary={},
+        recommendation={"requiresHumanAuthority": True},
+    )
+    report = ValidityReport(artifact_validities=(artifact_validity,))
+    action = planner.plan_reaction(report).planned_actions[0]
+    assert action.requires_human_authority is True
+
+
+def test_h004_malformed_discrepancy_escalates(planner):
+    artifact = VersionedRef("Area", "A1", 1)
+    derivation = DerivationValidity(
+        "R1",
+        artifact,
+        "STALE",
+        discrepancies=({"reference": {"id": "G1"}, "code": "VERSION_MISMATCH"},),
+    )
+    artifact_validity = ArtifactValidity(
+        artifact_ref=artifact,
+        state="FULLY_STALE",
+        derivation_validities=(derivation,),
+        summary={},
+        recommendation={"requiresHumanAuthority": True},
+    )
+    report = ValidityReport(artifact_validities=(artifact_validity,))
+    action = planner.plan_reaction(report).planned_actions[0]
+    assert action.status == ActionStatus.BLOCKED
+    assert action.action_type == ActionType.ESCALATE
+    assert action.reason == "MALFORMED_DISCREPANCY"
+    assert action.requires_human_authority is True

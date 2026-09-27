@@ -12,6 +12,9 @@ from typing import Any
 from .derivation import VersionedRef
 from .validity import ValidityReport, ArtifactValidity
 
+_BLOCKED_PRIORITY = 999
+_REFERENCE_KEYS = frozenset(("entityType", "entityId", "version"))
+
 
 class ActionType(str, Enum):
     RECOMPUTE = "RECOMPUTE"
@@ -93,6 +96,17 @@ class ReactionPlanner:
 
     def _determine_action(self, artifact_validity: ArtifactValidity) -> PlannedAction | None:
         state = artifact_validity.state
+        if any(self._is_malformed_discrepancy(discrepancy)
+               for derivation in artifact_validity.derivation_validities
+               for discrepancy in derivation.discrepancies):
+            return PlannedAction(
+                artifact_ref=artifact_validity.artifact_ref,
+                action_type=ActionType.ESCALATE,
+                status=ActionStatus.BLOCKED,
+                priority=_BLOCKED_PRIORITY,
+                reason="MALFORMED_DISCREPANCY",
+                requires_human_authority=True,
+            )
         if state == "FULLY_VALID":
             return None
         if state == "PARTIALLY_VALID":
@@ -111,7 +125,7 @@ class ReactionPlanner:
                 status=ActionStatus.PLANNED,
                 priority=0,
                 reason="All derivations are stale",
-                requires_human_authority=False,
+                requires_human_authority=True,
             )
         if state == "PARTIALLY_STALE":
             return PlannedAction(
@@ -218,7 +232,7 @@ class ReactionPlanner:
                         artifact_ref=ref,
                         action_type=ActionType.ESCALATE,
                         status=ActionStatus.BLOCKED,
-                        priority=999,
+                        priority=_BLOCKED_PRIORITY,
                         reason="Dependency cycle detected",
                         requires_human_authority=True,
                         blocked_by=cycle_deps,
@@ -237,6 +251,11 @@ class ReactionPlanner:
                     )
                 )
         return result
+
+    @staticmethod
+    def _is_malformed_discrepancy(discrepancy: dict[str, Any]) -> bool:
+        reference = discrepancy.get("reference")
+        return not isinstance(reference, dict) or not _REFERENCE_KEYS.issubset(reference)
 
 
 __all__ = [
