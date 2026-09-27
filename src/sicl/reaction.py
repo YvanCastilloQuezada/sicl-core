@@ -222,11 +222,48 @@ class ReactionPlanner:
             for ref in sorted(cycle_refs, key=lambda ref: (ref.entity_type, ref.entity_id, ref.version)):
                 ordered_refs.append(ref)
 
+        # RT-88: la condición BLOCKED se propaga a todos los dependientes.
+        initially_blocked = {
+            ref for ref, action in action_by_ref.items()
+            if action.status == ActionStatus.BLOCKED
+        }
+        transitive_blocked = set(initially_blocked)
+        block_queue = list(initially_blocked)
+        while block_queue:
+            current = block_queue.pop(0)
+            for dependent in sorted(
+                dependents.get(current, set()),
+                key=lambda ref: (ref.entity_type, ref.entity_id, ref.version),
+            ):
+                if dependent not in transitive_blocked:
+                    transitive_blocked.add(dependent)
+                    block_queue.append(dependent)
+
         result: list[PlannedAction] = []
         unresolved = {ref for ref, degree in in_degree.items() if degree > 0}
         for priority, ref in enumerate(ordered_refs):
             action = action_by_ref[ref]
-            if ref in unresolved:
+            if ref in transitive_blocked and ref not in initially_blocked:
+                blocking_deps = tuple(sorted(
+                    (dependency for dependency in dependencies[ref] if dependency in transitive_blocked),
+                    key=lambda dependency: (
+                        dependency.entity_type,
+                        dependency.entity_id,
+                        dependency.version,
+                    ),
+                ))
+                result.append(
+                    PlannedAction(
+                        artifact_ref=ref,
+                        action_type=ActionType.ESCALATE,
+                        status=ActionStatus.BLOCKED,
+                        priority=_BLOCKED_PRIORITY,
+                        reason="BLOCKED_DEPENDENCY: depends on a blocked or malformed artifact",
+                        requires_human_authority=True,
+                        blocked_by=blocking_deps,
+                    )
+                )
+            elif ref in unresolved:
                 cycle_deps = tuple(sorted(
                     (dependency for dependency in dependencies[ref] if dependency in unresolved),
                     key=lambda dependency: (
