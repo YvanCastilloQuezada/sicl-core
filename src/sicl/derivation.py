@@ -211,7 +211,6 @@ class DerivationLedger:
         _required_text(project_id, "project_id")
         result: list[DerivationRecord] = []
         ids: dict[str, DerivationRecord] = {}
-        outputs: dict[VersionedRef, DerivationRecord] = {}
         for event in self.store.events(project_id):
             if event.type != self.EVENT_TYPE:
                 continue
@@ -226,13 +225,7 @@ class DerivationLedger:
                 if prior_id == record:
                     continue
                 raise DerivationValidationError(f"historical derivation id conflict: {record.id}")
-            prior_output = outputs.get(record.output)
-            if prior_output is not None:
-                if prior_output == record:
-                    continue
-                raise DerivationValidationError(f"historical output derivation conflict: {record.output.to_dict()}")
             ids[record.id] = record
-            outputs[record.output] = record
             result.append(record)
         return result
 
@@ -245,23 +238,33 @@ class DerivationLedger:
                 if existing == record:
                     return existing  # idempotent replay, no duplicate event
                 raise DerivationValidationError(f"derivation id already exists with different content: {record.id}")
-            if existing.output == record.output:
-                raise DerivationValidationError(f"output already has a derivation: {record.output.to_dict()}")
         self.store.add_event(Event(None, now_iso(), project_id, self.EVENT_TYPE, {"derivation": record.to_dict()}, actor, self.EVENT_SOURCE))
         return record
 
     def why(self, project_id: str, output: VersionedRef) -> list[DerivationRecord]:
+        """Return every recorded justification path for output, deterministically and cycle-bounded."""
         records = self.list(project_id)
-        by_output = {r.output: r for r in records}
-        result, visited = [], set()
-        def visit(ref: VersionedRef) -> None:
-            if ref in visited: return
-            visited.add(ref)
-            rec = by_output.get(ref)
-            if rec is None: return
-            result.append(rec)
-            for inp in rec.inputs: visit(inp)
-        visit(output)
+        by_output: dict[VersionedRef, list[DerivationRecord]] = {}
+        for record in records:
+            by_output.setdefault(record.output, []).append(record)
+        for alternatives in by_output.values():
+            alternatives.sort(key=lambda record: record.id)
+
+        result: list[DerivationRecord] = []
+        visited_records: set[str] = set()
+
+        def visit(ref: VersionedRef, active_refs: frozenset[VersionedRef]) -> None:
+            if ref in active_refs:
+                return
+            next_active = active_refs | {ref}
+            for record in by_output.get(ref, ()):
+                if record.id not in visited_records:
+                    visited_records.add(record.id)
+                    result.append(record)
+                for input_ref in record.inputs:
+                    visit(input_ref, next_active)
+
+        visit(output, frozenset())
         return result
 
     def explain(self, project_id: str, output: VersionedRef) -> dict[str, Any]:
@@ -304,7 +307,11 @@ class DerivationLedger:
                     raise DerivationValidationError("current_refs values must be matching VersionedRef values")
                 if current.version != expected.version:
                     checks.append({"record_id": record.id, "reference": expected.to_dict(), "current": current.to_dict(), "code": "VERSION_MISMATCH"})
-                elif expected.content_hash is not None and current.content_hash is not None and expected.content_hash != current.content_hash:
+                elif expected.content_hash is None and current.content_hash is None:
+                    checks.append({"record_id": record.id, "reference": expected.to_dict(), "current": current.to_dict(), "code": "IDENTITY_UNVERIFIABLE"})
+                elif expected.content_hash is None or current.content_hash is None:
+                    checks.append({"record_id": record.id, "reference": expected.to_dict(), "current": current.to_dict(), "code": "IDENTITY_UNCERTAIN"})
+                elif expected.content_hash != current.content_hash:
                     checks.append({"record_id": record.id, "reference": expected.to_dict(), "current": current.to_dict(), "code": "CONTENT_HASH_MISMATCH"})
         return checks
 

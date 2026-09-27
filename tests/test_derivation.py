@@ -45,10 +45,11 @@ def test_epistemic_why_uses_supported_by_and_derived_from():
 def test_cycle_is_bounded_but_does_not_mutate():
     s=MemoryStore(); l=DerivationLedger(s); a=ref("Area","A",1); q=ref("Quantity","Q",1); l.record("P",record("DA",a,[q])); l.record("P",record("DQ",q,[a])); assert len(l.why("P",a))==2; assert len(s.items)==2
 
-def test_record_is_idempotent_but_conflicting_id_or_duplicate_output_rejected():
+def test_record_is_idempotent_conflicting_id_rejected_but_independent_output_derivation_allowed():
     s=MemoryStore(); l=DerivationLedger(s); a=ref("Area","A",1); g=ref("Geometry","G",1); r=record("D",a,[g]); l.record("P",r); l.record("P",r); assert len(s.items)==1
     with pytest.raises(DerivationValidationError): l.record("P",record("D",ref("Area","A2",1),[g]))
-    with pytest.raises(DerivationValidationError): l.record("P",record("D2",a,[g]))
+    l.record("P",record("D2",a,[ref("Geometry","G2",1)]))
+    assert [item.id for item in l.why("P",a)] == ["D", "D2"]
 
 def test_dependency_checks_distinguish_missing_and_version_mismatch_without_stale_inference():
     s=MemoryStore(); l=DerivationLedger(s); g=ref("Geometry","G1",3); a=ref("Area","A1",1); l.record("P",record("D",a,[g]))
@@ -84,19 +85,6 @@ def test_historical_malformed_derivation_event_fails_closed():
         ledger.list("P1")
 
 
-def test_historical_conflicting_outputs_fail_closed():
-    store = MemoryStore()
-    ledger = DerivationLedger(store)
-    g1, g2 = ref("Geometry", "G1", 1), ref("Geometry", "G2", 1)
-    a = ref("Area", "A1", 1)
-    r1 = record("D1", a, [g1])
-    r2 = record("D2", a, [g2])
-    store.items.append(Event(None, "2026-01-01T00:00:00+00:00", "P1", "DERIVATION_RECORDED", {"derivation": r1.to_dict()}, "x", "x"))
-    store.items.append(Event(None, "2026-01-01T00:00:01+00:00", "P1", "DERIVATION_RECORDED", {"derivation": r2.to_dict()}, "x", "x"))
-    with pytest.raises(DerivationValidationError):
-        ledger.why("P1", a)
-
-
 def test_assumptions_are_canonical_and_unique():
     g, a = ref("Geometry", "G1", 1), ref("Area", "A1", 1)
     item = DerivationRecord("D", a, (g,), "m", "1", (TypedRelation(a, g, "COMPUTED_FROM", "COMPUTATIONAL"),), assumptions=("  controlled assumption  ",))
@@ -130,3 +118,41 @@ def test_derivation_contract_version_is_explicit_and_fail_closed():
     raw["contractVersion"] = 2
     with pytest.raises(DerivationValidationError):
         DerivationRecord.from_dict(raw)
+
+
+def test_multiple_independent_derivations_for_same_output_are_preserved():
+    store = MemoryStore()
+    ledger = DerivationLedger(store)
+    g1, g2 = ref("Geometry", "G1", 1), ref("Geometry", "G2", 1)
+    a = ref("Area", "A1", 1)
+    ledger.record("P1", record("D1", a, [g1]))
+    ledger.record("P1", record("D2", a, [g2]))
+    why = ledger.why("P1", a)
+    assert [item.id for item in why] == ["D1", "D2"]
+    assert {item.inputs[0] for item in why} == {g1, g2}
+
+
+def test_identity_gap_is_explicit_when_hashes_absent():
+    store = MemoryStore()
+    ledger = DerivationLedger(store)
+    g = ref("Geometry", "G1", 1)
+    a = ref("Area", "A1", 1)
+    ledger.record("P", record("D", a, [g]))
+    checks = ledger.integrity_checks("P", {g.key(): ref("Geometry", "G1", 1)})
+    assert checks == [{
+        "record_id": "D",
+        "reference": g.to_dict(),
+        "current": g.to_dict(),
+        "code": "IDENTITY_UNVERIFIABLE",
+    }]
+
+
+def test_identity_gap_is_uncertain_when_only_one_side_has_hash():
+    store = MemoryStore()
+    ledger = DerivationLedger(store)
+    g = VersionedRef("Geometry", "G1", 1, "a" * 64)
+    a = ref("Area", "A1", 1)
+    ledger.record("P", record("D", a, [g]))
+    current = ref("Geometry", "G1", 1)
+    checks = ledger.integrity_checks("P", {g.key(): current})
+    assert checks[0]["code"] == "IDENTITY_UNCERTAIN"
