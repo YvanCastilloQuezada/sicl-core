@@ -252,15 +252,40 @@ class ReactionPlanner:
                         dependency.version,
                     ),
                 ))
+                reasons = ["BLOCKED_DEPENDENCY: depends on a blocked or malformed artifact"]
+                cycle_deps: tuple[VersionedRef, ...] = ()
+                if ref in unresolved:
+                    cycle_deps = tuple(sorted(
+                        (dependency for dependency in dependencies[ref] if dependency in unresolved),
+                        key=lambda dependency: (
+                            dependency.entity_type,
+                            dependency.entity_id,
+                            dependency.version,
+                        ),
+                    ))
+                    reasons.append(
+                        "Dependency cycle detected: "
+                        + ",".join(
+                            f"{item.entity_type}:{item.entity_id}@{item.version}"
+                            for item in (ref, *cycle_deps)
+                        )
+                    )
                 result.append(
                     PlannedAction(
                         artifact_ref=ref,
                         action_type=ActionType.ESCALATE,
                         status=ActionStatus.BLOCKED,
                         priority=_BLOCKED_PRIORITY,
-                        reason="BLOCKED_DEPENDENCY: depends on a blocked or malformed artifact",
+                        reason="; ".join(reasons),
                         requires_human_authority=True,
-                        blocked_by=blocking_deps,
+                        blocked_by=tuple(sorted(
+                            set(blocking_deps + cycle_deps),
+                            key=lambda dependency: (
+                                dependency.entity_type,
+                                dependency.entity_id,
+                                dependency.version,
+                            ),
+                        )),
                     )
                 )
             elif ref in unresolved:

@@ -294,3 +294,40 @@ class TestReactionPlanner_RT88:
         assert action_b.action_type == ActionType.ESCALATE
         assert "BLOCKED_DEPENDENCY" in action_b.reason
         assert action_b.blocked_by == (VersionedRef("Area", "A", 1),)
+
+    def test_h004_node_blocked_by_cascade_and_cycle_preserves_both_reasons(self, planner):
+        """RT-97: un nodo bloqueado por cascada y ciclo conserva ambas causas."""
+        from sicl.validity import ValidityReport, ArtifactValidity, DerivationValidity
+
+        area = VersionedRef("Area", "A", 1)
+        blocked = VersionedRef("Cost", "B", 1)
+        cycle = VersionedRef("Quantity", "C", 1)
+
+        dv_a = DerivationValidity(
+            "R_A", area, "STALE",
+            discrepancies=({"reference": {"bad_schema": True}},),
+            source_checks=("integrity_checks_R_A",),
+        )
+        dv_b = DerivationValidity(
+            "R_B", blocked, "STALE",
+            discrepancies=tuple({"reference": ref.to_dict(), "code": "VERSION_MISMATCH"} for ref in (area, cycle)),
+            source_checks=("integrity_checks_R_B",),
+        )
+        dv_c = DerivationValidity(
+            "R_C", cycle, "STALE",
+            discrepancies=({"reference": blocked.to_dict(), "code": "VERSION_MISMATCH"},),
+            source_checks=("integrity_checks_R_C",),
+        )
+        report = ValidityReport(artifact_validities=(
+            ArtifactValidity(area, "FULLY_STALE", (dv_a,), {}, {"action": "RECOMPUTE"}),
+            ArtifactValidity(blocked, "FULLY_STALE", (dv_b,), {}, {"action": "RECOMPUTE"}),
+            ArtifactValidity(cycle, "FULLY_STALE", (dv_c,), {}, {"action": "RECOMPUTE"}),
+        ))
+
+        actions = {action.artifact_ref.entity_id: action for action in planner.plan_reaction(report).planned_actions}
+        for entity_id in ("B", "C"):
+            assert actions[entity_id].status == ActionStatus.BLOCKED
+            assert "BLOCKED_DEPENDENCY" in actions[entity_id].reason
+            assert "Dependency cycle detected:" in actions[entity_id].reason
+        assert actions["B"].blocked_by == (area, cycle)
+        assert actions["C"].blocked_by == (blocked,)
