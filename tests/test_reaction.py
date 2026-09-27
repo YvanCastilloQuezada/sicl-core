@@ -91,7 +91,7 @@ class TestReactionPlanner_R02:
 
 
 class TestReactionPlanner_R05:
-    def test_partially_valid_artifact_has_no_action(self, ledger, validity_analyzer, planner):
+    def test_partially_valid_artifact_plans_review(self, ledger, validity_analyzer, planner):
         project_id = "test-project"
         record1 = DerivationRecord(
             id="R1", output=VersionedRef("Area", "A1", 1),
@@ -113,7 +113,10 @@ class TestReactionPlanner_R05:
         }
         validity_report = validity_analyzer.evaluate_validity(project_id, current_refs)
         plan = planner.plan_reaction(validity_report)
-        assert len(plan.planned_actions) == 0
+        assert len(plan.planned_actions) == 1
+        action = plan.planned_actions[0]
+        assert action.action_type == ActionType.REVIEW
+        assert action.requires_human_authority is True
 
 
 class TestReactionPlanner_R04:

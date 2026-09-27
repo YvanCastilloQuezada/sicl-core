@@ -148,7 +148,7 @@ class TestValidityAnalyzer_V02:
         assert artifact_validity.state == "PARTIALLY_VALID"
         assert artifact_validity.summary["validCount"] == 1
         assert artifact_validity.summary["staleCount"] == 1
-        assert artifact_validity.recommendation["action"] == "NO_ACTION"
+        assert artifact_validity.recommendation["action"] == "REVIEW"
 
 
 class TestValidityAnalyzer_V03:

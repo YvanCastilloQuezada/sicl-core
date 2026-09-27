@@ -125,7 +125,7 @@ class ValidityAnalyzer:
       V-02: ONE STALE DERIVATION ≠ STALE ARTIFACT
       V-03: UNCERTAIN → REQUIRES_HUMAN_REVIEW
       V-04: INVALID → REQUIRES_HUMAN_REVIEW
-      V-05: PARTIALLY_VALID → NO_ACTION
+      V-05: PARTIALLY_VALID → REVIEW (requires human authority)
       V-06: FULLY_STALE → RECOMMEND_RECOMPUTE
       V-07: HUMAN AUTHORITY REQUIRED FOR INVALIDATION
       V-08: READ-ONLY
@@ -283,7 +283,7 @@ class ValidityAnalyzer:
           V-02: ONE STALE DERIVATION ≠ STALE ARTIFACT
           V-03: UNCERTAIN → REQUIRES_HUMAN_REVIEW
           V-04: INVALID → REQUIRES_HUMAN_REVIEW
-          V-05: PARTIALLY_VALID → NO_ACTION
+          V-05: PARTIALLY_VALID → REVIEW (requires human authority)
           V-06: FULLY_STALE → RECOMMEND_RECOMPUTE
         """
         counts = {
@@ -313,7 +313,7 @@ class ValidityAnalyzer:
         Genera una recomendación basada en el estado del artefacto.
 
         Reglas:
-          V-05: PARTIALLY_VALID → NO_ACTION
+          V-05: PARTIALLY_VALID → REVIEW (requires human authority)
           V-06: FULLY_STALE → RECOMMEND_RECOMPUTE
           V-03/V-04: REQUIRES_HUMAN_REVIEW → REQUIRES_HUMAN_AUTHORITY
         """
@@ -326,9 +326,9 @@ class ValidityAnalyzer:
 
         if state == "PARTIALLY_VALID":
             return {
-                "action": "NO_ACTION",
-                "reason": "At least one derivation is valid",
-                "requiresHumanAuthority": False,
+                "action": "REVIEW",
+                "reason": "At least one derivation is valid, but others are stale",
+                "requiresHumanAuthority": True,
             }
 
         if state == "FULLY_STALE":

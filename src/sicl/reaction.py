@@ -93,8 +93,17 @@ class ReactionPlanner:
 
     def _determine_action(self, artifact_validity: ArtifactValidity) -> PlannedAction | None:
         state = artifact_validity.state
-        if state in ("FULLY_VALID", "PARTIALLY_VALID"):
+        if state == "FULLY_VALID":
             return None
+        if state == "PARTIALLY_VALID":
+            return PlannedAction(
+                artifact_ref=artifact_validity.artifact_ref,
+                action_type=ActionType.REVIEW,
+                status=ActionStatus.REQUIRES_AUTHORITY,
+                priority=0,
+                reason="At least one derivation is valid, but others are stale",
+                requires_human_authority=True,
+            )
         if state == "FULLY_STALE":
             return PlannedAction(
                 artifact_ref=artifact_validity.artifact_ref,
