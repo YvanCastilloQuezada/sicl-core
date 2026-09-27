@@ -7,6 +7,7 @@ from sicl.a002 import (
     EvidenceRef,
     KnowledgeItem,
     KnowledgeState,
+    OperationRequirement,
     SufficiencyEngine,
     SufficiencyRequest,
     SufficiencyStateStore,
@@ -14,6 +15,10 @@ from sicl.a002 import (
     requirements_for,
 )
 from sicl.domain import SpatialScope
+from sicl.derivation import DerivationLedger, DerivationRecord, TypedRelation, VersionedRef
+from sicl.h005 import ExecutionStatus, RecomputationRegistry, SelectiveRecomputationEngine
+from sicl.reaction import ReactionPlanner
+from sicl.validity import ValidityAnalyzer
 
 OP = "preliminary building massing"
 REQ = requirements_for(OP)
@@ -136,6 +141,16 @@ def test_determinism_is_independent_of_input_order():
     assert first.to_dict() == second.to_dict()
 
 
+def test_multiscale_ontology_evaluates_object_space_building_site_city_region_country():
+    scales = (SpatialScope.OBJETO, SpatialScope.ESPACIO, SpatialScope.EDIFICACION, SpatialScope.PARCELA_SITIO, SpatialScope.DISTRITO_CIUDAD, SpatialScope.REGION, SpatialScope.PAIS)
+    evidence = tuple(ev(f"scale-{scale.value}", f"verified {scale.value}", scale=scale) for scale in scales)
+    knowledge = tuple(item(f"field-{index}", KnowledgeState.KNOWN, scale.value, f"scale-{scale.value}", scale) for index, scale in enumerate(scales))
+    requirements = tuple(OperationRequirement(f"field-{index}", (KnowledgeState.KNOWN,), True, (scale,), reason=f"requires {scale.value}") for index, scale in enumerate(scales))
+    result = SufficiencyEngine().evaluate(SufficiencyRequest("A002-P", "multiscale audit", knowledge, requirements, evidence, None, "audit", None))
+    assert result.overall_status is SufficiencyStatus.SUFFICIENT
+    assert set(result.coverage) == {f"field-{index}" for index in range(len(scales))}
+
+
 def test_gate_permits_sufficient_and_calls_h005_once():
     evidence = full_evidence()
     req = request(base_knowledge(evidence, height=KnowledgeState.KNOWN), evidence)
@@ -152,6 +167,25 @@ def test_gate_blocks_insufficient_before_h005():
     result = SufficiencyEngine().evaluate(req)
     with pytest.raises(PermissionError, match="INSUFFICIENT"):
         A002H005Gate.execute_if_permitted(req, result, lambda: pytest.fail("H005 must not execute"))
+
+
+def test_sufficient_a002_permits_real_h005_recomputation():
+    evidence = full_evidence()
+    req = request(base_knowledge(evidence, height=KnowledgeState.KNOWN), evidence)
+    a002_result = SufficiencyEngine().evaluate(req)
+    store = type("Store", (), {"__init__": lambda self: setattr(self, "items", []), "add_event": lambda self, event: (self.items.append(event) or event), "events": lambda self, project_id=None: [event for event in self.items if project_id is None or event.project_id == project_id]})()
+    ledger = DerivationLedger(store)
+    registry = RecomputationRegistry()
+    old_input = VersionedRef("Geometry", "G", 1, "a" * 64)
+    current_input = VersionedRef("Geometry", "G", 2, "b" * 64)
+    old_output = VersionedRef("Area", "A", 1)
+    previous = DerivationRecord("D1", old_output, (old_input,), "area_from_geometry", "1.0", (TypedRelation(old_output, old_input, "COMPUTED_FROM", "COMPUTATIONAL"),))
+    ledger.record("A002-P", previous)
+    registry.register("area_from_geometry", "1.0", lambda project, record, refs: DerivationRecord("D2", VersionedRef("Area", "A", 2), (refs[("Geometry", "G")],), record.method, record.method_version, (TypedRelation(VersionedRef("Area", "A", 2), refs[("Geometry", "G")], "COMPUTED_FROM", "COMPUTATIONAL"),)))
+    h005 = SelectiveRecomputationEngine(ledger, registry)
+    plan = ReactionPlanner().plan_reaction(ValidityAnalyzer(ledger).evaluate_validity("A002-P", {("Geometry", "G"): current_input}))
+    report = A002H005Gate.execute_if_permitted(req, a002_result, lambda: h005.execute("A002-P", plan, {("Geometry", "G"): current_input}))
+    assert report.records[0].status is ExecutionStatus.EXECUTED
 
 
 def test_gate_rejects_stale_result():
