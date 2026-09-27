@@ -51,7 +51,7 @@ class SelectiveRecomputationEngine:
         self,
         project_id: str,
         plan: ReactionPlan,
-        action: PlannedAction,
+        action: object,
         current_refs: Mapping[tuple[str, str], VersionedRef],
     ) -> ExecutionRecord:
         empty_inputs: tuple[VersionedRef, ...] = ()
@@ -147,8 +147,9 @@ class SelectiveRecomputationEngine:
         return None
 
     @staticmethod
-    def _blocked(project_id: str, action: PlannedAction, reason: str, inputs: tuple[VersionedRef, ...], previous: DerivationRecord | None = None) -> ExecutionRecord:
-        return ExecutionRecord(project_id, action.artifact_ref, previous.id if previous else None, previous.method if previous else None, previous.method_version if previous else None, inputs, previous.output if previous else None, None, ExecutionStatus.BLOCKED, reason)
+    def _blocked(project_id: str, action: object, reason: str, inputs: tuple[VersionedRef, ...], previous: DerivationRecord | None = None) -> ExecutionRecord:
+        artifact_ref = action.artifact_ref if isinstance(action, PlannedAction) else VersionedRef("UNKNOWN", "UNKNOWN", 1)
+        return ExecutionRecord(project_id, artifact_ref, previous.id if previous else None, previous.method if previous else None, previous.method_version if previous else None, inputs, previous.output if previous else None, None, ExecutionStatus.BLOCKED, reason)
 
     @staticmethod
     def _rejected(project_id: str, action: PlannedAction, reason: str, inputs: tuple[VersionedRef, ...]) -> ExecutionRecord:

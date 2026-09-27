@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from sicl.derivation import DerivationLedger, DerivationRecord, TypedRelation, VersionedRef
 from sicl.h005 import ExecutionStatus, RecomputationRegistry, SelectiveRecomputationEngine
 from sicl.reaction import ActionStatus, ActionType, PlannedAction, ReactionPlan, ReactionPlanner
@@ -19,6 +21,16 @@ def make_record(rid, output, input_ref, method="area_from_geometry", version="1.
 def make_plan(ledger, project, current):
     report = ValidityAnalyzer(ledger).evaluate_validity(project, current)
     return ReactionPlanner().plan_reaction(report)
+
+
+@pytest.mark.parametrize("malformed_action", [None, {"actionType": "RECOMPUTE"}, "RECOMPUTE"])
+def test_h005_malformed_action_object_returns_blocked_not_crash(malformed_action):
+    plan = ReactionPlan(validity_report=ValidityReport(), planned_actions=(malformed_action,))
+    result = SelectiveRecomputationEngine(DerivationLedger(Store()), RecomputationRegistry()).execute("P1", plan, {})
+    assert len(result.records) == 1
+    assert result.records[0].status is ExecutionStatus.BLOCKED
+    assert result.records[0].reason == "MALFORMED_PLAN"
+    assert result.records[0].artifact_requested == VersionedRef("UNKNOWN", "UNKNOWN", 1)
 
 
 def test_engine_executes_only_full_stale_recompute_and_records_new_derivation():
