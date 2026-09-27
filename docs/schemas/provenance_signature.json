@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://arki.sicl/schemas/provenance_signature.json",
+  "title": "Provenance Signature",
+  "description": "Firma criptográfica de proveniencia que debe acompañar TODO output generado por una IA. Materializa la Regla 42 (Firma de Proveniencia Inmutable / C2PA).",
+  "type": "object",
+  "required": ["generator_id", "timestamp", "content_hash", "signature_algorithm", "domain_profile_ref"],
+  "properties": {
+    "generator_id": {
+      "type": "string",
+      "description": "ID único del modelo o agente que generó el output (ej. 'LLM-Bio-Gen-v3')"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora exacta de generación (ISO 8601)"
+    },
+    "content_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Hash SHA-256 del contenido del output generado (64 caracteres hex)"
+    },
+    "signature_algorithm": {
+      "type": "string",
+      "enum": ["SHA256_RSA", "C2PA", "ED25519", "HMAC_SHA256"],
+      "description": "Algoritmo criptográfico usado para la firma"
+    },
+    "domain_profile_ref": {
+      "type": "string",
+      "description": "Referencia al domain_profile.json bajo el cual se generó"
+    },
+    "source_data_refs": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Lista de IDs de documentos del corpus usados como fuente (Regla de Trazabilidad)"
+    },
+    "signature_value": {
+      "type": "string",
+      "description": "Valor de la firma criptográfica (base64 o hex)"
+    }
+  },
+  "additionalProperties": false
+}
