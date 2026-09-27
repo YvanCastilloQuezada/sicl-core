@@ -274,7 +274,7 @@ class TestValidityAnalyzer_V06:
         artifact_validity = report.artifact_validities[0]
         assert artifact_validity.state == "FULLY_STALE"
         assert artifact_validity.recommendation["action"] == "RECOMPUTE"
-        assert artifact_validity.recommendation["requiresHumanAuthority"] is True
+        assert artifact_validity.recommendation["requiresHumanAuthority"] is False
 
 
 class TestValidityAnalyzer_V08:

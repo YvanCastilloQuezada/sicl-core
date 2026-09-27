@@ -190,7 +190,7 @@ def test_multiscale_wall_move_e2e():
     costo_validity = next(av for av in validity_report.artifact_validities if av.artifact_ref.entity_id == "COSTO")
     assert costo_validity.state == "FULLY_STALE"
     assert costo_validity.recommendation["action"] == "RECOMPUTE"
-    assert costo_validity.recommendation["requiresHumanAuthority"] is True
+    assert costo_validity.recommendation["requiresHumanAuthority"] is False
 
     # P-03 debe ser REQUIRES_HUMAN_REVIEW (porque viola normativa)
     p03_validity = next(av for av in validity_report.artifact_validities if av.artifact_ref.entity_id == "P-03")

@@ -91,7 +91,7 @@ class TestReactionPlanner_R02:
         assert len(plan.planned_actions) == 1
         action = plan.planned_actions[0]
         assert action.action_type == ActionType.RECOMPUTE
-        assert action.requires_human_authority is True
+        assert action.requires_human_authority is False
         assert action.status == ActionStatus.PLANNED
 
 
@@ -194,7 +194,7 @@ def test_h003_h004_agree_on_human_authority_per_state(planner, state):
     )
     report = ValidityReport(artifact_validities=(artifact_validity,))
     action = planner.plan_reaction(report).planned_actions[0]
-    assert action.requires_human_authority is True
+    assert action.requires_human_authority is (state == "PARTIALLY_VALID")
 
 
 def test_h004_malformed_discrepancy_escalates(planner):

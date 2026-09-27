@@ -335,7 +335,7 @@ class ValidityAnalyzer:
             return {
                 "action": "RECOMPUTE",
                 "reason": "All derivations are stale",
-                "requiresHumanAuthority": True,
+                "requiresHumanAuthority": False,
             }
 
         if state == "PARTIALLY_STALE":

@@ -125,7 +125,7 @@ class ReactionPlanner:
                 status=ActionStatus.PLANNED,
                 priority=0,
                 reason="All derivations are stale",
-                requires_human_authority=True,
+                requires_human_authority=False,
             )
         if state == "PARTIALLY_STALE":
             return PlannedAction(
