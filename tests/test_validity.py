@@ -308,6 +308,32 @@ class TestValidityAnalyzer_V08:
         # Ledger no debe haber cambiado
         assert ledger_after == ledger_before
 
+    def test_source_checks_is_tuple_of_names_not_characters(self, ledger, analyzer):
+        """RT-78: sourceChecks conserva nombres completos de checks."""
+        project_id = "source-checks-contract"
+        record = DerivationRecord(
+            id="R1",
+            output=VersionedRef("Area", "A1", 1),
+            inputs=(VersionedRef("Geometry", "G1", 3),),
+            method="M1", method_version="1",
+            relations=(TypedRelation(
+                from_ref=VersionedRef("Area", "A1", 1),
+                to_ref=VersionedRef("Geometry", "G1", 3),
+                relation_type="COMPUTED_FROM",
+                relation_domain="COMPUTATIONAL"
+            ),)
+        )
+        ledger.record(project_id, record)
+
+        report = analyzer.evaluate_validity(
+            project_id,
+            {("Geometry", "G1"): VersionedRef("Geometry", "G1", 4)},
+        )
+        source_checks = report.derivation_validities[0].source_checks
+        assert source_checks == ("integrity_checks_R1",)
+        assert all(isinstance(check, str) and len(check) > 1 for check in source_checks)
+        assert report.derivation_validities[0].to_dict()["sourceChecks"] == ["integrity_checks_R1"]
+
 
 class TestValidityAnalyzer_Integration:
     """Tests de integración con RT-A (múltiples derivaciones)"""

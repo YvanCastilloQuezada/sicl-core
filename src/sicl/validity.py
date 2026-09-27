@@ -46,6 +46,13 @@ class DerivationValidity:
     # Proveniencia: qué integrity_checks generaron este estado
     source_checks: tuple[str, ...] = field(default_factory=tuple)
 
+    def __post_init__(self) -> None:
+        """Garantiza que la trazabilidad no se degrade a caracteres individuales."""
+        if isinstance(self.source_checks, str):
+            raise TypeError("source_checks must be tuple[str, ...], not str")
+        if any(not isinstance(check, str) or len(check) <= 1 for check in self.source_checks):
+            raise ValueError("source_checks entries must be non-empty names longer than one character")
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "derivationId": self.derivation_id,
@@ -189,7 +196,7 @@ class ValidityAnalyzer:
                 output=record.output,
                 state=state,
                 discrepancies=tuple(relevant_checks),
-                source_checks=tuple(f"integrity_checks_{record.id}"),
+                source_checks=(f"integrity_checks_{record.id}",),
             ))
 
         # ──────────────────────────────────────────────
