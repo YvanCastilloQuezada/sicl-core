@@ -205,6 +205,14 @@ class ReactionPlanner:
         for priority, ref in enumerate(ordered_refs):
             action = action_by_ref[ref]
             if ref in unresolved:
+                cycle_deps = tuple(sorted(
+                    (dependency for dependency in dependencies[ref] if dependency in unresolved),
+                    key=lambda dependency: (
+                        dependency.entity_type,
+                        dependency.entity_id,
+                        dependency.version,
+                    ),
+                ))
                 result.append(
                     PlannedAction(
                         artifact_ref=ref,
@@ -213,7 +221,7 @@ class ReactionPlanner:
                         priority=999,
                         reason="Dependency cycle detected",
                         requires_human_authority=True,
-                        blocked_by=tuple(sorted(dependencies[ref], key=lambda x: (x.entity_type, x.entity_id, x.version))),
+                        blocked_by=cycle_deps,
                     )
                 )
             else:
