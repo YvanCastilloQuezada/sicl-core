@@ -17,7 +17,7 @@ def test_validate_high_risk_compliant():
     aia = {"status": "APPROVED", "authority_approval_id": "AUTH-001"}
     valid, message = EUAIActClassifier.validate_high_risk_requirements(profile, aia)
     assert valid is True
-    assert "Compliant" in message
+    assert "precheck" in message
 
 
 def test_validate_high_risk_missing_aia():

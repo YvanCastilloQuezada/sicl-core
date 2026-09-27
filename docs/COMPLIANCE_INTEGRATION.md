@@ -10,7 +10,7 @@ Este documento explica cómo integrar `sicl.compliance` con ARKI sin modificar e
 Laboratorio → ComplianceValidator → ARKI Core H-001..H-004 → ComplianceValidator → Luxa
 ```
 
-El módulo no escribe en el ledger, no modifica SQLite y no concede autoridad automática a agentes o modelos.
+El módulo no escribe en el ledger, no modifica SQLite y no concede autoridad automática a agentes o modelos. Es experimental y no constituye certificación legal.
 
 ## Uso básico
 
@@ -36,10 +36,10 @@ signature = {
     "generator_id": "LLM-Bio-Gen-v3",
     "timestamp": "2026-09-28T10:00:00Z",
     "content_hash": hashlib.sha256(content.encode("utf-8")).hexdigest(),
-    "signature_algorithm": "SHA256_RSA",
+    "hash_algorithm": "SHA256_HASH",
     "domain_profile_ref": "bio_longevity_v1",
 }
-result_42 = validator.validate_provenance_signature(content, signature)
+result_42 = validator.validate_provenance_hash(content, signature)
 
 assessment = {
     "assessment_id": "AIA-001",
@@ -64,7 +64,7 @@ El Bridge puede invocar el validador antes de enviar una solicitud al Core y ant
 
 ## Integración con el Laboratorio
 
-El generador debe calcular el hash del contenido antes de construir `provenance_signature`. Para perfiles `LIMITED` o `HIGH`, la AIA debe existir y contar con aprobación humana antes de promover el output a `CANONICAL`.
+El generador debe calcular el hash del contenido antes de construir `provenance_hash`. Para perfiles `LIMITED` o `HIGH`, la AIA debe existir y contar con aprobación humana antes de promover el output a `CANONICAL`.
 
 ## Verificación
 
@@ -75,7 +75,7 @@ PYTHONPATH=src python -m pytest tests/test_compliance.py -v --tb=short
 
 ## Estado
 
-FROZEN v1.0 — 2026-09-28
+EXPERIMENTAL v1.1 — 2026-09-28
 Autoridad: Wilfredo Yvan Castillo Quezada
 
 > Esta capa no modifica H-001, H-002, H-003 ni H-004.

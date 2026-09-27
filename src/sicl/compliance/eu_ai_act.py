@@ -1,22 +1,17 @@
-"""Clasificador y validador de dominios según EU AI Act."""
+"""HEURISTIC / NOT A LEGAL CLASSIFIER.
+
+Preclasificador experimental por identificador de dominio. No sustituye
+asesoría jurídica ni una evaluación formal del EU AI Act.
+"""
 from __future__ import annotations
 
 from typing import Any
 
 
 class EUAIActClassifier:
-    """Clasifica dominios y valida requisitos de alto riesgo del EU AI Act."""
+    """Clasificación heurística preliminar; no determina cumplimiento legal."""
 
-    HIGH_RISK_DOMAINS = [
-        "biometric_identification",
-        "critical_infrastructure",
-        "education_employment",
-        "essential_private_services",
-        "law_enforcement",
-        "migration_asylum",
-        "administration_of_justice",
-        "bio_longevity",
-    ]
+    HIGH_RISK_DOMAINS = ["biometric_identification", "critical_infrastructure", "education_employment", "essential_private_services", "law_enforcement", "migration_asylum", "administration_of_justice", "bio_longevity"]
 
     @classmethod
     def classify_domain(cls, domain_id: str) -> str:
@@ -35,7 +30,7 @@ class EUAIActClassifier:
             return False, f"AIA status must be APPROVED, got {aia.get('status')}"
         if not aia.get("authority_approval_id"):
             return False, "AIA must have an authority_approval_id for human oversight (Art. 14)"
-        return True, "Compliant with EU AI Act High-Risk requirements"
+        return True, "High-risk precheck passed; not a legal compliance determination"
 
 
 __all__ = ["EUAIActClassifier"]

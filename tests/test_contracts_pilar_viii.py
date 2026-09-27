@@ -81,10 +81,9 @@ class TestProvenanceSignatureContract:
             "generator_id": "LLM-Bio-Gen-v3",
             "timestamp": "2026-09-28T10:00:00Z",
             "content_hash": "a" * 64,
-            "signature_algorithm": "SHA256_RSA",
+            "hash_algorithm": "SHA256_HASH",
             "domain_profile_ref": "bio_longevity_v1",
             "source_data_refs": ["doi:10.1038/s41586-023-00000"],
-            "signature_value": "base64encodedvalue==",
         }
         Draft7Validator(schema).validate(sig)
 
@@ -93,7 +92,7 @@ class TestProvenanceSignatureContract:
             "generator_id": "LLM-Bio-Gen-v3",
             "timestamp": "2026-09-28T10:00:00Z",
             "content_hash": "abc123",
-            "signature_algorithm": "SHA256_RSA",
+            "hash_algorithm": "SHA256_HASH",
             "domain_profile_ref": "bio_longevity_v1",
         }
         with pytest.raises(ValidationError):
@@ -103,7 +102,7 @@ class TestProvenanceSignatureContract:
         sig = {
             "timestamp": "2026-09-28T10:00:00Z",
             "content_hash": "a" * 64,
-            "signature_algorithm": "SHA256_RSA",
+            "hash_algorithm": "SHA256_HASH",
             "domain_profile_ref": "bio_longevity_v1",
         }
         with pytest.raises(ValidationError):

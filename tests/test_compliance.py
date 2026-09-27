@@ -46,32 +46,32 @@ class TestRule41DomainProfile:
 class TestRule42ProvenanceSignature:
     def test_valid_signature(self, validator):
         content = "test output content"
-        signature = {"generator_id": "LLM-Bio-Gen-v3", "timestamp": "2026-09-28T10:00:00Z", "content_hash": hashlib.sha256(content.encode()).hexdigest(), "signature_algorithm": "SHA256_RSA", "domain_profile_ref": "bio_longevity_v1"}
+        signature = {"generator_id": "LLM-Bio-Gen-v3", "timestamp": "2026-09-28T10:00:00Z", "content_hash": hashlib.sha256(content.encode()).hexdigest(), "hash_algorithm": "SHA256_HASH", "domain_profile_ref": "bio_longevity_v1"}
         assert validator.validate_provenance_signature(content, signature).status == ComplianceStatus.COMPLIANT
 
     def test_tampered_content_detected(self, validator):
         original = "original content"
-        signature = {"generator_id": "LLM-Bio-Gen-v3", "timestamp": "2026-09-28T10:00:00Z", "content_hash": hashlib.sha256(original.encode()).hexdigest(), "signature_algorithm": "SHA256_RSA", "domain_profile_ref": "bio_longevity_v1"}
+        signature = {"generator_id": "LLM-Bio-Gen-v3", "timestamp": "2026-09-28T10:00:00Z", "content_hash": hashlib.sha256(original.encode()).hexdigest(), "hash_algorithm": "SHA256_HASH", "domain_profile_ref": "bio_longevity_v1"}
         result = validator.validate_provenance_signature("tampered content", signature)
         assert result.status == ComplianceStatus.NON_COMPLIANT
         assert "tampered" in result.message.lower()
 
     def test_invalid_hash_length(self, validator):
-        result = validator.validate_provenance_signature("content", {"generator_id": "LLM-Bio-Gen-v3", "timestamp": "2026-09-28T10:00:00Z", "content_hash": "abc123", "signature_algorithm": "SHA256_RSA", "domain_profile_ref": "bio_longevity_v1"})
+        result = validator.validate_provenance_signature("content", {"generator_id": "LLM-Bio-Gen-v3", "timestamp": "2026-09-28T10:00:00Z", "content_hash": "abc123", "hash_algorithm": "SHA256_HASH", "domain_profile_ref": "bio_longevity_v1"})
         assert result.status == ComplianceStatus.NON_COMPLIANT
         assert "64 hex characters" in result.message
 
     def test_missing_signature_fields(self, validator):
         result = validator.validate_provenance_signature("content", {"generator_id": "LLM-Bio-Gen-v3"})
         assert result.status == ComplianceStatus.NON_COMPLIANT
-        assert "Missing required signature fields" in result.message
+        assert "Missing required provenance hash fields" in result.message
 
-    def test_invalid_signature_algorithm(self, validator):
+    def test_invalid_hash_algorithm(self, validator):
         content = "test"
-        signature = {"generator_id": "LLM-Bio-Gen-v3", "timestamp": "2026-09-28T10:00:00Z", "content_hash": hashlib.sha256(content.encode()).hexdigest(), "signature_algorithm": "INVALID_ALGO", "domain_profile_ref": "bio_longevity_v1"}
+        signature = {"generator_id": "LLM-Bio-Gen-v3", "timestamp": "2026-09-28T10:00:00Z", "content_hash": hashlib.sha256(content.encode()).hexdigest(), "hash_algorithm": "INVALID_ALGO", "domain_profile_ref": "bio_longevity_v1"}
         result = validator.validate_provenance_signature(content, signature)
         assert result.status == ComplianceStatus.NON_COMPLIANT
-        assert "Invalid signature_algorithm" in result.message
+        assert "Schema validation failed" in result.message
 
 
 class TestRule43EthicalImpactAssessment:
@@ -110,7 +110,7 @@ class TestFullComplianceValidation:
     def test_full_compliance_minimal_risk(self, validator):
         profile = {"domain_id": "test_domain", "risk_tier": "MINIMAL", "hard_constraints": [], "aia_required": False}
         content = "test output"
-        signature = {"generator_id": "LLM-Test-v1", "timestamp": "2026-09-28T10:00:00Z", "content_hash": hashlib.sha256(content.encode()).hexdigest(), "signature_algorithm": "SHA256_RSA", "domain_profile_ref": "test_domain"}
+        signature = {"generator_id": "LLM-Test-v1", "timestamp": "2026-09-28T10:00:00Z", "content_hash": hashlib.sha256(content.encode()).hexdigest(), "hash_algorithm": "SHA256_HASH", "domain_profile_ref": "test_domain"}
         results = validator.validate_full_compliance(profile, content, signature, "OUTPUT-123")
         assert len(results) == 2
         assert all(result.status == ComplianceStatus.COMPLIANT for result in results)
@@ -118,7 +118,7 @@ class TestFullComplianceValidation:
     def test_full_compliance_high_risk_with_aia(self, validator):
         profile = {"domain_id": "bio_longevity_v1", "risk_tier": "HIGH", "hard_constraints": ["somatic_only"], "aia_required": True}
         content = "bio output"
-        signature = {"generator_id": "LLM-Bio-Gen-v3", "timestamp": "2026-09-28T10:00:00Z", "content_hash": hashlib.sha256(content.encode()).hexdigest(), "signature_algorithm": "SHA256_RSA", "domain_profile_ref": "bio_longevity_v1"}
+        signature = {"generator_id": "LLM-Bio-Gen-v3", "timestamp": "2026-09-28T10:00:00Z", "content_hash": hashlib.sha256(content.encode()).hexdigest(), "hash_algorithm": "SHA256_HASH", "domain_profile_ref": "bio_longevity_v1"}
         aia = {"assessment_id": "AIA-001", "target_output_ref": "OUTPUT-456", "bias_declaration": {"known_biases": [], "mitigation_steps": []}, "harm_assessment_score": 20, "authority_approval_id": "AUTH-001", "status": "APPROVED"}
         results = validator.validate_full_compliance(profile, content, signature, "OUTPUT-456", aia)
         assert len(results) == 3
@@ -127,7 +127,7 @@ class TestFullComplianceValidation:
     def test_full_compliance_high_risk_without_aia_fails(self, validator):
         profile = {"domain_id": "bio_longevity_v1", "risk_tier": "HIGH", "hard_constraints": [], "aia_required": True}
         content = "bio output"
-        signature = {"generator_id": "LLM-Bio-Gen-v3", "timestamp": "2026-09-28T10:00:00Z", "content_hash": hashlib.sha256(content.encode()).hexdigest(), "signature_algorithm": "SHA256_RSA", "domain_profile_ref": "bio_longevity_v1"}
+        signature = {"generator_id": "LLM-Bio-Gen-v3", "timestamp": "2026-09-28T10:00:00Z", "content_hash": hashlib.sha256(content.encode()).hexdigest(), "hash_algorithm": "SHA256_HASH", "domain_profile_ref": "bio_longevity_v1"}
         results = validator.validate_full_compliance(profile, content, signature, "OUTPUT-789")
         assert len(results) == 3
         assert results[0].status == ComplianceStatus.COMPLIANT

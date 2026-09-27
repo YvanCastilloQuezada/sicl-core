@@ -14,8 +14,8 @@ Este documento mapea los niveles de riesgo de ARKI a las categorías operativas 
 ## Controles implementados
 
 - **Art. 9:** Regla 41 (`domain_profile` y `risk_tier`).
-- **Art. 10:** Regla 42 (`provenance_signature` y fuentes).
+- **Art. 10:** Regla 42 (`provenance_hash` y fuentes). El hash aporta integridad, no autenticidad ni certificación legal.
 - **Art. 13:** transparencia mediante proveniencia y evaluación de sesgos.
 - **Art. 14:** supervisión humana en promociones a `CANONICAL`.
 
-**Versión:** 1.0 | **Fecha:** 2026-09-28 | **Estado:** FROZEN
+**Versión:** 1.1 | **Fecha:** 2026-09-27 | **Estado:** EXPERIMENTAL — no es clasificación jurídica exhaustiva.

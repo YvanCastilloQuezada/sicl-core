@@ -1,4 +1,4 @@
-"""Generador de etiquetas de contenido compatible con C2PA."""
+"""Etiquetado experimental de contenido; hash de integridad, no firma C2PA/RSA."""
 from __future__ import annotations
 
 import hashlib
@@ -7,7 +7,7 @@ from typing import Any
 
 
 class ContentLabeler:
-    """Genera y verifica etiquetas de proveniencia para contenido generado por IA."""
+    """Genera y verifica etiquetas de hash para contenido generado por IA."""
 
     @staticmethod
     def generate_label(content: str | bytes, generator_id: str, domain_profile_ref: str, source_data_refs: list[str] | None = None) -> dict[str, Any]:
@@ -16,11 +16,11 @@ class ContentLabeler:
             "generator_id": generator_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "content_hash": hashlib.sha256(content_bytes).hexdigest(),
-            "signature_algorithm": "SHA256_RSA",
+            "hash_algorithm": "SHA256_HASH",
             "domain_profile_ref": domain_profile_ref,
             "source_data_refs": source_data_refs or [],
-            "label_version": "1.0",
-            "standard": "C2PA-inspired",
+            "label_version": "1.1",
+            "standard": "hash-integrity-only",
         }
 
     @staticmethod
@@ -29,10 +29,12 @@ class ContentLabeler:
         expected_hash = label.get("content_hash")
         if not expected_hash:
             return False, "Label missing content_hash"
+        if label.get("hash_algorithm") != "SHA256_HASH":
+            return False, "Unsupported or misleading hash_algorithm"
         computed_hash = hashlib.sha256(content_bytes).hexdigest()
         if computed_hash != expected_hash:
             return False, "Content hash mismatch: content has been tampered with"
-        return True, "Label verified successfully"
+        return True, "Hash label verified successfully"
 
 
 __all__ = ["ContentLabeler"]

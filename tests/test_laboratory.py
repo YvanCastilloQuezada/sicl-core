@@ -7,7 +7,7 @@ import pytest
 from sicl.laboratory.authority_gate import AuthorityGate, AuthorityRequiredError
 from sicl.laboratory.corpus_validator import CorpusValidationStatus, CorpusValidator
 from sicl.laboratory.deterministic_generator import DeterministicGenerator
-from sicl.laboratory.sandbox_ledger import SandboxEventType, SandboxLedger
+from sicl.laboratory.sandbox_ledger import SandboxConfigurationError, SandboxEventType, SandboxLedger
 
 
 @pytest.fixture
@@ -22,9 +22,9 @@ def temp_ledger():
 class TestLAB001Trazabilidad:
     def test_lab_001_provenance_required(self, temp_ledger):
         alternative = DeterministicGenerator(temp_ledger).generate("P1", "test prompt", seed=42, corpus=["source1", "source2", "source3"])
-        assert alternative.provenance_signature is not None
-        assert "content_hash" in alternative.provenance_signature
-        assert "generator_id" in alternative.provenance_signature
+        assert alternative.provenance_hash is not None
+        assert "content_hash" in alternative.provenance_hash
+        assert "generator_id" in alternative.provenance_hash
 
     def test_lab_001_events_recorded(self, temp_ledger):
         DeterministicGenerator(temp_ledger).generate("P1", "test prompt", seed=42, corpus=["source1", "source2", "source3"])
@@ -85,3 +85,13 @@ class TestLAB004AutoridadHumana:
         events = temp_ledger.list_events("P1")
         assert events[-1].event_type == SandboxEventType.PROMOTED_TO_CANONICAL
         assert events[-1].payload["authorityApprovalId"] == "AUTH-YVAN-001"
+
+
+def test_lab_fail_closed_rejects_non_sandbox_storage_path(tmp_path):
+    with pytest.raises(SandboxConfigurationError):
+        SandboxLedger(storage_path=Path("/var/lib/arki/production.json"))
+
+
+def test_lab_fail_closed_rejects_productive_database_filename(tmp_path):
+    with pytest.raises(SandboxConfigurationError):
+        SandboxLedger(storage_path=Path(tempfile.gettempdir()) / "sicl.sqlite")

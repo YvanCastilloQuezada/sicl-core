@@ -27,4 +27,11 @@ helper productivo que escribía sobre el IFC rastreado durante la generación
 de fixtures. La corrección dirige la salida al destino solicitado o a un
 archivo temporal; **H-001, H-002, H-003 y H-004 no fueron modificados**.
 
+### Alcance experimental de Compliance y Laboratory
+
+`sicl.compliance` y `sicl.laboratory` son capas experimentales de gobernanza.
+No constituyen certificación legal de cumplimiento, no deben presentarse como
+EU AI Act compliant ni ISO/IEC 42001 certified ante terceros, y requieren
+auditoría externa formal antes de cualquier claim comercial o regulatorio.
+
 **FIRMADO:** Wilfredo Yvan Castillo Quezada, Product Owner & Human Authority, 2026-09-27

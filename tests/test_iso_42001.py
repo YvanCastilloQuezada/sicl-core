@@ -15,8 +15,9 @@ def test_iso_42001_empty_log_report():
         report = ISO42001Auditor(temp_path).generate_audit_report("test-project")
         assert report["standard"] == "ISO/IEC 42001"
         assert report["summary"]["totalValidations"] == 0
-        assert report["summary"]["complianceRate"] == 100.0
-        assert report["status"] == "COMPLIANT"
+        assert report["summary"]["complianceRate"] is None
+        assert report["status"] == "NOT_EVALUATED"
+        assert report["evidenceStatus"] == "INSUFFICIENT_EVIDENCE"
     finally:
         temp_path.unlink(missing_ok=True)
 

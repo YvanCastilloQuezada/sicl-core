@@ -7,7 +7,8 @@ def test_generate_label_creates_valid_structure():
     assert label["generator_id"] == "LLM-Arch-v2"
     assert label["domain_profile_ref"] == "arch_layout_v1"
     assert len(label["content_hash"]) == 64
-    assert label["standard"] == "C2PA-inspired"
+    assert label["standard"] == "hash-integrity-only"
+    assert label["hash_algorithm"] == "SHA256_HASH"
 
 
 def test_verify_label_success():
@@ -15,7 +16,7 @@ def test_verify_label_success():
     label = ContentLabeler.generate_label(content, "TestGen", "test_domain")
     valid, message = ContentLabeler.verify_label(content, label)
     assert valid is True
-    assert "verified successfully" in message
+    assert "Hash label verified" in message
 
 
 def test_verify_label_tampered_content():

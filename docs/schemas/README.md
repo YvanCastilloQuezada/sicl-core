@@ -7,7 +7,7 @@ Este directorio contiene los contratos JSON que materializan las Reglas del Pila
 | Archivo | Regla | Propósito |
 |---|---|---|
 | `domain_profile.json` | Regla 41 | Clasificación dinámica de riesgo (EU AI Act) |
-| `provenance_signature.json` | Regla 42 | Firma de proveniencia inmutable (C2PA) |
+| `provenance_signature.json` | Regla 42 | Hash de integridad de proveniencia (sin firma criptográfica; nombre histórico) |
 | `ethical_impact_assessment.json` | Regla 43 | Evaluación de Impacto Algorítmico obligatoria |
 
 ## Uso
@@ -15,7 +15,7 @@ Este directorio contiene los contratos JSON que materializan las Reglas del Pila
 Estos schemas son **contratos obligatorios** que:
 
 1. El **Laboratorio** debe cumplir al generar outputs.
-2. **ARKI Core (H-001/H-003)** valida para aceptar o rechazar datos.
+2. La **capa experimental de Compliance** valida para aceptar o rechazar datos; H-001–H-004 permanecen independientes.
 3. **Luxa** expone al usuario final como evidencia de cumplimiento.
 
 ## Validación
@@ -29,5 +29,5 @@ python -c "import jsonschema; jsonschema.Draft7Validator.check_schema(json.load(
 
 ## Estado
 
-FROZEN v1.0 — 2026-09-28
+EXPERIMENTAL v1.1 — 2026-09-27
 Autoridad: Wilfredo Yvan Castillo Quezada

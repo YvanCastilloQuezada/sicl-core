@@ -1,8 +1,10 @@
-"""Sandbox Ledger — LAB-001: trazabilidad absoluta."""
+"""Sandbox Ledger — LAB-001: trazabilidad absoluta y aislamiento fail-closed."""
 from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -19,6 +21,10 @@ class SandboxEventType(str, Enum):
     PROMOTED_TO_CANONICAL = "PROMOTED_TO_CANONICAL"
 
 
+class SandboxConfigurationError(ValueError):
+    """La ruta de persistencia no cumple el aislamiento del Laboratorio."""
+
+
 @dataclass(frozen=True)
 class SandboxEvent:
     event_type: SandboxEventType
@@ -32,15 +38,30 @@ class SandboxEvent:
 
 
 class SandboxLedger:
-    """Ledger del Laboratorio. Los eventos se agregan y se persisten."""
+    """Ledger append-only del Laboratorio, restringido a JSON bajo el temp dir."""
 
     def __init__(self, storage_path: Path | None = None):
         if storage_path is None:
-            storage_path = Path(__file__).parent.parent.parent.parent / "data" / "sandbox_ledger.json"
-        self.storage_path = storage_path
+            storage_path = Path(tempfile.gettempdir()) / f"arki-sandbox-ledger-{os.getpid()}.json"
+        self.storage_path = Path(storage_path)
+        self._validate_storage_path()
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
         self._events: list[SandboxEvent] = []
         self._load()
+
+    def _validate_storage_path(self) -> None:
+        resolved = self.storage_path.resolve(strict=False)
+        temp_root = Path(tempfile.gettempdir()).resolve()
+        if self.storage_path.suffix.lower() != ".json":
+            raise SandboxConfigurationError("SandboxLedger requires a .json file under the OS temporary directory")
+        if self.storage_path.is_symlink():
+            raise SandboxConfigurationError("SandboxLedger rejects symlinked storage paths")
+        try:
+            resolved.relative_to(temp_root)
+        except ValueError as exc:
+            raise SandboxConfigurationError("SandboxLedger storage must remain inside the OS temporary directory") from exc
+        if resolved.name.lower() in {"sicl.sqlite", "sicl.db", "production.sqlite", "production.db"}:
+            raise SandboxConfigurationError("SandboxLedger rejects productive database filenames")
 
     def _load(self) -> None:
         if self.storage_path.exists():
@@ -59,4 +80,4 @@ class SandboxLedger:
         return [event for event in self._events if event.payload.get("alternativeId") == alternative_id]
 
 
-__all__ = ["SandboxLedger", "SandboxEvent", "SandboxEventType"]
+__all__ = ["SandboxLedger", "SandboxEvent", "SandboxEventType", "SandboxConfigurationError"]
