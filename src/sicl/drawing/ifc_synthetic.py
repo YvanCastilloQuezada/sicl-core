@@ -1,7 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -29,13 +28,16 @@ def synthetic_elements() -> tuple[dict, ...]:
     ))
 
 def create_synthetic_ifc(path: str | Path | None = None) -> str:
-    """Run the committed API-based generator and copy its real IFC to the requested path."""
+    """Run the committed API-based generator directly at a temporary/requested path."""
     target = Path(path or Path(tempfile.gettempdir()) / "EDIFICIO-YVAN-TRUJILLO-01.ifc")
     root = Path(__file__).resolve().parents[3]
-    generated = root / "docs/reference/RFC030_OUTPUT/EDIFICIO-YVAN-TRUJILLO-01.ifc"
-    subprocess.run([sys.executable, str(root / "scripts/generate_synthetic_ifc.py")], check=True, cwd=root, stdout=subprocess.DEVNULL)
     target.parent.mkdir(parents=True, exist_ok=True)
-    if target.resolve() != generated.resolve(): shutil.copy2(generated, target)
+    subprocess.run(
+        [sys.executable, str(root / "scripts/generate_synthetic_ifc.py"), str(target)],
+        check=True,
+        cwd=root,
+        stdout=subprocess.DEVNULL,
+    )
     return str(target)
 
 def validate_ifc(path: str | Path) -> tuple[bool, list[str]]:

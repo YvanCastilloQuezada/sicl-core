@@ -7,7 +7,7 @@ import ifcopenshell
 import ifcopenshell.api
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'docs/reference/RFC030_OUTPUT/EDIFICIO-YVAN-TRUJILLO-01.ifc'
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path('/tmp/EDIFICIO-YVAN-TRUJILLO-01.ifc')
 
 def run(model, usecase, **kwargs):
     return ifcopenshell.api.run(usecase, model, **kwargs)
@@ -100,5 +100,6 @@ def make_model():
     return model
 
 def main():
-    OUT.parent.mkdir(parents=True,exist_ok=True); model=make_model(); model.write(str(OUT)); print(OUT)
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    model=make_model(); model.write(str(OUT)); print(OUT)
 if __name__=='__main__': main()
