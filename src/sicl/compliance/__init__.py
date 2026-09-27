@@ -40,7 +40,7 @@ class ComplianceValidator:
 
     def __init__(self, schemas_dir: Path | None = None):
         if schemas_dir is None:
-            schemas_dir = Path(__file__).parent.parent.parent / "docs" / "schemas"
+            schemas_dir = Path(__file__).parent.parent.parent.parent / "docs" / "schemas"
         self.schemas_dir = schemas_dir
         self._load_schemas()
 
