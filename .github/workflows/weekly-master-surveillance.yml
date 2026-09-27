@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "0 6 * * 1"
   workflow_dispatch:
+    inputs:
+      simulate_critical_change:
+        description: "Test-only: simulate one critical master change and open a test issue"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -32,6 +38,24 @@ jobs:
           python scripts/weekly_master_surveillance.py
           test -s "data/master_registry/logs/$(date -u +%F)_weekly_review.md"
 
+      - name: Simulate critical change (test-only)
+        if: inputs.simulate_critical_change == true
+        shell: bash
+        run: |
+          report="data/master_registry/logs/$(date -u +%F)_weekly_review.md"
+          python - "$report" <<'PY'
+          from pathlib import Path
+          import sys
+          path = Path(sys.argv[1])
+          text = path.read_text(encoding="utf-8")
+          old = "| Cambios detectados | 0 |"
+          if old not in text:
+              raise SystemExit("simulation refused: report does not have the expected zero-change baseline")
+          text = text.replace(old, "| Cambios detectados | 1 |", 1)
+          text += "\n\n> TEST-ONLY SIMULATION: one critical master change was injected into this report; the registry and runtime were not modified.\n"
+          path.write_text(text, encoding="utf-8")
+          PY
+
       - name: Upload weekly report
         uses: actions/upload-artifact@v4
         with:
@@ -59,10 +83,14 @@ jobs:
         uses: actions/github-script@v7
         env:
           CHANGED_COUNT: ${{ steps.changes.outputs.changed }}
-          REPORT_DATE: ${{ github.run_id }}
+          SIMULATION: ${{ inputs.simulate_critical_change == true }}
         with:
           script: |
             const label = 'vsm-review-required';
+            const simulation = process.env.SIMULATION === 'true';
+            const title = simulation
+              ? '[VSM TEST] Simulated master change — verify automatic issue flow'
+              : '[VSM] Master changes detected — manual evaluation required';
             try {
               await github.rest.issues.getLabel({ owner: context.repo.owner, repo: context.repo.repo, name: label });
             } catch (error) {
@@ -82,14 +110,14 @@ jobs:
               labels: label,
               per_page: 100
             });
-            if (openIssues.some(issue => issue.title.startsWith('[VSM] Master changes detected'))) {
+            if (openIssues.some(issue => issue.title === title)) {
               core.info('An open VSM review issue already exists; no duplicate created.');
               return;
             }
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: '[VSM] Master changes detected — manual evaluation required',
+              title,
               labels: [label],
-              body: `## Weekly Master Surveillance\n\nThe detector found **${process.env.CHANGED_COUNT}** master(s) whose observed version differs from the registered baseline.\n\n- Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n- Artifact: \\`weekly-master-surveillance-${context.runId}\\`\n- Policy: do not update, absorb, or purge automatically. Reproduce the ground truth and classify the change under RFC-037.1.\n\nThis issue was created by detection only; no production code or rule was modified.`
+              body: `## Weekly Master Surveillance\n\n${simulation ? '> **TEST-ONLY SIMULATION** — this issue was intentionally generated to verify the automation. Close it after validation; no master or runtime was changed.\\n\\n' : ''}The detector found **${process.env.CHANGED_COUNT}** master(s) whose observed version differs from the registered baseline.\n\n- Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n- Artifact: \\`weekly-master-surveillance-${context.runId}\\`\n- Policy: do not update, absorb, or purge automatically. Reproduce the ground truth and classify the change under RFC-037.1.\n\nThis issue was created by detection only; no production code or rule was modified.`
             });
