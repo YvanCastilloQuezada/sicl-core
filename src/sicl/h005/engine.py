@@ -136,7 +136,9 @@ class SelectiveRecomputationEngine:
             return "PROVENANCE_INPUT_SET_MISMATCH"
         for item in produced.inputs:
             current = current_refs.get(item.key())
-            if current is not None and item != current:
+            if current is None:
+                return "MISSING_CURRENT_DEPENDENCY"
+            if item != current:
                 return "INPUT_REF_NOT_CURRENT"
         relation_keys = {(relation.to_ref.entity_type, relation.to_ref.entity_id, relation.to_ref.version) for relation in produced.relations if relation.from_ref == produced.output}
         expected_keys = {(item.entity_type, item.entity_id, item.version) for item in produced.inputs}
