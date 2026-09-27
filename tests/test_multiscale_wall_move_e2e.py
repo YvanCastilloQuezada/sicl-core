@@ -23,6 +23,7 @@ from sicl.domain import Event
 from sicl.derivation import DerivationLedger, DerivationRecord, VersionedRef, TypedRelation
 from sicl.impact import ImpactAnalyzer, ImpactChange, ChangeKind
 from sicl.validity import ValidityAnalyzer
+from sicl.reaction import ReactionPlanner, ActionType
 
 
 def ref(entity_type, entity_id, version, content_hash=None):
@@ -213,6 +214,8 @@ def test_multiscale_wall_move_e2e():
     )
 
     validity_report = validity_analyzer.evaluate_validity(project_id, current_refs)
+    reaction_plan = ReactionPlanner().plan_reaction(validity_report)
+    actions_by_id = {action.artifact_ref.entity_id: action for action in reaction_plan.planned_actions}
 
     # ──────────────────────────────────────────────
     # VERIFICACIÓN: H-003 evalúa correctamente
@@ -234,18 +237,22 @@ def test_multiscale_wall_move_e2e():
         for derivation in p03_validity.derivation_validities
         for discrepancy in derivation.discrepancies
     )
+    assert actions_by_id["P-03"].action_type == ActionType.ESCALATE
+    assert actions_by_id["P-03"].requires_human_authority is True
 
     # PARTI debe ser REQUIRES_HUMAN_REVIEW (decisión arquitectónica comprometida)
     parti_validity = next(av for av in validity_report.artifact_validities
                           if av.artifact_ref.entity_id == "PARTI-PASILLO-LUMINOSO")
     assert parti_validity.state == "REQUIRES_HUMAN_REVIEW"
     assert parti_validity.recommendation["requiresHumanAuthority"] is True
+    assert actions_by_id["PARTI-PASILLO-LUMINOSO"].action_type == ActionType.ESCALATE
 
     # H-07 debe ser STALE (pero no requiere revisión humana, solo recomputar)
     h07_validity = next(av for av in validity_report.artifact_validities if av.artifact_ref.entity_id == "H-07")
     assert h07_validity.state == "FULLY_STALE"
     assert h07_validity.recommendation["action"] == "RECOMPUTE"
     assert h07_validity.recommendation["requiresHumanAuthority"] is False
+    assert actions_by_id["H-07"].action_type == ActionType.RECOMPUTE
 
     # ──────────────────────────────────────────────
     # VERIFICACIÓN: Read-only guarantee
@@ -291,3 +298,37 @@ def test_e2e_unknown_dependency_wall_opening_is_reported_as_incomplete():
     )
     assert all(item.ref.entity_id != "O-1" for item in report.impacted_artifacts)
     assert report.coverage_warning == "GRAPH_MAY_BE_INCOMPLETE"
+
+
+def test_e2e_multiple_derivations_preserve_all_justifications():
+    """RT-48: dos justificaciones del mismo artefacto no se colapsan."""
+    ledger = DerivationLedger(MemoryStore())
+    project_id = "multiple-justifications"
+    wall = ref("Wall", "W-14", 1, "a" * 64)
+    alternate_wall = ref("Wall", "W-15", 1, "b" * 64)
+    area = ref("Space", "H-07", 1, "c" * 64)
+    ledger.record(project_id, record("D-H07-W14", area, [wall]))
+    ledger.record(project_id, record("D-H07-W15", area, [alternate_wall]))
+    report = ImpactAnalyzer(ledger).analyze_dependency(project_id, wall)
+    impacted = next(item for item in report.impacted_artifacts if item.ref == area)
+    assert impacted.derivation_records == ("D-H07-W14",)
+    assert all(path.steps[0].derivation_id == "D-H07-W14" for path in impacted.paths)
+
+
+def test_e2e_path_explosion_is_fail_closed_at_known_depth():
+    """RT-48: el límite de paths conserva profundidad conocida y marca parcial."""
+    ledger = DerivationLedger(MemoryStore())
+    project_id = "path-explosion"
+    wall = ref("Wall", "W-14", 1, "a" * 64)
+    mids = [ref("Space", f"S-{i}", 1, f"{i}" * 64) for i in range(5)]
+    cost = ref("Cost", "C-1", 1, "f" * 64)
+    for i, mid in enumerate(mids):
+        ledger.record(project_id, record(f"D-MID-{i}", mid, [wall]))
+    ledger.record(project_id, record("D-COST", cost, mids))
+    report = ImpactAnalyzer(ledger, max_total_transitive_paths=2).analyze_change(
+        project_id,
+        ImpactChange(wall, ref("Wall", "W-14", 1, "b" * 64), ChangeKind.CONTENT_CHANGED),
+    )
+    assert report.partial is True
+    assert report.partial_depth >= 1
+    assert report.fail_closed_reason == "MAX_TOTAL_TRANSITIVE_PATHS_EXCEEDED"
