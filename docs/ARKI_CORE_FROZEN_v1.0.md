@@ -34,4 +34,26 @@ No constituyen certificación legal de cumplimiento, no deben presentarse como
 EU AI Act compliant ni ISO/IEC 42001 certified ante terceros, y requieren
 auditoría externa formal antes de cualquier claim comercial o regulatorio.
 
+### Excepciones y reservas documentales RD-02 — 2026-09-27
+
+- **R1 — Dependencia runtime:** se autoriza `jsonschema>=4,<5` en
+  `pyproject.toml` para ejecutar formalmente los contratos Draft-07 de
+  Compliance. Esta dependencia no modifica H-001–H-004.
+- **R2 — Evidencia ISO parcial:** un log vacío devuelve `NOT_EVALUATED`;
+  logs pequeños quedan declarados como evidencia parcial y no equivalen a
+  certificación estadística ni auditoría externa.
+- **R3 — JSON Schema fail-closed:** los payloads inválidos producen estado
+  explícito `NON_COMPLIANT`; la suite de contratos verifica este rechazo.
+- **R4 — Baseline operativo:** el baseline canónico es
+  `sicl-core-1.0-rd02-remediated-2026-09-27` @
+  `505ccd120772f7236ddb6ce476f3ee5b95e2e2b8`.
+
+#### Baselines históricos
+
+- `sicl-core-1.0-rt97-patched`: merge RT-97 previo a la remediación.
+- `sicl-core-1.0-full-baseline-2026-09-27`: post RT-97 + F-02 + Compliance.
+
+**RD-02 REMEDIATION: COMPLETE.** Las reservas R1–R4 quedan registradas como
+excepciones documentales; ninguna bloquea el inicio del siguiente hito.
+
 **FIRMADO:** Wilfredo Yvan Castillo Quezada, Product Owner & Human Authority, 2026-09-27
