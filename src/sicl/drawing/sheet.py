@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from .paper import DEFAULT_MARGINS, Margins, Orientation, PaperSize, PaperSpec
-from .primitives import Dimension, Hatch, Line, Polyline, Rect, Text
+from .primitives import Arc, Circle, Dimension, Hatch, Line, Polyline, Rect, Text
 from .scale import Scale
 from .title_block import TitleBlock
 
@@ -11,7 +11,7 @@ class Viewport:
     name: str
     scale: Scale
     origin_paper_mm: tuple[float, float]
-    elements: tuple[Line | Polyline | Rect | Text | Hatch | Dimension, ...] = field(default_factory=tuple)
+    elements: tuple[Line | Polyline | Rect | Text | Hatch | Dimension | Arc | Circle, ...] = field(default_factory=tuple)
     label_position_paper_mm: tuple[float, float] | None = None
     def __post_init__(self) -> None:
         if not self.name:
