@@ -18,6 +18,10 @@ Replay returns `REPLAY_NO_DOUBLE_APPLICATION` with `derivation_recorded=False`, 
 
 The `GeometryKind` enum declares `EXTRUDED_RECTANGLE` and `EXTRUDED_CIRCLE`. The current IFC exporter implements only `EXTRUDED_RECTANGLE`. `EXTRUDED_CIRCLE` is a declared future capability, not an implemented one; export fails closed with `GEOMETRY_KIND_NOT_IMPLEMENTED` rather than silently producing an incorrect IFC.
 
+## IFC publication boundary
+
+`ArchiTransaction` serializes IFC to memory first. When an external `ifc_path` is requested, bytes are written to a sibling staging file and promoted with a reversible backup. Ledger publication follows promotion; if the atomic ledger batch fails, the previous IFC is restored or a newly promoted file is removed. If staging or promotion fails, the ledger and canonical state remain untouched. `ifc_path=None` never creates a filesystem artifact.
+
 ## Dependency version semantics
 
 `ArchiElement.semantic_dict()` includes `hosted_in_version` and `contained_in_version` when the corresponding relationship is present. A dependent recomputed against host version 2 therefore has a different deterministic semantic hash from the same dependent hosted in version 1.

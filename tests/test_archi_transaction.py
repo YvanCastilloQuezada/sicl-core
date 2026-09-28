@@ -1,4 +1,5 @@
 import json
+import hashlib
 import pytest
 from sicl.archi import *
 from sicl.derivation import DerivationLedger, DerivationRecord, TypedRelation, VersionedRef
@@ -84,7 +85,32 @@ def test_add_opening_fails_closed_without_canonical_change():
 def test_invalid_ifc_path_fails_without_publication(tmp_path):
     wall,door,space,ledger,registry,refs=setup_chain(); tx=ArchiTransaction((wall,door,space)); before=tx.canonical
     result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'bad-ifc-path'),ledger,registry,refs,ifc_path=tmp_path/'missing'/'model.ifc')
-    assert result.status is MutationStatus.FAILED and result.reason.startswith('IFC_EXPORT:') and tx.canonical==before and len(ledger.list('P'))==2
+    assert result.status is MutationStatus.FAILED and result.reason=='PUBLICATION:FileNotFoundError' and tx.canonical==before and len(ledger.list('P'))==2
+
+def test_rt16_ledger_failure_removes_new_final_ifc(tmp_path, monkeypatch):
+    wall,door,space,ledger,registry,refs=setup_chain(); tx=ArchiTransaction((wall,door,space)); final=tmp_path/'model.ifc'
+    def fail(*args, **kwargs): raise RuntimeError('forced-ledger-failure')
+    monkeypatch.setattr(ledger, 'record_batch', fail)
+    result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'rt16-no-previous'),ledger,registry,refs,ifc_path=final)
+    assert result.status is MutationStatus.FAILED and result.reason=='PUBLICATION:RuntimeError'
+    assert not final.exists() and tx.canonical==(wall,door,space) and len(ledger.list('P'))==2
+    assert list(tmp_path.iterdir())==[]
+
+def test_rt16_ledger_failure_preserves_previous_final_ifc(tmp_path, monkeypatch):
+    wall,door,space,ledger,registry,refs=setup_chain(); tx=ArchiTransaction((wall,door,space)); final=tmp_path/'model.ifc'
+    final.write_bytes(export_ifc(tx.canonical)); before=hashlib.sha256(final.read_bytes()).hexdigest()
+    def fail(*args, **kwargs): raise RuntimeError('forced-ledger-failure')
+    monkeypatch.setattr(ledger, 'record_batch', fail)
+    result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'rt16-previous'),ledger,registry,refs,ifc_path=final)
+    assert result.status is MutationStatus.FAILED and hashlib.sha256(final.read_bytes()).hexdigest()==before
+    assert tx.canonical==(wall,door,space) and len(ledger.list('P'))==2 and list(tmp_path.iterdir())==[final]
+
+def test_rt16_promotion_failure_happens_before_ledger_publication(tmp_path, monkeypatch):
+    wall,door,space,ledger,registry,refs=setup_chain(); tx=ArchiTransaction((wall,door,space)); final=tmp_path/'model.ifc'
+    monkeypatch.setattr(tx, '_promote_ifc', lambda *args: (_ for _ in ()).throw(RuntimeError('forced-promotion-failure')))
+    result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'rt16-promotion'),ledger,registry,refs,ifc_path=final)
+    assert result.status is MutationStatus.FAILED and result.reason=='PUBLICATION:RuntimeError'
+    assert not final.exists() and len(ledger.list('P'))==2 and tx.canonical==(wall,door,space)
 
 def test_no_unauthorized_execution():
     artifact=VersionedRef('A','1',1); dv=DerivationValidity('d',artifact,'REQUIRES_HUMAN_REVIEW',source_checks=('integrity_checks_d',)); action=ReactionPlanner().plan_reaction(ValidityReport(artifact_validities=(ArtifactValidity(artifact,'REQUIRES_HUMAN_REVIEW',(dv,),{},{}),))).planned_actions[0]; assert action.requires_human_authority and action.action_type is ActionType.ESCALATE
