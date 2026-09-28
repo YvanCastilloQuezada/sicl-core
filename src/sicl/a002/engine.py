@@ -38,10 +38,13 @@ def _is_valid_value(value: object) -> bool:
 
 def _applicability_index(
     declarations: tuple[ApplicabilityDeclaration, ...],
+    jurisdiction: str | None,
 ) -> dict[str, ApplicabilityStatus]:
-    """Aggregate declarations per field. If two disagree, mark CONFLICTING."""
+    """Aggregate declarations relevant to the request jurisdiction."""
     out: dict[str, ApplicabilityStatus] = {}
     for decl in declarations:
+        if jurisdiction is not None and decl.jurisdiction != jurisdiction:
+            continue
         current = out.get(decl.field)
         if current is None:
             out[decl.field] = decl.status
@@ -63,7 +66,9 @@ class SufficiencyEngine:
             by_field[item.field].append(item)
 
         evidence_by_id = {e.evidence_id: e for e in request.evidence}
-        applicability_by_field = _applicability_index(request.applicability)
+        applicability_by_field = _applicability_index(
+            request.applicability, request.jurisdiction
+        )
 
         known: list[str] = []
         observed: list[str] = []
@@ -212,6 +217,12 @@ class SufficiencyEngine:
                 elif applicability_status is ApplicabilityStatus.NOT_APPLICABLE and requirement.blocking:
                     effective = KnowledgeState.MISSING
                     downgrade_reason = downgrade_reason or "APPLICABILITY_NOT_APPLICABLE"
+
+            if effective not in requirement.required_states:
+                downgrade_reason = downgrade_reason or "STATE_NOT_ALLOWED"
+                (blocking if requirement.blocking else non_blocking).append(
+                    requirement.field
+                )
 
             # Classify into buckets (RT-V14-08: no double counting).
             if effective is KnowledgeState.KNOWN:
