@@ -1,8 +1,9 @@
 """Operation-specific A-002 requirement policies."""
 from __future__ import annotations
+import hashlib, json
 from .model import KnowledgeState, OperationRequirement
+from .policy import PolicyIdentity
 from ..domain import SpatialScope
-
 
 def preliminary_building_massing_requirements() -> tuple[OperationRequirement, ...]:
     return (
@@ -16,8 +17,11 @@ def preliminary_building_massing_requirements() -> tuple[OperationRequirement, .
         OperationRequirement("client_preferences", (KnowledgeState.KNOWN, KnowledgeState.OBSERVED, KnowledgeState.ASSUMED), False, (SpatialScope.EDIFICACION,), reason="preferences refine the proposal", allow_assumed=True),
     )
 
+def policy_for(operation: str) -> PolicyIdentity:
+    reqs = preliminary_building_massing_requirements() if operation == "preliminary building massing" else ()
+    canonical = json.dumps([r.to_dict() for r in reqs], sort_keys=True, separators=(",", ":"))
+    return PolicyIdentity("a002-" + operation.replace(" ", "-"), 1, hashlib.sha256(canonical.encode()).hexdigest(), operation)
 
 def requirements_for(operation: str) -> tuple[OperationRequirement, ...]:
-    if operation == "preliminary building massing":
-        return preliminary_building_massing_requirements()
+    if operation == "preliminary building massing": return preliminary_building_massing_requirements()
     raise KeyError(f"no A-002 policy registered for operation: {operation}")
