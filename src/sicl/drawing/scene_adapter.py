@@ -13,7 +13,7 @@ import math
 from types import MappingProxyType
 from typing import Mapping
 
-from ..representation import GraphicEntity, GraphicScene
+from ..representation import GraphicEntity, GraphicScene, GraphicTrace
 from .primitives import Circle, LineWeight, Point, Rect
 from .scale import Scale
 from .sheet import Viewport
@@ -21,6 +21,11 @@ from .svg_export import export_view_svg
 
 ADAPTER_VERSION = "arki-draw-scene-adapter-v1"
 DEFAULT_MARGIN_MM = 10.0
+SUPPORTED_ROLES = frozenset({
+    "WALL_CUT", "WALL_PROJECTED", "SPACE_BOUNDARY", "OPENING_CUT",
+    "OPENING_PROJECTED", "DOOR_EVIDENCE", "WINDOW_EVIDENCE",
+    "COLUMN_CUT", "COLUMN_PROJECTED", "SLAB_PROJECTED", "BEAM_PROJECTED",
+})
 
 
 class DrawingAdapterError(ValueError):
@@ -69,22 +74,54 @@ def _bounds(scene: GraphicScene) -> tuple[float, float, float, float]:
     for entity in scene.entities:
         intent = entity.geometry_intent
         kind = intent.get("kind")
+        _validate_entity(scene, entity)
         if kind == "rectangle":
-            x = float(intent["x_mm"])
-            y = float(intent["y_mm"])
-            width = float(intent["width_mm"])
-            depth = float(intent["depth_mm"])
+            x = _number(intent, "x_mm")
+            y = _number(intent, "y_mm")
+            width = _positive_number(intent, "width_mm")
+            depth = _positive_number(intent, "depth_mm")
             points.extend(((x, y), (x + width, y + depth)))
         elif kind == "circle":
-            x = float(intent["center_x_mm"])
-            y = float(intent["center_y_mm"])
-            radius = float(intent["radius_mm"])
+            x = _number(intent, "center_x_mm")
+            y = _number(intent, "center_y_mm")
+            radius = _positive_number(intent, "radius_mm")
             points.extend(((x - radius, y - radius), (x + radius, y + radius)))
         else:
             raise DrawingAdapterError(f"UNSUPPORTED_GRAPHIC_GEOMETRY:{kind}")
     if not points:
         raise DrawingAdapterError("EMPTY_GRAPHIC_SCENE")
     return min(x for x, _ in points), min(y for _, y in points), max(x for x, _ in points), max(y for _, y in points)
+
+
+def _number(intent: Mapping[str, object], key: str) -> float:
+    try:
+        value = float(intent[key])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise DrawingAdapterError(f"MALFORMED_GEOMETRY:{key}") from exc
+    if not math.isfinite(value):
+        raise DrawingAdapterError(f"NONFINITE_GEOMETRY:{key}")
+    return value
+
+
+def _positive_number(intent: Mapping[str, object], key: str) -> float:
+    value = _number(intent, key)
+    if value <= 0:
+        raise DrawingAdapterError(f"NONPOSITIVE_GEOMETRY:{key}")
+    return value
+
+
+def _validate_entity(scene: GraphicScene, entity: GraphicEntity) -> None:
+    if entity.role not in SUPPORTED_ROLES:
+        raise DrawingAdapterError(f"UNSUPPORTED_GRAPHIC_ROLE:{entity.role}")
+    if not isinstance(entity.trace, GraphicTrace):
+        raise DrawingAdapterError(f"MALFORMED_GRAPHIC_TRACE:{entity.entity_id}")
+    intent = entity.geometry_intent
+    if intent.get("visibility") != "VISIBLE":
+        raise DrawingAdapterError(f"UNRESOLVED_VISIBILITY:{entity.entity_id}")
+    if intent.get("cut_relation") not in {"CUT", "BELOW_CUT"}:
+        raise DrawingAdapterError(f"UNRESOLVED_CUT_RELATION:{entity.entity_id}")
+    if entity.style_ref != scene.graphic_style.style_id:
+        raise DrawingAdapterError(f"STYLE_REFERENCE_MISMATCH:{entity.entity_id}")
 
 
 def _primitive_id(scene: GraphicScene, entity: GraphicEntity, ordinal: int) -> str:
@@ -122,16 +159,16 @@ def _entity_geometry(
     primitive_id = _primitive_id(scene, entity, 0)
     source_ref = entity.entity_id
     if kind == "rectangle":
-        x = float(intent["x_mm"])
-        y = float(intent["y_mm"])
-        width = float(intent["width_mm"])
-        depth = float(intent["depth_mm"])
+        x = _number(intent, "x_mm")
+        y = _number(intent, "y_mm")
+        width = _positive_number(intent, "width_mm")
+        depth = _positive_number(intent, "depth_mm")
         primitive = Rect(Point(tx(x), ty(y)), width, depth, weight, entity.role, primitive_id, entity.role, source_ref)
         return primitive, width, depth
     if kind == "circle":
-        x = float(intent["center_x_mm"])
-        y = float(intent["center_y_mm"])
-        radius = float(intent["radius_mm"])
+        x = _number(intent, "center_x_mm")
+        y = _number(intent, "center_y_mm")
+        radius = _positive_number(intent, "radius_mm")
         primitive = Circle(Point(tx(x), ty(y)), radius, weight, entity.role, primitive_id, entity.role, source_ref)
         return primitive, radius * 2, radius * 2
     raise DrawingAdapterError(f"UNSUPPORTED_GRAPHIC_GEOMETRY:{kind}")

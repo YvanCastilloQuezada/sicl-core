@@ -102,7 +102,7 @@ def test_unknown_role_geometry_and_style_fail_closed():
     scene = make_scene()
     unknown = replace(scene.entities[0], role="UNKNOWN_ROLE")
     bad_scene = replace(scene, entities=(unknown, *scene.entities[1:]))
-    with pytest.raises(DrawingAdapterError, match="STYLE_MAPPING_REQUIRED:UNKNOWN_ROLE"):
+    with pytest.raises(DrawingAdapterError, match="UNSUPPORTED_GRAPHIC_ROLE:UNKNOWN_ROLE"):
         graphic_scene_to_svg(bad_scene)
     missing_style = GraphicStyle("MISSING", line_weights={})
     with pytest.raises(DrawingAdapterError, match="STYLE_MAPPING_REQUIRED"):
@@ -114,3 +114,26 @@ def test_empty_scene_is_explicitly_rejected():
     empty = replace(scene, entities=())
     with pytest.raises(DrawingAdapterError, match="EMPTY_GRAPHIC_SCENE"):
         graphic_scene_to_svg(empty)
+
+
+def test_unknown_visibility_and_cut_relation_fail_closed():
+    scene = make_scene()
+    unknown = replace(scene.entities[0], geometry_intent={**dict(scene.entities[0].geometry_intent), "visibility": "UNKNOWN_VISIBILITY"})
+    with pytest.raises(DrawingAdapterError, match="UNRESOLVED_VISIBILITY"):
+        graphic_scene_to_svg(replace(scene, entities=(unknown, *scene.entities[1:])))
+    unresolved = replace(scene.entities[0], geometry_intent={**dict(scene.entities[0].geometry_intent), "cut_relation": "ABOVE_CUT"})
+    with pytest.raises(DrawingAdapterError, match="UNRESOLVED_CUT_RELATION"):
+        graphic_scene_to_svg(replace(scene, entities=(unresolved, *scene.entities[1:])))
+
+
+def test_malformed_trace_and_geometry_fail_closed():
+    scene = make_scene()
+    malformed_trace = replace(scene.entities[0], trace=None)
+    with pytest.raises(DrawingAdapterError, match="MALFORMED_GRAPHIC_TRACE"):
+        graphic_scene_to_svg(replace(scene, entities=(malformed_trace, *scene.entities[1:])))
+    malformed_geometry = replace(scene.entities[0], geometry_intent={**dict(scene.entities[0].geometry_intent), "width_mm": "nan"})
+    with pytest.raises(DrawingAdapterError, match="NONFINITE_GEOMETRY"):
+        graphic_scene_to_svg(replace(scene, entities=(malformed_geometry, *scene.entities[1:])))
+    negative_geometry = replace(scene.entities[0], geometry_intent={**dict(scene.entities[0].geometry_intent), "depth_mm": -1})
+    with pytest.raises(DrawingAdapterError, match="NONPOSITIVE_GEOMETRY"):
+        graphic_scene_to_svg(replace(scene, entities=(negative_geometry, *scene.entities[1:])))
