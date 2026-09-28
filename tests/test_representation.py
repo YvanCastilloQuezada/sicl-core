@@ -12,10 +12,12 @@ from sicl.representation import (
     GraphicStyle,
     GraphicTrace,
     ProfileKind,
+    ProjectionKind,
     RepresentationError,
     RepresentationProfile,
     SourceAuthority,
     SourceConflictError,
+    SourceLineage,
     SourceSnapshot,
     ViewDefinition,
     ViewFamily,
@@ -30,7 +32,11 @@ HASH_B = "b" * 64
 
 
 def source(authority=SourceAuthority.CANONICAL_SOURCE, version="1", digest=HASH_A, freshness=Freshness.CURRENT, **kwargs):
-    return SourceSnapshot("MODEL-1", "D2", version, digest, authority, freshness=freshness, **kwargs)
+    lineage = kwargs.pop("lineage", None)
+    if authority is SourceAuthority.DERIVED_SOURCE and lineage is None:
+        lineage = SourceLineage("MODEL-1", version, digest)
+    source_id = "SPATIAL-REP-1" if authority is SourceAuthority.DERIVED_SOURCE else "MODEL-1"
+    return SourceSnapshot(source_id, "D2", version, digest, authority, freshness=freshness, lineage=lineage, **kwargs)
 
 
 def contracts(source_snapshot=None):
@@ -64,14 +70,15 @@ def test_canonical_source_is_accepted_and_scene_is_read_only():
 
 def test_derived_source_retains_provenance_and_current_freshness():
     canonical = source()
-    derived = source(SourceAuthority.DERIVED_SOURCE, freshness=Freshness.UNKNOWN)
-    assert derived.source_id == canonical.source_id
+    derived = source(SourceAuthority.DERIVED_SOURCE, freshness=Freshness.UNKNOWN, lineage=SourceLineage("MODEL-1", "1", HASH_A))
+    assert derived.source_id != canonical.source_id
+    assert derived.lineage.source_id == canonical.source_id
     assert derived.authority is SourceAuthority.DERIVED_SOURCE
     assert evaluate_freshness(derived, canonical) is Freshness.CURRENT
 
 
 def test_derived_source_stale_is_blocked():
-    stale = source(SourceAuthority.DERIVED_SOURCE, version="1", digest=HASH_A, freshness=Freshness.STALE)
+    stale = source(SourceAuthority.DERIVED_SOURCE, version="2", digest=HASH_B, freshness=Freshness.STALE, lineage=SourceLineage("MODEL-1", "0", HASH_A))
     _, view, profile, style, annotation = contracts(stale)
     with pytest.raises(RepresentationError, match="STALE_SOURCE"):
         build_scene(stale, view, profile, style, annotation, "transform-1")
@@ -83,6 +90,14 @@ def test_unknown_freshness_is_explicit_not_silent_fallback():
     scene = build_scene(src, view, profile, style, annotation, "transform-1")
     assert DiagnosticCode.MISSING_REQUIRED_EVIDENCE in scene.diagnostics
     assert scene.entities == ()
+
+
+def test_unknown_with_required_evidence_is_blocked():
+    unknown = source(freshness=Freshness.UNKNOWN)
+    _, view, _, style, annotation = contracts(unknown)
+    required = RepresentationProfile("REQUIRED", ProfileKind.PROFESSIONAL, ViewFamily.GEOMETRIC, validation_evidence_required=True)
+    with pytest.raises(RepresentationError, match="MISSING_REQUIRED_EVIDENCE"):
+        build_scene(unknown, view, required, style, annotation, "transform-1")
 
 
 def test_exchange_source_requires_declared_role_and_never_becomes_canonical():
@@ -157,6 +172,39 @@ def test_graphic_scene_is_not_a_viewport_sheet_or_svg_payload():
 def test_section_requires_cut_plane_evidence():
     with pytest.raises(RepresentationError, match="cut_plane"):
         ViewDefinition("SECTION-1", ViewType.SECTION, ViewFamily.GEOMETRIC, "PROJECT-1")
+
+
+def test_complete_view_taxonomy_has_canonical_family_mapping():
+    knowledge = (ViewType.RELATIONSHIP_DIAGRAM, ViewType.FLOW_CIRCULATION_DIAGRAM, ViewType.ZONING_SCHEMATIC, ViewType.ADJACENCY_VIEW, ViewType.FUNCTIONAL_TOPOLOGY_VIEW)
+    geometric = (ViewType.ARCHITECTURAL_PLAN, ViewType.SECTION, ViewType.ELEVATION, ViewType.AXONOMETRIC, ViewType.ANALYTICAL_3D)
+    visualization = (ViewType.CONCEPTUAL_RENDER, ViewType.MATERIAL_RENDER, ViewType.INTERIOR_RENDER, ViewType.EXTERIOR_RENDER, ViewType.AERIAL_RENDER, ViewType.NIGHT_RENDER, ViewType.PHOTOREALISTIC_RENDER)
+    for item in knowledge:
+        assert ViewDefinition(item.value, item, ViewFamily.KNOWLEDGE, "PROJECT-1")
+    for item in geometric:
+        cut = "z=0" if item is ViewType.SECTION else None
+        assert ViewDefinition(item.value, item, ViewFamily.GEOMETRIC, "PROJECT-1", cut_plane=cut)
+    for item in visualization:
+        assert ViewDefinition(item.value, item, ViewFamily.VISUALIZATION, "PROJECT-1")
+
+
+def test_invalid_view_family_combinations_fail_closed():
+    with pytest.raises(RepresentationError, match="INVALID_PROFILE"):
+        ViewDefinition("BAD", ViewType.ARCHITECTURAL_PLAN, ViewFamily.KNOWLEDGE, "PROJECT-1")
+    with pytest.raises(RepresentationError, match="INVALID_PROFILE"):
+        ViewDefinition("BAD", ViewType.RELATIONSHIP_DIAGRAM, ViewFamily.GEOMETRIC, "PROJECT-1")
+    with pytest.raises(RepresentationError, match="INVALID_PROFILE"):
+        ViewDefinition("BAD", ViewType.PHOTOREALISTIC_RENDER, ViewFamily.GEOMETRIC, "PROJECT-1")
+
+
+def test_view_definition_contains_projection_and_semantic_scope_contract():
+    view = ViewDefinition(
+        "PLAN", ViewType.ARCHITECTURAL_PLAN, ViewFamily.GEOMETRIC, "PROJECT-1",
+        projection=ProjectionKind.ORTHOGRAPHIC,
+        visibility=("WALL",), filters={"level": "L1"}, semantic_scope=("SPACE-1",),
+        scale_intent="PROFESSIONAL", representation_purpose="DOCUMENTATION",
+    )
+    assert view.projection is ProjectionKind.ORTHOGRAPHIC
+    assert view.filters["level"] == "L1"
 
 
 def test_invalid_source_fingerprint_is_rejected():

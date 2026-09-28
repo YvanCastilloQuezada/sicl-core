@@ -9,7 +9,7 @@
 |---|---|---|
 | Canonical architectural identity | `src/sicl/archi/identity.py`, `ArchiElementId` | Reuse as source references; ARE does not recreate D2 identity. |
 | Canonical architectural elements | `src/sicl/archi/model.py`, `ArchiElement`, `ArchiGeometry` | Treat as canonical source evidence; no mutation or duplication. |
-| Derived spatial source | `src/sicl/spatial.py`, `SpatialRepresentation`, `SpatialElement` | Accept as a derived source only with explicit provenance metadata supplied by ARE. |
+| Derived spatial source | `src/sicl/spatial.py`, `SpatialRepresentation`, `SpatialElement` | Accept as a derived source only with explicit `SourceLineage`; derived identity is never conflated with canonical identity. |
 | Stable canonical serialization | `src/sicl/spatial.py`, `canonical_json()` | Reuse the repository convention; ARE adds its own canonical serialization for its contracts. |
 | Vector payload primitives | `src/sicl/drawing/primitives.py` | Reuse only as an optional payload type in future adapters; ARE-002 stays renderer-neutral. |
 | A-002 sufficiency | `src/sicl/a002/` | Preserve boundary; ARE-002 does not turn A-002 into a generic graphic gate. |
@@ -39,6 +39,9 @@
 - Immutable `ViewDefinition`, `RepresentationProfile`, `GraphicStyle`, and `AnnotationProfile`.
 - Renderer-neutral immutable `GraphicScene`, entities, diagnostics, and traceability.
 - Deterministic scene fingerprint independent of serialized backend fingerprint.
+- Explicit lineage comparison against the canonical source; stale lineage blocks and unknown lineage remains explicit.
+- Canonical view-family taxonomy and validation before scene construction.
+- Required-evidence gating: unknown freshness may create only a diagnostic scene when the profile does not require validation evidence.
 
 ## Explicit non-goals
 

@@ -54,11 +54,27 @@ class ViewType(str, Enum):
     RELATIONSHIP_DIAGRAM = "RELATIONSHIP_DIAGRAM"
     FLOW_CIRCULATION_DIAGRAM = "FLOW_CIRCULATION_DIAGRAM"
     ZONING_SCHEMATIC = "ZONING_SCHEMATIC"
+    ADJACENCY_VIEW = "ADJACENCY_VIEW"
+    FUNCTIONAL_TOPOLOGY_VIEW = "FUNCTIONAL_TOPOLOGY_VIEW"
     ARCHITECTURAL_PLAN = "ARCHITECTURAL_PLAN"
     SECTION = "SECTION"
     ELEVATION = "ELEVATION"
+    AXONOMETRIC = "AXONOMETRIC"
     ANALYTICAL_3D = "ANALYTICAL_3D"
-    VISUALIZATION = "VISUALIZATION"
+    CONCEPTUAL_RENDER = "CONCEPTUAL_RENDER"
+    MATERIAL_RENDER = "MATERIAL_RENDER"
+    INTERIOR_RENDER = "INTERIOR_RENDER"
+    EXTERIOR_RENDER = "EXTERIOR_RENDER"
+    AERIAL_RENDER = "AERIAL_RENDER"
+    NIGHT_RENDER = "NIGHT_RENDER"
+    PHOTOREALISTIC_RENDER = "PHOTOREALISTIC_RENDER"
+
+
+class ProjectionKind(str, Enum):
+    NONE = "NONE"
+    ORTHOGRAPHIC = "ORTHOGRAPHIC"
+    PERSPECTIVE = "PERSPECTIVE"
+    GRAPH = "GRAPH"
 
 
 class ProfileKind(str, Enum):
@@ -78,6 +94,27 @@ class DiagnosticCode(str, Enum):
     INVALID_PROFILE = "INVALID_PROFILE"
     INVALID_SOURCE = "INVALID_SOURCE"
     MISSING_REQUIRED_EVIDENCE = "MISSING_REQUIRED_EVIDENCE"
+
+
+_VIEW_FAMILY_BY_TYPE = {
+    ViewType.RELATIONSHIP_DIAGRAM: ViewFamily.KNOWLEDGE,
+    ViewType.FLOW_CIRCULATION_DIAGRAM: ViewFamily.KNOWLEDGE,
+    ViewType.ZONING_SCHEMATIC: ViewFamily.KNOWLEDGE,
+    ViewType.ADJACENCY_VIEW: ViewFamily.KNOWLEDGE,
+    ViewType.FUNCTIONAL_TOPOLOGY_VIEW: ViewFamily.KNOWLEDGE,
+    ViewType.ARCHITECTURAL_PLAN: ViewFamily.GEOMETRIC,
+    ViewType.SECTION: ViewFamily.GEOMETRIC,
+    ViewType.ELEVATION: ViewFamily.GEOMETRIC,
+    ViewType.AXONOMETRIC: ViewFamily.GEOMETRIC,
+    ViewType.ANALYTICAL_3D: ViewFamily.GEOMETRIC,
+    ViewType.CONCEPTUAL_RENDER: ViewFamily.VISUALIZATION,
+    ViewType.MATERIAL_RENDER: ViewFamily.VISUALIZATION,
+    ViewType.INTERIOR_RENDER: ViewFamily.VISUALIZATION,
+    ViewType.EXTERIOR_RENDER: ViewFamily.VISUALIZATION,
+    ViewType.AERIAL_RENDER: ViewFamily.VISUALIZATION,
+    ViewType.NIGHT_RENDER: ViewFamily.VISUALIZATION,
+    ViewType.PHOTOREALISTIC_RENDER: ViewFamily.VISUALIZATION,
+}
 
 
 def _freeze(value: Any) -> Any:
@@ -138,6 +175,7 @@ class SourceSnapshot:
     authority: SourceAuthority
     exchange_role: ExchangeRole | None = None
     freshness: Freshness = Freshness.UNKNOWN
+    lineage: "SourceLineage | None" = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -153,6 +191,14 @@ class SourceSnapshot:
             raise RepresentationError("exchange_role is only valid for exchange sources")
         if not isinstance(self.freshness, Freshness):
             raise RepresentationError("freshness must be Freshness")
+        if self.authority is SourceAuthority.DERIVED_SOURCE and self.lineage is None:
+            raise RepresentationError("derived sources require explicit lineage")
+        if self.exchange_role is ExchangeRole.DERIVED_EXPORT and self.lineage is None:
+            raise RepresentationError("DERIVED_EXPORT sources require explicit lineage")
+        if self.authority is SourceAuthority.CANONICAL_SOURCE and self.lineage is not None:
+            raise RepresentationError("canonical sources cannot declare derived lineage")
+        if self.lineage is not None and not isinstance(self.lineage, SourceLineage):
+            raise RepresentationError("lineage must be SourceLineage")
         object.__setattr__(self, "metadata", _freeze(self.metadata))
 
     def canonical_dict(self) -> dict[str, Any]:
@@ -164,7 +210,27 @@ class SourceSnapshot:
             "authority": self.authority.value,
             "exchange_role": self.exchange_role.value if self.exchange_role else None,
             "freshness": self.freshness.value,
+            "lineage": self.lineage.canonical_dict() if self.lineage else None,
             "metadata": _plain(self.metadata),
+        }
+
+
+@dataclass(frozen=True)
+class SourceLineage:
+    source_id: str
+    source_version: str
+    source_fingerprint: str
+
+    def __post_init__(self) -> None:
+        _text(self.source_id, "lineage.source_id")
+        _text(self.source_version, "lineage.source_version")
+        object.__setattr__(self, "source_fingerprint", _fingerprint(self.source_fingerprint, "lineage.source_fingerprint"))
+
+    def canonical_dict(self) -> dict[str, str]:
+        return {
+            "source_id": self.source_id,
+            "source_version": self.source_version,
+            "source_fingerprint": self.source_fingerprint,
         }
 
 
@@ -173,9 +239,11 @@ def evaluate_freshness(derived: SourceSnapshot, canonical: SourceSnapshot) -> Fr
         raise RepresentationError("derived snapshot must have DERIVED_SOURCE authority")
     if canonical.authority is not SourceAuthority.CANONICAL_SOURCE:
         raise RepresentationError("canonical snapshot must have CANONICAL_SOURCE authority")
-    if derived.source_id != canonical.source_id:
+    if derived.lineage is None:
         return Freshness.UNKNOWN
-    if derived.source_version == canonical.source_version and derived.source_fingerprint == canonical.source_fingerprint:
+    if derived.lineage.source_id != canonical.source_id:
+        return Freshness.UNKNOWN
+    if derived.lineage.source_version == canonical.source_version and derived.lineage.source_fingerprint == canonical.source_fingerprint:
         return Freshness.CURRENT
     return Freshness.STALE
 
@@ -206,18 +274,31 @@ class ViewDefinition:
     view_type: ViewType
     view_family: ViewFamily
     source_scope: str
+    projection: ProjectionKind = ProjectionKind.NONE
     orientation: str | None = None
     cut_plane: str | None = None
     view_direction: str | None = None
-    visibility_scope: tuple[str, ...] = ()
+    visibility: tuple[str, ...] = ()
+    filters: Mapping[str, Any] = field(default_factory=dict)
+    semantic_scope: tuple[str, ...] = ()
     level_scope: str | None = None
+    scale_intent: str | None = None
+    representation_purpose: str | None = None
 
     def __post_init__(self) -> None:
         _text(self.view_id, "view_id")
         _text(self.source_scope, "source_scope")
         if not isinstance(self.view_type, ViewType) or not isinstance(self.view_family, ViewFamily):
             raise RepresentationError("view_type and view_family must use ARE enums")
-        object.__setattr__(self, "visibility_scope", tuple(_text(v, "visibility_scope item") for v in self.visibility_scope))
+        if _VIEW_FAMILY_BY_TYPE[self.view_type] is not self.view_family:
+            raise RepresentationError(
+                f"INVALID_PROFILE: {self.view_type.value} requires {_VIEW_FAMILY_BY_TYPE[self.view_type].value} family"
+            )
+        if not isinstance(self.projection, ProjectionKind):
+            raise RepresentationError("projection must use ProjectionKind")
+        object.__setattr__(self, "visibility", tuple(_text(v, "visibility item") for v in self.visibility))
+        object.__setattr__(self, "semantic_scope", tuple(_text(v, "semantic_scope item") for v in self.semantic_scope))
+        object.__setattr__(self, "filters", _freeze(self.filters))
         if self.view_family is ViewFamily.GEOMETRIC and self.view_type in {ViewType.ARCHITECTURAL_PLAN, ViewType.SECTION, ViewType.ELEVATION}:
             if self.view_type is ViewType.SECTION and not self.cut_plane:
                 raise RepresentationError("section views require cut_plane evidence")
@@ -350,6 +431,8 @@ class GraphicScene:
         for name in ("view", "representation_profile", "graphic_style", "annotation_profile"):
             if not isinstance(getattr(self, name), (ViewDefinition, RepresentationProfile, GraphicStyle, AnnotationProfile)):
                 raise RepresentationError(f"{name} has an invalid ARE contract type")
+        if self.view.view_family is not self.representation_profile.view_family:
+            raise RepresentationError("INVALID_PROFILE: view/profile families are incompatible")
         object.__setattr__(self, "entities", tuple(self.entities))
         if len({entity.entity_id for entity in self.entities}) != len(self.entities):
             raise RepresentationError("GraphicScene entity IDs must be unique")
@@ -367,6 +450,7 @@ class GraphicScene:
             "annotation_profile": self.annotation_profile.canonical_dict(),
             "transform_version": self.transform_version,
             "entities": [_plain(entity) for entity in self.entities],
+            "diagnostics": [code.value for code in self.diagnostics],
         }
 
     def canonical_dict(self) -> dict[str, Any]:
@@ -388,6 +472,8 @@ def build_scene(
     if source_snapshot.freshness is Freshness.STALE:
         raise RepresentationError(DiagnosticCode.STALE_SOURCE.value)
     if source_snapshot.freshness is Freshness.UNKNOWN:
+        if representation_profile.validation_evidence_required:
+            raise RepresentationError(DiagnosticCode.MISSING_REQUIRED_EVIDENCE.value)
         diagnostics = tuple(diagnostics) + (DiagnosticCode.MISSING_REQUIRED_EVIDENCE,)
     require_no_source_conflict(source_snapshot)
     scene_id = fingerprint({
@@ -414,7 +500,7 @@ def build_scene(
 __all__ = [
     "AnnotationProfile", "DiagnosticCode", "ExchangeRole", "Freshness", "GraphicEntity",
     "GraphicScene", "GraphicStyle", "GraphicTrace", "ProfileKind", "RepresentationError",
-    "RepresentationProfile", "SourceAuthority", "SourceConflictError", "SourceSnapshot",
-    "ViewDefinition", "ViewFamily", "ViewType", "build_scene", "canonical_json",
+    "RepresentationProfile", "ProjectionKind", "SourceAuthority", "SourceConflictError",
+    "SourceLineage", "SourceSnapshot", "ViewDefinition", "ViewFamily", "ViewType", "build_scene", "canonical_json",
     "detect_source_conflict", "evaluate_freshness", "fingerprint", "require_no_source_conflict",
 ]
