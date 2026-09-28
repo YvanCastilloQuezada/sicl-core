@@ -35,7 +35,7 @@ def test_full_chain_h003_h004_h005_applied_published(tmp_path):
     wall,door,space,ledger,registry,refs=setup_chain(); tx=ArchiTransaction((wall,door,space)); m=ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1000},'full-chain'); before=json.dumps([e.semantic_dict() for e in tx.canonical],sort_keys=True); p1=tmp_path/'one.ifc'; result=tx.apply_full_chain(m,ledger,registry,refs,ifc_path=p1)
     assert result.status is MutationStatus.APPLIED and result.lifecycle is MutationLifecycle.PUBLISHED and result.derivation_recorded
     assert tx.canonical[0].version==2 and json.dumps([e.semantic_dict() for e in tx.canonical],sort_keys=True)!=before
-    assert set(result.provenance)=={'a002','h002','h003','h004','h005'}; assert all(r['status']=='EXECUTED' for r in result.provenance['h005']['records'])
+    assert set(result.provenance)=={'a002','h002','h003','h004','h005','ifc'}; assert result.provenance['ifc']['published'] and len(result.provenance['ifc']['sha256'])==64; assert all(r['status']=='EXECUTED' for r in result.provenance['h005']['records'])
     assert len(ledger.list('P'))==4 and p1.exists()
 
 def test_h003_invalid_canonical_unchanged():

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Callable, Mapping
+import hashlib
 from .model import ArchiElement
 from .mutation import ArchiMutation
 from .sufficiency import snapshot_for
@@ -95,7 +96,9 @@ class ArchiTransaction:
         h005=SelectiveRecomputationEngine(temp, registry).execute(mutation.project_id, reaction, changed_refs)
         prov["h005"]=h005.to_dict()
         if any(r.status is not ExecutionStatus.EXECUTED for r in h005.records): return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), "H005_BLOCKED_OR_FAILED", False, prov)
-        try: export_ifc(candidate, ifc_path)
+        try:
+            ifc_bytes=export_ifc(candidate, ifc_path)
+            prov["ifc"]={"sha256":hashlib.sha256(ifc_bytes).hexdigest(),"published":True}
         except Exception as exc: return MutationResult(mid, MutationStatus.FAILED, MutationLifecycle.EVALUATED, self._canonical, (), f"IFC_EXPORT:{type(exc).__name__}", False, prov)
         # Publish only after every read-only gate and IFC export succeeded.
         for record in temp.list(mutation.project_id):
