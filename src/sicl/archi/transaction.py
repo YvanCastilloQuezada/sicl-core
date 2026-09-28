@@ -102,6 +102,19 @@ class ArchiTransaction:
         else:
             final.unlink(missing_ok=True)
 
+    @staticmethod
+    def _cleanup_ifc(stage: Path | None, backup: Path | None) -> list[str]:
+        """Best-effort post-commit cleanup; return diagnostics, never rollback."""
+        errors = []
+        for artifact in (stage, backup):
+            if artifact is None:
+                continue
+            try:
+                artifact.unlink(missing_ok=True)
+            except OSError as exc:
+                errors.append(f"{artifact.name}:{type(exc).__name__}")
+        return errors
+
     def apply_full_chain(self, mutation: ArchiMutation, ledger: DerivationLedger, registry: RecomputationRegistry, current_refs: Mapping[tuple[str,str], VersionedRef], *, ifc_path=None) -> MutationResult:
         """Run A-002, H-002, H-003, H-004, H-005, then publish ledger and IFC."""
         mid=mutation.compute_id()
@@ -150,7 +163,6 @@ class ArchiTransaction:
         final = Path(ifc_path) if ifc_path is not None else None
         backup = None
         promoted = False
-        cleanup_backup = True
         try:
             if final is not None:
                 stage = self._stage_ifc(final, ifc_bytes)
@@ -168,17 +180,22 @@ class ArchiTransaction:
                 try:
                     self._rollback_ifc(final, backup)
                 except Exception as rollback_exc:
-                    cleanup_backup = False
                     return MutationResult(mid, MutationStatus.FAILED, MutationLifecycle.EVALUATED, self._canonical, (), f"TRANSACTION_ROLLBACK_FAILED:{type(rollback_exc).__name__}", False, prov)
             return MutationResult(mid, MutationStatus.FAILED, MutationLifecycle.EVALUATED, self._canonical, (), f"PUBLICATION:{type(exc).__name__}", False, prov)
-        finally:
-            if stage is not None:
-                stage.unlink(missing_ok=True)
-            if backup is not None and cleanup_backup:
-                backup.unlink(missing_ok=True)
 
-        prov["ifc"]["published"] = final is not None
+        # COMMIT POINT: from here ledger, IFC and canonical state are new.
         self._canonical=candidate; self._applied.add(mid)
-        return MutationResult(mid, MutationStatus.APPLIED, MutationLifecycle.PUBLISHED, self._canonical, self._canonical, "APPLIED_PUBLISHED", True, prov)
+        prov["ifc"]["published"] = final is not None
+
+        # POST-COMMIT HOUSEKEEPING: never allow cleanup to turn a committed
+        # transaction into FAILED or to roll back canonical state.
+        cleanup_errors = self._cleanup_ifc(stage, backup)
+        if cleanup_errors:
+            prov["cleanup"] = {"status": "DEFERRED", "errors": cleanup_errors}
+            reason = "APPLIED_PUBLISHED_CLEANUP_DEFERRED"
+        else:
+            prov["cleanup"] = {"status": "COMPLETE", "errors": []}
+            reason = "APPLIED_PUBLISHED"
+        return MutationResult(mid, MutationStatus.APPLIED, MutationLifecycle.PUBLISHED, self._canonical, self._canonical, reason, True, prov)
 
 __all__=["MutationLifecycle","MutationStatus","MutationResult","ArchiTransaction"]

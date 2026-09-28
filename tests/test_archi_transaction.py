@@ -40,7 +40,7 @@ def test_full_chain_h003_h004_h005_applied_published(tmp_path):
     wall,door,space,ledger,registry,refs=setup_chain(); tx=ArchiTransaction((wall,door,space)); m=ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1000},'full-chain'); before=json.dumps([e.semantic_dict() for e in tx.canonical],sort_keys=True); p1=tmp_path/'one.ifc'; result=tx.apply_full_chain(m,ledger,registry,refs,ifc_path=p1)
     assert result.status is MutationStatus.APPLIED and result.lifecycle is MutationLifecycle.PUBLISHED and result.derivation_recorded
     assert tx.canonical[0].version==2 and json.dumps([e.semantic_dict() for e in tx.canonical],sort_keys=True)!=before
-    assert set(result.provenance)=={'a002','h002','h003','h004','h005','ifc'}; assert result.provenance['ifc']['published'] and len(result.provenance['ifc']['sha256'])==64; assert all(r['status']=='EXECUTED' for r in result.provenance['h005']['records'])
+    assert set(result.provenance)=={'a002','h002','h003','h004','h005','ifc','cleanup'}; assert result.provenance['ifc']['published'] and result.provenance['cleanup']['status']=='COMPLETE' and len(result.provenance['ifc']['sha256'])==64; assert all(r['status']=='EXECUTED' for r in result.provenance['h005']['records'])
     assert len(ledger.list('P'))==4 and p1.exists()
 
 def test_h003_invalid_canonical_unchanged():
@@ -111,6 +111,24 @@ def test_rt16_promotion_failure_happens_before_ledger_publication(tmp_path, monk
     result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'rt16-promotion'),ledger,registry,refs,ifc_path=final)
     assert result.status is MutationStatus.FAILED and result.reason=='PUBLICATION:RuntimeError'
     assert not final.exists() and len(ledger.list('P'))==2 and tx.canonical==(wall,door,space)
+
+def test_rt17_backup_cleanup_failure_is_post_commit_and_replay_safe(tmp_path, monkeypatch):
+    wall,door,space,ledger,registry,refs=setup_chain(); tx=ArchiTransaction((wall,door,space)); final=tmp_path/'model.ifc'
+    final.write_bytes(export_ifc(tx.canonical))
+    monkeypatch.setattr(tx, '_cleanup_ifc', lambda stage, backup: ['.previous:PermissionError'])
+    mutation=ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'rt17-backup')
+    result=tx.apply_full_chain(mutation,ledger,registry,refs,ifc_path=final)
+    replay=tx.apply_full_chain(mutation,ledger,registry,refs,ifc_path=final)
+    assert result.status is MutationStatus.APPLIED and result.reason=='APPLIED_PUBLISHED_CLEANUP_DEFERRED'
+    assert result.provenance['cleanup']['status']=='DEFERRED' and len(ledger.list('P'))==4 and tx.canonical[0].version==2
+    assert replay.reason=='REPLAY_NO_DOUBLE_APPLICATION' and replay.derivation_recorded is False and len(ledger.list('P'))==4
+
+def test_rt17_stage_cleanup_failure_cannot_leave_canonical_old(tmp_path, monkeypatch):
+    wall,door,space,ledger,registry,refs=setup_chain(); tx=ArchiTransaction((wall,door,space)); final=tmp_path/'model.ifc'
+    monkeypatch.setattr(tx, '_cleanup_ifc', lambda stage, backup: ['.stage:OSError'])
+    result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'rt17-stage'),ledger,registry,refs,ifc_path=final)
+    assert result.status is MutationStatus.APPLIED and result.reason=='APPLIED_PUBLISHED_CLEANUP_DEFERRED'
+    assert result.provenance['cleanup']['errors']==['.stage:OSError'] and final.exists() and tx.canonical[0].version==2 and len(ledger.list('P'))==4
 
 def test_no_unauthorized_execution():
     artifact=VersionedRef('A','1',1); dv=DerivationValidity('d',artifact,'REQUIRES_HUMAN_REVIEW',source_checks=('integrity_checks_d',)); action=ReactionPlanner().plan_reaction(ValidityReport(artifact_validities=(ArtifactValidity(artifact,'REQUIRES_HUMAN_REVIEW',(dv,),{},{}),))).planned_actions[0]; assert action.requires_human_authority and action.action_type is ActionType.ESCALATE

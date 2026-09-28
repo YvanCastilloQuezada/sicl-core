@@ -22,6 +22,8 @@ The `GeometryKind` enum declares `EXTRUDED_RECTANGLE` and `EXTRUDED_CIRCLE`. The
 
 `ArchiTransaction` serializes IFC to memory first. When an external `ifc_path` is requested, bytes are written to a sibling staging file and promoted with a reversible backup. Ledger publication follows promotion; if the atomic ledger batch fails, the previous IFC is restored or a newly promoted file is removed. If staging or promotion fails, the ledger and canonical state remain untouched. `ifc_path=None` never creates a filesystem artifact.
 
+The commit point is the successful ledger batch followed immediately by the canonical assignment and replay marker. Stage/backup deletion is post-commit housekeeping: an `OSError` is reported in provenance as `CLEANUP_DEFERRED`, but cannot turn the committed transaction into `FAILED` or revert canonical state. Residual `.stage`/`.previous` files are recovery artifacts, not published architectural state.
+
 ## Dependency version semantics
 
 `ArchiElement.semantic_dict()` includes `hosted_in_version` and `contained_in_version` when the corresponding relationship is present. A dependent recomputed against host version 2 therefore has a different deterministic semantic hash from the same dependent hosted in version 1.
