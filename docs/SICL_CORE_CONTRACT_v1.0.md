@@ -389,3 +389,9 @@ Esta incorporación es documental y no modifica A-002, H-001–H-005, D-1, D-2, 
 > **ARKI no empieza diseñando para después comprobar si la solución corresponde al problema. Primero determina los parámetros aplicables, restringe el espacio de posibilidades y luego diseña dentro del espacio que los cumple.**
 
 **Estado de implementación:** `RUNTIME_ENFORCEMENT = NOT_IMPLEMENTED`. Esta sección no crea reglas normativas, catálogo de anti-patrones, Candidate Pruning ni lógica de enforcement.
+
+## Ley canónica — La vida de las ideas es cruel
+
+La doctrina transversal **LEY — LA VIDA DE LAS IDEAS ES CRUEL**, cuya fórmula es **MUCHAS IDEAS NACEN... POCAS SOBREVIVEN.**, y su mecanismo conceptual **Ley del Embudo** están incorporados en [ARKI_LAW_LIFE_OF_IDEAS_IS_CRUEL.md](ARKI_LAW_LIFE_OF_IDEAS_IS_CRUEL.md).
+
+Esta incorporación es exclusivamente documental. No implementa runtime pruning, survival pipeline ni asignación automática de cómputo; no modifica D-1, D-2.2R, H-001–H-005, A-002 ni ARKI-DRAW. Human Authority permanece como invariante y el Principio 5 permanece preservado.
