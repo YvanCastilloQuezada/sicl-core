@@ -290,3 +290,102 @@ El código está publicado en `main` y el tag `sims-dei-2.11-deploy-e2e`. La sui
 ## Matriz vigente RFC-015–026
 
 Consulte [`SIMS_DEI_CURRENT_ARCHITECTURE_v2.11.md`](SIMS_DEI_CURRENT_ARCHITECTURE_v2.11.md) y [`RFC_015_026_COHERENCE_AUDIT.md`](RFC_015_026_COHERENCE_AUDIT.md). Estas referencias corrigen la lectura de estados históricos y registran las mejoras de simulación, factibilidad, generación, variables, normativa y conocimiento de diseño.
+
+## Principio Canónico N.º 5 — Se diseña lo que cumple los parámetros
+
+> **SE DISEÑA LO QUE CUMPLE LOS PARÁMETROS.**
+
+ARKI determina primero los parámetros y restricciones aplicables al problema arquitectónico y restringe el espacio de posibilidades antes de iniciar el diseño.
+
+> **LO QUE NO CUMPLE, NO NACE.**
+> **LO QUE NO NACE, NO VALE Y SE ELIMINA.**
+
+Una posibilidad que no supera los parámetros aplicables no constituye una propuesta arquitectónica rechazada: nunca llegó a nacer como propuesta. La distinción canónica es:
+
+```text
+POSIBILIDAD ≠ CANDIDATO ARQUITECTÓNICO
+CONSIDERAR ≠ DISEÑAR
+EXPLORAR ≠ GENERAR
+```
+
+### Parámetros y aplicabilidad
+
+`PARÁMETROS` es un concepto contextual y no cerrado. Puede comprender, según la escala, tipología, ubicación, jurisdicción y naturaleza del problema: legal/normativo, cliente, funcional, espacial, climático, bioclimático, cultural, social, histórico, patrimonial, natural, ambiental, ecológico, topográfico, geomorfológico, geológico, geotécnico, sísmico, hidrológico, hidrogeológico, urbano, territorial, estructural, constructivo, técnico, MEP, energético, de recursos, accesibilidad, seguridad, habitabilidad, económico, temporal, operacional, mantenimiento y ciclo de vida.
+
+```text
+PARAMETER AVAILABLE ≠ PARAMETER APPLICABLE
+```
+
+La aplicabilidad depende de `WHAT`, `WHO`, `WHERE`, `WHEN`, `SCALE`, `ENTITY TYPE`, `JURISDICTION`, `SOURCE`, `VERSION` y `CONTEXT`. Una norma jurisdiccional no se convierte en norma universal; una preferencia cultural no se convierte en obligación legal; una recomendación climática no se convierte en prohibición normativa; y una heurística no se convierte en certeza.
+
+El canon preserva como distinciones conceptuales mínimas:
+
+```text
+HARD CONSTRAINT
+SOFT CONSTRAINT
+OBJECTIVE
+PREFERENCE
+ASSUMPTION
+UNKNOWN
+```
+
+Una preferencia no se convierte automáticamente en restricción dura, ni una recomendación en prohibición.
+
+### Frontera de nacimiento
+
+El flujo conceptual es:
+
+```text
+ESPACIO DE POSIBILIDADES BRUTAS
+        ↓
+DETERMINACIÓN DE PARÁMETROS
+        ↓
+DETERMINACIÓN DE APLICABILIDAD
+        ↓
+SUFICIENCIA DE INFORMACIÓN
+        ↓
+¿SE PUEDE EVALUAR?
+   NO → UNKNOWN → RESOLVER INFORMACIÓN → REEVALUAR
+   SÍ → ¿CUMPLE?
+          NO → NO NACE → NO VALE → SE ELIMINA
+          SÍ → NACE → DISEÑO
+```
+
+Una posibilidad solo adquiere derecho a nacer como candidato cuando supera las condiciones requeridas para esa etapa:
+
+```text
+CUMPLE → PUEDE NACER
+NO CUMPLE → NO NACE
+NO NACE → NO VALE
+NO VALE → SE ELIMINA
+```
+
+Una posibilidad eliminada antes de nacer no genera geometría, `ArchiElement`, `DerivationRecord`, entrada H-001, estado arquitectónico canónico, simulación posterior ni propuesta visible al usuario. No se crea un cementerio de candidatos ni se registra como derivación arquitectónica descartada.
+
+`UNKNOWN` no equivale a cumplimiento ni a incumplimiento. La falta de datos (`MISSING DATA`) no equivale a no conformidad (`NON-COMPLIANCE`). La información indispensable debe resolverse antes de avanzar.
+
+### Invariantes y límites
+
+```text
+CUMPLIR ≠ SER ÓPTIMO
+NACER ≠ SER BUEN DISEÑO
+NACER ≠ SER SELECCIONADO
+SELECCIONADO ≠ HUMAN APPROVED
+SYSTEM FILTERING ≠ HUMAN SELECTION
+SYSTEM COMPLIANCE ≠ HUMAN APPROVAL
+```
+
+Superar el Principio 5 concede derecho a entrar al proceso de diseño, pero no implica calidad, optimalidad ni selección. Después del nacimiento pueden actuar generación, simulación, evaluación, crítica, mutación, optimización, comparación de alternativas y autoridad humana.
+
+### Relación con las capas existentes
+
+Esta incorporación es documental y no modifica A-002, H-001–H-005, D-1, D-2, D-2.1 ni ARKI-DRAW.
+
+- A-002 puede determinar si existe información suficiente para evaluar una operación, pero `INPUT SUFFICIENCY ≠ PARAMETRIC COMPLIANCE`.
+- Antes de nacer no existe `DerivationRecord` arquitectónico ni entrada H-001.
+- RAP queda subordinado al Principio 5 como mecanismo futuro especializado y permanece `DEFERRED_AFTER_D2_CORE`.
+- ARKI-DRAW recibe candidatos que ya superaron las barreras aplicables; no decide cumplimiento ni dibuja todo para comprobarlo después.
+
+> **ARKI no empieza diseñando para después comprobar si la solución corresponde al problema. Primero determina los parámetros aplicables, restringe el espacio de posibilidades y luego diseña dentro del espacio que los cumple.**
+
+**Estado de implementación:** `RUNTIME_ENFORCEMENT = NOT_IMPLEMENTED`. Esta sección no crea reglas normativas, catálogo de anti-patrones, Candidate Pruning ni lógica de enforcement.
