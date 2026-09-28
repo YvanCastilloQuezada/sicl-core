@@ -40,6 +40,8 @@
 - Renderer-neutral immutable `GraphicScene`, entities, diagnostics, and traceability.
 - Deterministic scene fingerprint independent of serialized backend fingerprint.
 - Explicit lineage comparison against the canonical source; stale lineage blocks and unknown lineage remains explicit.
+- Declared freshness is evidence metadata only; `build_scene()` verifies derived freshness against an explicit canonical context.
+- A derived source cannot certify its own currentness. `STALE` is distinct from `SOURCE_CONFLICT`; conflict applies to incompatible derived results sharing the same lineage.
 - Canonical view-family taxonomy and validation before scene construction.
 - Required-evidence gating: unknown freshness may create only a diagnostic scene when the profile does not require validation evidence.
 

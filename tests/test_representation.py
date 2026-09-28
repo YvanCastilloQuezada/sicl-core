@@ -75,13 +75,25 @@ def test_derived_source_retains_provenance_and_current_freshness():
     assert derived.lineage.source_id == canonical.source_id
     assert derived.authority is SourceAuthority.DERIVED_SOURCE
     assert evaluate_freshness(derived, canonical) is Freshness.CURRENT
+    _, view, profile, style, annotation = contracts(derived)
+    scene = build_scene(derived, view, profile, style, annotation, "transform-1", canonical_source=canonical)
+    assert scene.source_snapshot.source_id != canonical.source_id
 
 
 def test_derived_source_stale_is_blocked():
     stale = source(SourceAuthority.DERIVED_SOURCE, version="2", digest=HASH_B, freshness=Freshness.STALE, lineage=SourceLineage("MODEL-1", "0", HASH_A))
+    canonical = source(version="1", digest=HASH_B)
     _, view, profile, style, annotation = contracts(stale)
     with pytest.raises(RepresentationError, match="STALE_SOURCE"):
-        build_scene(stale, view, profile, style, annotation, "transform-1")
+        build_scene(stale, view, profile, style, annotation, "transform-1", canonical_source=canonical)
+
+
+def test_forged_current_is_rejected_by_verified_freshness():
+    forged = source(SourceAuthority.DERIVED_SOURCE, version="2", digest=HASH_B, freshness=Freshness.CURRENT, lineage=SourceLineage("MODEL-1", "1", HASH_A))
+    canonical = source(version="2", digest=HASH_B)
+    _, view, profile, style, annotation = contracts(forged)
+    with pytest.raises(RepresentationError, match="STALE_SOURCE"):
+        build_scene(forged, view, profile, style, annotation, "transform-1", canonical_source=canonical)
 
 
 def test_unknown_freshness_is_explicit_not_silent_fallback():
@@ -100,6 +112,18 @@ def test_unknown_with_required_evidence_is_blocked():
         build_scene(unknown, view, required, style, annotation, "transform-1")
 
 
+def test_wrong_lineage_is_unknown_and_required_context_blocks():
+    wrong = source(SourceAuthority.DERIVED_SOURCE, freshness=Freshness.CURRENT, lineage=SourceLineage("MODEL-X", "1", HASH_A))
+    canonical = source()
+    _, view, _, style, annotation = contracts(wrong)
+    optional = RepresentationProfile("OPTIONAL", ProfileKind.CONCEPTUAL, ViewFamily.GEOMETRIC)
+    scene = build_scene(wrong, view, optional, style, annotation, "transform-1", canonical_source=canonical)
+    assert DiagnosticCode.MISSING_REQUIRED_EVIDENCE in scene.diagnostics
+    required = RepresentationProfile("REQUIRED", ProfileKind.PROFESSIONAL, ViewFamily.GEOMETRIC, validation_evidence_required=True)
+    with pytest.raises(RepresentationError, match="MISSING_REQUIRED_EVIDENCE"):
+        build_scene(wrong, view, required, style, annotation, "transform-1", canonical_source=canonical)
+
+
 def test_exchange_source_requires_declared_role_and_never_becomes_canonical():
     with pytest.raises(RepresentationError):
         SourceSnapshot("IFC-1", "IFC", "1", HASH_A, SourceAuthority.EXCHANGE_SOURCE)
@@ -109,6 +133,12 @@ def test_exchange_source_requires_declared_role_and_never_becomes_canonical():
     )
     assert exchange.authority is SourceAuthority.EXCHANGE_SOURCE
     assert exchange.exchange_role is ExchangeRole.REFERENCE_IMPORT
+    export = SourceSnapshot(
+        "EXPORT-1", "IFC", "1", HASH_B, SourceAuthority.EXCHANGE_SOURCE,
+        exchange_role=ExchangeRole.DERIVED_EXPORT,
+        lineage=SourceLineage("MODEL-1", "1", HASH_A),
+    )
+    assert evaluate_freshness(export, source()) is Freshness.CURRENT
 
 
 def test_same_identity_and_version_with_incompatible_fingerprint_conflicts():
@@ -118,6 +148,16 @@ def test_same_identity_and_version_with_incompatible_fingerprint_conflicts():
     with pytest.raises(SourceConflictError, match="SOURCE_CONFLICT"):
         from sicl.representation import require_no_source_conflict
         require_no_source_conflict(left, right)
+
+
+def test_derived_canonical_lineage_relationship_distinguishes_stale_from_conflict():
+    canonical = source(version="2", digest=HASH_B)
+    stale = source(SourceAuthority.DERIVED_SOURCE, version="9", digest=HASH_A, lineage=SourceLineage("MODEL-1", "1", HASH_A))
+    assert evaluate_freshness(stale, canonical) is Freshness.STALE
+    assert not detect_source_conflict(stale, canonical)
+    first = source(SourceAuthority.DERIVED_SOURCE, version="1", digest=HASH_A, lineage=SourceLineage("MODEL-1", "2", HASH_B))
+    second = source(SourceAuthority.DERIVED_SOURCE, version="1", digest=HASH_B, lineage=SourceLineage("MODEL-1", "2", HASH_B))
+    assert detect_source_conflict(first, second)
 
 
 def test_different_source_identity_is_unknown_freshness_not_conflict():

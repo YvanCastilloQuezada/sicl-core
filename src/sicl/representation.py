@@ -234,9 +234,13 @@ class SourceLineage:
         }
 
 
+def _is_derived_source(source: SourceSnapshot) -> bool:
+    return source.authority is SourceAuthority.DERIVED_SOURCE or source.exchange_role is ExchangeRole.DERIVED_EXPORT
+
+
 def evaluate_freshness(derived: SourceSnapshot, canonical: SourceSnapshot) -> Freshness:
-    if derived.authority is not SourceAuthority.DERIVED_SOURCE:
-        raise RepresentationError("derived snapshot must have DERIVED_SOURCE authority")
+    if not _is_derived_source(derived):
+        raise RepresentationError("source must be a derived source or DERIVED_EXPORT")
     if canonical.authority is not SourceAuthority.CANONICAL_SOURCE:
         raise RepresentationError("canonical snapshot must have CANONICAL_SOURCE authority")
     if derived.lineage is None:
@@ -250,6 +254,17 @@ def evaluate_freshness(derived: SourceSnapshot, canonical: SourceSnapshot) -> Fr
 
 def detect_source_conflict(left: SourceSnapshot, right: SourceSnapshot) -> bool:
     """Return true only for relevant snapshots that cannot be selected safely."""
+    if _is_derived_source(left) and _is_derived_source(right):
+        return (
+            left.lineage is not None
+            and right.lineage is not None
+            and left.lineage == right.lineage
+            and left.source_fingerprint != right.source_fingerprint
+        )
+    if _is_derived_source(left) and right.authority is SourceAuthority.CANONICAL_SOURCE:
+        return _derived_pair_conflict(left, right)
+    if _is_derived_source(right) and left.authority is SourceAuthority.CANONICAL_SOURCE:
+        return _derived_pair_conflict(right, left)
     if left.source_id != right.source_id:
         return False
     if left.authority is right.authority and left.source_version == right.source_version:
@@ -257,6 +272,13 @@ def detect_source_conflict(left: SourceSnapshot, right: SourceSnapshot) -> bool:
     if {left.authority, right.authority} == {SourceAuthority.CANONICAL_SOURCE, SourceAuthority.DERIVED_SOURCE}:
         return left.source_version == right.source_version and left.source_fingerprint != right.source_fingerprint
     return left.source_version != right.source_version or left.source_fingerprint != right.source_fingerprint
+
+
+def _derived_pair_conflict(derived: SourceSnapshot, canonical: SourceSnapshot) -> bool:
+    """Lineage relates stale/current states; it does not turn staleness into conflict."""
+    if derived.lineage is None or derived.lineage.source_id != canonical.source_id:
+        return False
+    return False
 
 
 def require_no_source_conflict(*sources: SourceSnapshot) -> None:
@@ -465,13 +487,21 @@ def build_scene(
     annotation_profile: AnnotationProfile,
     transform_version: str,
     *,
+    canonical_source: SourceSnapshot | None = None,
     entities: Sequence[GraphicEntity] = (),
     diagnostics: Sequence[DiagnosticCode] = (),
 ) -> GraphicScene:
     """Construct a scene without projecting or inventing architectural data."""
-    if source_snapshot.freshness is Freshness.STALE:
+    verified_freshness = source_snapshot.freshness
+    if _is_derived_source(source_snapshot):
+        verified_freshness = (
+            evaluate_freshness(source_snapshot, canonical_source)
+            if canonical_source is not None
+            else Freshness.UNKNOWN
+        )
+    if verified_freshness is Freshness.STALE:
         raise RepresentationError(DiagnosticCode.STALE_SOURCE.value)
-    if source_snapshot.freshness is Freshness.UNKNOWN:
+    if verified_freshness is Freshness.UNKNOWN:
         if representation_profile.validation_evidence_required:
             raise RepresentationError(DiagnosticCode.MISSING_REQUIRED_EVIDENCE.value)
         diagnostics = tuple(diagnostics) + (DiagnosticCode.MISSING_REQUIRED_EVIDENCE,)
