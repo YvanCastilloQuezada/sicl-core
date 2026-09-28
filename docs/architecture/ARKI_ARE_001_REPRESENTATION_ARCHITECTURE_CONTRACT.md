@@ -16,9 +16,15 @@ ARE is the architectural boundary that derives multiple representations from one
 ```text
 ARCHITECTURAL KNOWLEDGE / ARCHIMODEL
               ↓
-       VIEW DEFINITION
+       SOURCE SNAPSHOT
+              │
+    ┌─────────┼─────────┬─────────┐
+    ▼         ▼         ▼         ▼
+  VIEW    REPRESENT.  GRAPHIC  ANNOTATION
+  DEF.     PROFILE    STYLE    PROFILE
+    └─────────┴─────────┴─────────┘
               ↓
-   REPRESENTATION PROFILE
+       VIEW / EXTRACTION
               ↓
        GRAPHIC SCENE
               ↓
@@ -95,7 +101,7 @@ The repository has lower-level building blocks but no canonical intermediate rep
               ARKI-DRAW / 3D / RENDER
 ```
 
-ARE is a transformation boundary, not an alternate model. A transformation must be deterministic for the same source snapshot, view definition, profile, style, annotation profile, and backend version. Any uncertainty or missing source evidence remains explicit.
+ARE is a transformation boundary, not an alternate model. A transformation must be deterministic for the same source snapshot, `ViewDefinition`, `RepresentationProfile`, `GraphicStyle`, `AnnotationProfile`, and transform version. This is **GraphicScene determinism**. Serialized output has a second backend-specific layer: when serialization depends on it, the backend version is also part of the output identity. Any uncertainty or missing source evidence remains explicit.
 
 ## 5. View taxonomy
 
@@ -122,7 +128,7 @@ These require sufficient geometry and coordinate context:
 - `AXONOMETRIC`
 - `ANALYTICAL_3D`
 
-Source: D2 geometry, an eligible `SpatialRepresentation`, or an explicitly declared exchange snapshot. Insufficient geometry yields `UNKNOWN`/`BLOCKED`, never a visually similar fallback.
+Source: a source snapshot with declared authority, an eligible `SpatialRepresentation`, or an explicitly declared exchange snapshot. Insufficient geometry yields `UNKNOWN`/`BLOCKED`, never a visually similar fallback.
 
 ### 5.3 Visualization views
 
@@ -204,28 +210,67 @@ sheet_id, paper, orientation, margins,
 viewports, title_block, legends, notes, revision_data
 ```
 
-Existing ARKI-DRAW `Sheet`, `Viewport`, `DrawingSheet`, and layout zones are lower-level realizations that must remain compatible with this distinction.
+Existing ARKI-DRAW `Sheet`, `Viewport`, `DrawingSheet`, and layout zones are lower-level realizations that must remain compatible with this distinction. A representation may exist as a scene or backend artifact without a sheet. `SheetDefinition` is optional documentary composition, required only when the output is a sheet.
 
-### 6.6 `GraphicScene`
+### 6.6 Source authority and source freshness
+
+Every source supplied to ARE has a declared conceptual role:
+
+```text
+CANONICAL_SOURCE  → architectural authority
+DERIVED_SOURCE    → derived evidence with lineage
+EXCHANGE_SOURCE   → imported/exported exchange snapshot
+```
+
+D2/functional knowledge is `CANONICAL_SOURCE` when it is the applicable authority. `SpatialRepresentation` is a `DERIVED_SOURCE` unless explicitly promoted by an independent authority workflow. IFC and similar files are `EXCHANGE_SOURCE`; they may be `AUTHORITATIVE_IMPORT`, `REFERENCE_IMPORT`, or `DERIVED_EXPORT`, but the format alone never grants canonical authority.
+
+A derived source is eligible only when its metadata can establish, conceptually, `source_identity`, `source_version_or_snapshot`, `source_fingerprint`, and `freshness_status`. These are contract requirements, not runtime fields added by this order.
+
+```text
+DERIVED_SOURCE(snapshot N) + CANONICAL_SOURCE(snapshot N+1) → STALE
+STALE → BLOCKED / STALE_SOURCE
+CANONICAL + DERIVED contradiction → SOURCE_CONFLICT → BLOCKED
+```
+
+ARE never chooses silently between contradictory sources.
+
+### 6.7 `GraphicScene`
 
 **Decision: adopt `GraphicScene` as the ARE intermediate contract.**
 
 It prevents a rigid direct conversion from `Wall` to `SVG Line` and allows the same semantic source to feed vector, 3D, analytical, and visualization backends.
 
+Conceptual inputs:
+
+```text
+SOURCE SNAPSHOT
+ViewDefinition
+RepresentationProfile
+GraphicStyle
+AnnotationProfile
+TRANSFORM VERSION
+```
+
 Conceptual fields:
 
 ```text
 scene_id
+source_authority
 source_snapshot_ref
+source_fingerprint
+source_freshness_status
 view_id
 profile_id
+style_id
+annotation_profile_id
+transform_version
 primitives[]
 scene_warnings[]
 backend_constraints
 traceability_index
 ```
 
-A scene primitive carries graphic intent, not architectural authority:
+A scene primitive carries graphic intent, not architectural authority. GraphicScene consumes the complete input set above; it is never a prerequisite for creating any of those independent definitions.
 
 ```text
 primitive_id
@@ -262,41 +307,52 @@ It supports inspection, highlighting, and future UI selection. It must never sil
 ### 8.1 General pipeline
 
 ```text
-SOURCE KNOWLEDGE
-      ↓
-VIEW EXTRACTION
-      ↓
-REPRESENTATION TRANSFORMATION
-      ↓
-GRAPHIC SEMANTICS / GRAPHIC SCENE
-      ↓
-OUTPUT BACKEND
+SOURCE SNAPSHOT + DECLARED SOURCE AUTHORITY
+      │
+      ├── ViewDefinition
+      ├── RepresentationProfile
+      ├── GraphicStyle
+      └── AnnotationProfile
+                    ↓
+             VIEW / EXTRACTION
+                    ↓
+               GraphicScene
+                    ↓
+              OUTPUT BACKEND
 ```
+
+`ViewDefinition`, `RepresentationProfile`, `GraphicStyle`, and `AnnotationProfile` are independent configuration inputs. `GraphicScene` depends on them; none depends causally on `GraphicScene`.
 
 ### 8.2 Vector pipeline
 
 ```text
-D2 / FUNCTIONAL KNOWLEDGE
-      ↓
-VIEW DEFINITION
-      ↓
-PROJECTION OR KNOWLEDGE EXTRACTION
-      ↓
-GRAPHIC SCENE
-      ↓
-ARKI-DRAW
-      ↓
-SVG / FUTURE VECTOR PDF / FUTURE DXF
+D2 / FUNCTIONAL KNOWLEDGE + SOURCE AUTHORITY
+      │
+      ├── VIEW DEFINITION
+      ├── REPRESENTATION PROFILE
+      ├── GRAPHIC STYLE
+      └── ANNOTATION PROFILE
+                    ↓
+       PROJECTION OR KNOWLEDGE EXTRACTION
+                    ↓
+              GRAPHIC SCENE
+                    ↓
+                ARKI-DRAW
+                    ↓
+       SVG / FUTURE VECTOR PDF / FUTURE DXF
 ```
 
 ### 8.3 Visualization pipeline
 
 ```text
 SOURCE KNOWLEDGE + GEOMETRY + MATERIAL/CONTEXT EVIDENCE
-      ↓
-VIEW DEFINITION + REPRESENTATION PROFILE
-      ↓
-3D/VISUALIZATION SCENE
+      │
+      ├── VIEW DEFINITION
+      ├── REPRESENTATION PROFILE
+      ├── GRAPHIC STYLE
+      └── ANNOTATION PROFILE
+                    ↓
+             3D/VISUALIZATION SCENE
       ↓
 RASTER OR HYBRID BACKEND
 ```
@@ -309,6 +365,9 @@ No backend may silently substitute another view family. Backend unavailability i
 |---|---|
 | Unsupported view | `FAIL_CLOSED` |
 | Insufficient source data | `UNKNOWN` or `BLOCKED` |
+| Derived source is stale | `BLOCKED / STALE_SOURCE` |
+| Canonical and derived sources conflict | `BLOCKED / SOURCE_CONFLICT` |
+| Source authority is undeclared | `BLOCKED` with diagnostic |
 | Unavailable backend | `BLOCKED_BY_TOOLING` |
 | Unsupported representation | `NOT_IMPLEMENTED` |
 | Missing geometric reference for radial/angular annotation | `BLOCKED_BY_MODEL` |
@@ -352,11 +411,13 @@ ARE may prepare evidence and alternatives. Only the authorized human/authority w
 
 ## 12. D2 boundary
 
-D2 remains the semantic/geometric source when applicable. ARE may read D2 snapshots and declared derived representations. ARE must not modify `src/sicl/archi/`, D2 identities, mutations, transactions, provenance, or IFC semantics.
+D2 remains the semantic/geometric source when applicable. ARE may read D2 snapshots and declared derived representations. ARE must not modify `src/sicl/archi/`, D2 identities, mutations, transactions, provenance, or IFC semantics. A future ARE implementation must declare source authority and precedence before constructing a view. A `DERIVED_SOURCE` must demonstrate correspondence and freshness to the applicable canonical snapshot. An `EXCHANGE_SOURCE` must declare whether it is an authoritative import, reference import, or derived export. Contradictory sources are blocked, not reconciled silently.
 
 A future ARE implementation must declare:
 
+- source authority role and precedence;
 - source snapshot/version and content fingerprint;
+- derived-source freshness/correspondence status;
 - required semantic and geometric evidence;
 - whether a view is functional, geometric, analytical, or visual;
 - read-only traceability back to source entities;
@@ -395,6 +456,8 @@ A Red Team reviewer must be able to verify:
 - traceability is separated from causal derivation and inverse selection from mutation;
 - unsupported and insufficient cases fail closed;
 - the backlog and dependency graph are complete for the required capabilities;
+- source authority, freshness, stale-source, and source-conflict semantics are explicit;
+- GraphicScene inputs and optional SheetDefinition composition are consistent across every diagram and pipeline;
 - implementation remains unauthorized until a separate order.
 
 ## 16. Proposed implementation sequence after future authorization

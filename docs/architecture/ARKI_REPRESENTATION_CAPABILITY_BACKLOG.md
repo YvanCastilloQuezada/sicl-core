@@ -24,12 +24,12 @@ FUTURE
 
 | Capability | Status | Existing evidence / scope | Depends on | Blocked by | Unlock condition | Target front |
 |---|---|---|---|---|---|---|
-| ViewDefinition contract | `BLOCKED_BY_CONTRACT` | Defined conceptually in ARE-001 only | source scope, view taxonomy | no runtime contract | Red Team + separate ARE core authorization | ARE Core Types |
+| ViewDefinition contract | `BLOCKED_BY_CONTRACT` | Defined conceptually in ARE-001 only | source authority, source scope, view taxonomy | no runtime contract | Red Team + separate ARE core authorization | ARE Core Types |
 | RepresentationProfile contract | `BLOCKED_BY_CONTRACT` | Defined conceptually in ARE-001 only | view family, fidelity policy | no runtime contract | approve profile schema and validation rules | ARE Core Types |
 | GraphicStyle contract | `PARTIAL` | RFC-030 drawing rules and ARKI-DRAW styles exist | technical drawing standard | no cross-family contract | define immutable style registry boundary | ARE Core Types / ARKI-DRAW |
 | AnnotationProfile contract | `PARTIAL` | RFC-030 annotations and dimensions exist | view definition, geometry references | radial/angular semantics incomplete | approve annotation contract and references | ARE Core Types |
-| SheetDefinition contract | `PARTIAL` | ARKI-DRAW Sheet/Viewport and layout engine exist | viewports, title block, layout | no ARE composition contract | bind existing lower layer without changing it | ARE Core Types / Sheet Composition |
-| GraphicScene | `BLOCKED_BY_CONTRACT` | No runtime type exists | source refs, view, profile, primitives | intermediate semantics not implemented | authorize ARE core and scene invariants | Graphic Scene |
+| SheetDefinition contract | `PARTIAL` | ARKI-DRAW Sheet/Viewport and layout engine exist | one or more views/scenes, viewports, title block, layout | no ARE composition contract | bind existing lower layer without changing it | ARE Core Types / Sheet Composition |
+| GraphicScene | `BLOCKED_BY_CONTRACT` | No runtime type exists | source snapshot + ViewDefinition + RepresentationProfile + GraphicStyle + AnnotationProfile + transform version | intermediate semantics not implemented | authorize ARE core and scene invariants | Graphic Scene |
 | Knowledge views | `PARTIAL` | spatial/functional DTOs and diagrams exist in adjacent capabilities | functional knowledge, relationships | no unified ViewDefinition | authorize knowledge extraction contract | Knowledge Views |
 | Relationship diagram | `PARTIAL` | relationship data exists; no ARE scene backend | knowledge view, graph semantics | no unified scene | define graph scene mapping | Knowledge Views |
 | Flow/circulation diagram | `DECLARED_NOT_IMPLEMENTED` | No canonical ARE implementation | functional topology, graph layout | no view/scene runtime | source topology contract + scene backend | Knowledge Views |
@@ -56,54 +56,63 @@ FUTURE
 | Conceptual render | `DECLARED_NOT_IMPLEMENTED` | no ARE render engine | scene, materials/context | renderer not authorized | render contract and backend decision | Visualization |
 | Photorealistic render | `FUTURE` | RFC-035 is a separate future namespace | 3D scene, materials, renderer | no ARE/render authorization | separate RFC/runtime gate | Visualization / RFC-035 |
 | Hybrid sheets | `PARTIAL` | sheets can compose vector/text and documentation; raster integration not ARE-defined | SheetDefinition, vector/raster assets | no hybrid scene/profile contract | define asset provenance and composition contract | Sheet Composition |
-| Graphic traceability | `PARTIAL` | source metadata exists in RFC-030 and ARKI-DRAW | source refs, scene primitives | no unified GraphicScene | approve traceability schema | ARE Core / Graphic Scene |
+| Graphic traceability | `PARTIAL` | source metadata exists in RFC-030 and ARKI-DRAW | source refs, scene primitives, source authority | no unified GraphicScene | approve traceability schema | ARE Core / Graphic Scene |
 | Graphic selection | `DECLARED_NOT_IMPLEMENTED` | no canonical inverse lookup contract | traceability index | no UI/inspection contract | define read-only selection protocol | Interaction |
 | Architectural mutation from selection | `BLOCKED_BY_CONTRACT` | D2 transaction exists separately | authorized D2 mutation | forbidden direct SVG mutation | explicit D2 transaction handoff only | D2 Boundary |
 | Fidelity/compute policy | `PARTIAL` | law and cheapest-sufficient direction documented | stage, evidence, cost | no runtime funnel | separate funnel authorization | Policy |
 | Render validation | `BLOCKED_BY_CONTRACT` | render is explicitly not validation | validation domain, evidence | human/validation separation | define independent validation workflow | Governance |
+| Source authority model | `BLOCKED_BY_CONTRACT` | D2, SpatialRepresentation, IFC roles exist but no ARE registry | canonical/derived/exchange role definitions | authority precedence not runtime-defined | approve source-role and precedence contract | ARE Core Types |
+| Source freshness / staleness | `BLOCKED_BY_CONTRACT` | fingerprints and versions exist in source capabilities | snapshot correspondence, freshness evidence | no ARE freshness evaluator | approve freshness status contract | ARE Core Types / Governance |
+| Source conflict detection | `BLOCKED_BY_CONTRACT` | no ARE conflict resolver | source precedence and correspondence | silent conflict resolution forbidden | approve fail-closed conflict contract | Governance |
+| GraphicScene determinism | `BLOCKED_BY_CONTRACT` | deterministic lower-level serializers exist | source snapshot, four configuration inputs, transform version | no scene runtime | approve identity/fingerprint contract | Graphic Scene |
+| Serialized output determinism | `PARTIAL` | ARKI-DRAW SVG determinism exists | GraphicScene, backend version | no generalized backend contract | define backend identity and serialization rules | Output Backend |
 
 ## Dependency graph
 
 ```text
-D2 ArchiModel / Functional Knowledge
-        │
-        ├── source snapshots + fingerprints
-        │             │
-        │             ├── Knowledge Views
-        │             │       └── GraphicScene ──┐
-        │             │                           │
-        │             └── Geometric Views        │
-        │                     └── GraphicScene ──┤
-        │                                         ▼
-        │                               RepresentationProfile
-        │                                         │
-        │                                   GraphicStyle
-        │                                         │
-        │                                AnnotationProfile
-        │                                         │
-        │                                  SheetDefinition
-        │                                         │
-        │                    ┌────────────────────┼──────────────────┐
-        │                    ▼                    ▼                  ▼
-        │               ARKI-DRAW             3D backend       Visualization backend
-        │                    │                    │                  │
-        │                   SVG             future 3D          future raster/hybrid
-        │
-        └── D2 mutation/approval remains outside ARE and requires existing gates
+CANONICAL / DERIVED / EXCHANGE SOURCE SNAPSHOT
+                  │
+                  ├── ViewDefinition
+                  ├── RepresentationProfile
+                  ├── GraphicStyle
+                  └── AnnotationProfile
+                              │
+                              ▼
+                    VIEW / EXTRACTION TRANSFORM
+                              │
+                              ▼
+                         GraphicScene
+                              │
+          ┌───────────────────┼───────────────────┐
+          ▼                   ▼                   ▼
+      ARKI-DRAW          3D backend       Visualization backend
+          │                   │                   │
+         SVG             future 3D          future raster/hybrid
+          │
+          └── optional SheetDefinition → sheet composition
+
+D2 mutation/approval remains outside ARE and requires existing gates.
 ```
 
-## Explicit dependency rules
+## Source authority and freshness rules
+1. `CANONICAL_SOURCE` carries architectural authority when applicable; ARE is read-only.
+2. `DERIVED_SOURCE` is eligible only with source identity, source version/snapshot, source fingerprint, and freshness/correspondence status.
+3. `EXCHANGE_SOURCE` must declare `AUTHORITATIVE_IMPORT`, `REFERENCE_IMPORT`, or `DERIVED_EXPORT`; an exchange format alone is not canonical authority.
+4. `DERIVED_SOURCE(snapshot N)` against canonical snapshot `N+1` is `STALE`; stale sources yield `BLOCKED / STALE_SOURCE`.
+5. Contradictory canonical and derived/exchange sources yield `BLOCKED / SOURCE_CONFLICT`; ARE never chooses silently.
 
-1. A view definition depends on a declared source scope; it never invents a source.
+## Explicit dependency rules
+1. A view definition depends on declared source authority and scope; it never invents a source.
 2. A geometric projection depends on sufficient geometry, coordinate system, and orientation/cut data.
 3. A knowledge view does not depend on a ConstructionModel 3D object.
-4. A GraphicScene depends on a view and profile and must retain source references.
-5. GraphicStyle and AnnotationProfile may alter representation only, never source semantics.
-6. A SheetDefinition depends on one or more views/scenes, not on a new architectural model.
-7. A backend consumes a scene and reports unsupported operations; it must not silently substitute another backend.
-8. H-001 causal derivation is not a dependency of every graphic primitive.
-9. D2 mutation is not a consequence of graphic selection; explicit authority and D2 transaction are required.
-
+4. `ViewDefinition`, `RepresentationProfile`, `GraphicStyle`, and `AnnotationProfile` are independent configuration inputs.
+5. A `GraphicScene` depends on the source snapshot, those four inputs, and a transform version; it must retain source references.
+6. GraphicStyle and AnnotationProfile may alter representation only, never source semantics.
+7. A `SheetDefinition` composes one or more views/scenes only when a sheet is required; it is not a universal prerequisite.
+8. A backend consumes a scene and reports unsupported operations; it must not silently substitute another backend.
+9. GraphicScene determinism and serialized-output determinism are separate: backend version affects the latter when serialization depends on it.
+10. H-001 causal derivation is not a dependency of every graphic primitive.
+11. D2 mutation is not a consequence of graphic selection; explicit authority and D2 transaction are required.
 ## Current implementation sequence
 
 ```text
