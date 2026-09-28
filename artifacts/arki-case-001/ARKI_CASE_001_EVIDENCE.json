@@ -1,0 +1,685 @@
+{
+  "base_svg_sha256": "700f69b3e3969c1328d05552d41ebc0ad3256cc1da8a41cc41256a570d75de50",
+  "baseline_commit": "71e72bb1abfb217bf4854f464ae443764281f469",
+  "case_id": "ARKI-CASE-001",
+  "d2_element_inventory": {
+    "BEAM": 0,
+    "COLUMN": 0,
+    "DOOR": 5,
+    "OPENING": 0,
+    "SITE": 1,
+    "SLAB": 0,
+    "SPACE": 6,
+    "WALL": 12,
+    "WINDOW": 4
+  },
+  "d2_elements_in_projection": 27,
+  "deferred_capabilities": [
+    "dimensions",
+    "room labels",
+    "door swings",
+    "window/door symbols",
+    "material hatches",
+    "sheet composition",
+    "professional annotations"
+  ],
+  "fabrication_audit": {
+    "fabricated_items": 0,
+    "forbidden_markers_found": []
+  },
+  "graphic_scene_entity_inventory": {
+    "count": 27,
+    "not_visible_or_not_applicable": [
+      "550d5048fff95729b795a7c69389abe3d858dd03405c8e4c4e5497606302ddee"
+    ],
+    "represented_source_ids": [
+      "121c9ffb536ea7233010aad6db038b114296256554c4ac490fa4f5fc265a6549",
+      "27b9692a79900829bde4970b55a8c29eb511f4f34896e896bd359eb6085a9a62",
+      "2a820f9fe877cc174df0982a16b898d4e25d2add438eaa53957d0fcc3e20f123",
+      "358c9984e89caa7083f9355be071f40e011d1ee29a8191052d49344749b37e61",
+      "3844820c521c95d73b50dee1397a727ec0f8f37396d33ccf26d71b29344e9ed8",
+      "46370fd7e0aad7fe0ae1fe3d6d9448cabbb8ce3b015121f5445f7b78b366af96",
+      "5a00bde9f85a689afea81b3f8a7bf7beef52b737c46f91965ddad7577ac196d9",
+      "5e5c13fa42162b5dea2c7f4cb3d955aaff3649d22f942fae6c2e28393caf50b6",
+      "5ecd7888a1b3cf92bf2b2840a6895e95e6adf8b5cb3d60887ca4fa6fd9254182",
+      "65f6c86d74b36de0288eb7ce42c8d2eaaaf148deed3d1cc034afc1c86e236920",
+      "69345f16b12aea7e38bb2909498b729ecc0d4d83846ffe8ef43b61a69565c01e",
+      "79b92438df8d6897c17495a9548166a93c3e6014e7ddc3ef911cebb4892a6f35",
+      "7bac456273148ef1577a96856a7ffaa3470e06a7ce4c69855174524d9c1414f7",
+      "84a09eaa4238711a98bcce2b3c3632b5013094097ddc0492abfc102638777829",
+      "8544c28ef15dd0226636db6e4eadaa1af6a8058c5cbfe9b1f8c230a36e8bd412",
+      "9d866d1140b8fa70326d264f064520d4cece5b2f59c35fbb1435c62a39b5ee95",
+      "a00414e10a1801236463b6b24b1e3b9c5a34a8d3a09d2e96d711c6d583275a9c",
+      "b124db27ba60b6ffb2781d00a658b4d9ebbd655d5fbb7d5138e95998ade40f34",
+      "b64622c3206d3ea35615589e867792be3d17f745b2c304806e2404843f1b21a8",
+      "c2817b233d50c225e7aa6c16a18c4dc8464c035364b84e1492eeac5f20c225ea",
+      "c8d9b36c837b4f81c62c653e5ca15c3a965a6ef373c010edce5c741ee326b359",
+      "ca733e4325fffe6bc74500ed01f3a0c5c17c8865d79f352152696dd7660fdf43",
+      "d04b0be51c32c3e02b68063d0ec97e4365e074a5c5dd1a13ffca34e14e414746",
+      "d18e05bbf0a72572aa92e50cc6438b450386ade0d709b4d850f0e8e57f937ade",
+      "d561c22daf65e0db1f47c993f25602c3238cc71bab345ebf58af0af858a06cdc",
+      "f098742e569a068317ee31b20d8cf579624b68e99b26ef0b981322602ac8a53a",
+      "f8646a5ff02abf97d1e6e650915984b0f68907777dd7b8d32f88d69273334ec9"
+    ]
+  },
+  "margin_mm": 10.0,
+  "mutated_svg_sha256": "4a68e0fd548300af90de187214077627aaea895042acbd7ea9e79e558da6fd5a",
+  "mutation": {
+    "base_entity_id": "G-0e202928ba9f71316dee17f9",
+    "delta_x_mm": 600,
+    "mutated_entity_id": "G-0e202928ba9f71316dee17f9",
+    "target": "c2817b233d50c225e7aa6c16a18c4dc8464c035364b84e1492eeac5f20c225ea"
+  },
+  "scale": "1:50",
+  "svg_determinism": true,
+  "svg_primitive_inventory": {
+    "parseable": true,
+    "primitives": [
+      {
+        "data-primitive-id": "P-823e4bcaa34d5ca7fe8f051c",
+        "data-semantic-role": "SPACE_BOUNDARY",
+        "data-source-ref": "G-859f1a55bf513916f33d4dca"
+      },
+      {
+        "data-primitive-id": "P-d4a1a0e95fab4b9cf1961b06",
+        "data-semantic-role": "SPACE_BOUNDARY",
+        "data-source-ref": "G-5f2db32e112bd4ef45d495ed"
+      },
+      {
+        "data-primitive-id": "P-6317f96f48480dd615493536",
+        "data-semantic-role": "SPACE_BOUNDARY",
+        "data-source-ref": "G-2969372eb7f24281fb87bbea"
+      },
+      {
+        "data-primitive-id": "P-95289d929541590ae5eb30bf",
+        "data-semantic-role": "SPACE_BOUNDARY",
+        "data-source-ref": "G-45c1bb75d7345b9bee2bb964"
+      },
+      {
+        "data-primitive-id": "P-4ecc41ba0cb93b518dbdd00f",
+        "data-semantic-role": "SPACE_BOUNDARY",
+        "data-source-ref": "G-9dd18e61a64a60257fab2db1"
+      },
+      {
+        "data-primitive-id": "P-8f88e9c68fd3e5b214c52851",
+        "data-semantic-role": "SPACE_BOUNDARY",
+        "data-source-ref": "G-9b03e1aa869d87291dd96a1c"
+      },
+      {
+        "data-primitive-id": "P-8712924a13b0dadb5800f34a",
+        "data-semantic-role": "WALL_CUT",
+        "data-source-ref": "G-b045313bf0662f0170be0a22"
+      },
+      {
+        "data-primitive-id": "P-3a1e425087f5e30056b5a3a6",
+        "data-semantic-role": "WALL_CUT",
+        "data-source-ref": "G-d9d67dcd2bc85cf5ca1d188e"
+      },
+      {
+        "data-primitive-id": "P-c5181bee87e953c545eaea27",
+        "data-semantic-role": "WALL_CUT",
+        "data-source-ref": "G-9cee7caf1939951df398cc7b"
+      },
+      {
+        "data-primitive-id": "P-6af1ca7c8392a4557c795e53",
+        "data-semantic-role": "WALL_CUT",
+        "data-source-ref": "G-d2cc76c07cee1423add0fb13"
+      },
+      {
+        "data-primitive-id": "P-ca35056556e66810c43a4208",
+        "data-semantic-role": "WALL_CUT",
+        "data-source-ref": "G-1a6acabd39e7e5844d8547f3"
+      },
+      {
+        "data-primitive-id": "P-14a0ba12d08b88a7d99a0727",
+        "data-semantic-role": "WALL_CUT",
+        "data-source-ref": "G-82307caacdc197833a0e7d86"
+      },
+      {
+        "data-primitive-id": "P-bb84c4f23cf9f2fbe89d7ec9",
+        "data-semantic-role": "WALL_CUT",
+        "data-source-ref": "G-f7abc73aab8bade66d31d4c9"
+      },
+      {
+        "data-primitive-id": "P-f840f39ca0c7b85f99cf60ed",
+        "data-semantic-role": "WALL_CUT",
+        "data-source-ref": "G-d9ccb2a86a8b3c27bfeed946"
+      },
+      {
+        "data-primitive-id": "P-873e0bfd4c0673f21ded823d",
+        "data-semantic-role": "WALL_CUT",
+        "data-source-ref": "G-0e202928ba9f71316dee17f9"
+      },
+      {
+        "data-primitive-id": "P-6fc3cfc883aa903420f54770",
+        "data-semantic-role": "WALL_CUT",
+        "data-source-ref": "G-d581fa2c68b3f9af4f5c62f3"
+      },
+      {
+        "data-primitive-id": "P-771cd34d9f175ed87a709d2d",
+        "data-semantic-role": "WALL_CUT",
+        "data-source-ref": "G-046d124c41e8f2742f5f3af4"
+      },
+      {
+        "data-primitive-id": "P-12b7576ed22dcd07c5d073a5",
+        "data-semantic-role": "WALL_CUT",
+        "data-source-ref": "G-fc576310b1be8466bd8d3a96"
+      },
+      {
+        "data-primitive-id": "P-283419ef065fd6437318be02",
+        "data-semantic-role": "DOOR_EVIDENCE",
+        "data-source-ref": "G-cc0cac88b5ecc98cad216adf"
+      },
+      {
+        "data-primitive-id": "P-4ca86c7d147996ddf88607b5",
+        "data-semantic-role": "DOOR_EVIDENCE",
+        "data-source-ref": "G-24c5f9073d521ad42ce974cf"
+      },
+      {
+        "data-primitive-id": "P-a89408a680126f0c4f579397",
+        "data-semantic-role": "DOOR_EVIDENCE",
+        "data-source-ref": "G-99e97cf5b46e3e5a33251f43"
+      },
+      {
+        "data-primitive-id": "P-0b10eb221ca793dc99e77fb4",
+        "data-semantic-role": "DOOR_EVIDENCE",
+        "data-source-ref": "G-c4434ae2f543cf8781b56de0"
+      },
+      {
+        "data-primitive-id": "P-95db1c12512f80ad7c60a436",
+        "data-semantic-role": "DOOR_EVIDENCE",
+        "data-source-ref": "G-307539c157403e472b4c8198"
+      },
+      {
+        "data-primitive-id": "P-a12e41338423205ad0852220",
+        "data-semantic-role": "WINDOW_EVIDENCE",
+        "data-source-ref": "G-47ad7060b1fcb76e023881a8"
+      },
+      {
+        "data-primitive-id": "P-b9e426cc6b71c860c1ced3d3",
+        "data-semantic-role": "WINDOW_EVIDENCE",
+        "data-source-ref": "G-f1042f81a28d5758a6afe1fb"
+      },
+      {
+        "data-primitive-id": "P-5229953d7bb2385750fcb643",
+        "data-semantic-role": "WINDOW_EVIDENCE",
+        "data-source-ref": "G-59cd9849f8cbf0ab891d7445"
+      },
+      {
+        "data-primitive-id": "P-00380f9e90997478b35be9c3",
+        "data-semantic-role": "WINDOW_EVIDENCE",
+        "data-source-ref": "G-9746ddd01a0619bf6288c75a"
+      }
+    ],
+    "raster_images": 0
+  },
+  "traceability": [
+    {
+      "d2_element_id": "121c9ffb536ea7233010aad6db038b114296256554c4ac490fa4f5fc265a6549",
+      "d2_version": 1,
+      "graphic_entity_id": "G-859f1a55bf513916f33d4dca",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "SPACE_BOUNDARY",
+        "source_entity_refs": [
+          "121c9ffb536ea7233010aad6db038b114296256554c4ac490fa4f5fc265a6549"
+        ],
+        "source_fingerprint": "5c1c865a8aaba570fc841e694bc5f3ad153eeeaaaf209f1a45792beb3f900f89",
+        "source_version": "1"
+      },
+      "primitive_id": "P-823e4bcaa34d5ca7fe8f051c",
+      "svg_data_semantic_role": "SPACE_BOUNDARY",
+      "svg_data_source_ref": "G-859f1a55bf513916f33d4dca"
+    },
+    {
+      "d2_element_id": "27b9692a79900829bde4970b55a8c29eb511f4f34896e896bd359eb6085a9a62",
+      "d2_version": 1,
+      "graphic_entity_id": "G-b045313bf0662f0170be0a22",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WALL_CUT",
+        "source_entity_refs": [
+          "27b9692a79900829bde4970b55a8c29eb511f4f34896e896bd359eb6085a9a62"
+        ],
+        "source_fingerprint": "31e830c32c3f00fa62745422ec8d9d3f5137cf7d159715bf93a47ee79c3535a3",
+        "source_version": "1"
+      },
+      "primitive_id": "P-8712924a13b0dadb5800f34a",
+      "svg_data_semantic_role": "WALL_CUT",
+      "svg_data_source_ref": "G-b045313bf0662f0170be0a22"
+    },
+    {
+      "d2_element_id": "2a820f9fe877cc174df0982a16b898d4e25d2add438eaa53957d0fcc3e20f123",
+      "d2_version": 1,
+      "graphic_entity_id": "G-d9d67dcd2bc85cf5ca1d188e",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WALL_CUT",
+        "source_entity_refs": [
+          "2a820f9fe877cc174df0982a16b898d4e25d2add438eaa53957d0fcc3e20f123"
+        ],
+        "source_fingerprint": "8872091e34dbf7c966b4355074c9f1af51fefa2a7fb6d038bc0dfcd654490ef6",
+        "source_version": "1"
+      },
+      "primitive_id": "P-3a1e425087f5e30056b5a3a6",
+      "svg_data_semantic_role": "WALL_CUT",
+      "svg_data_source_ref": "G-d9d67dcd2bc85cf5ca1d188e"
+    },
+    {
+      "d2_element_id": "358c9984e89caa7083f9355be071f40e011d1ee29a8191052d49344749b37e61",
+      "d2_version": 1,
+      "graphic_entity_id": "G-cc0cac88b5ecc98cad216adf",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "DOOR_EVIDENCE",
+        "source_entity_refs": [
+          "358c9984e89caa7083f9355be071f40e011d1ee29a8191052d49344749b37e61"
+        ],
+        "source_fingerprint": "b036fe95a8dd2800bb8136dd0baac8c2bd25a47348f5abbbbc05321037401737",
+        "source_version": "1"
+      },
+      "primitive_id": "P-283419ef065fd6437318be02",
+      "svg_data_semantic_role": "DOOR_EVIDENCE",
+      "svg_data_source_ref": "G-cc0cac88b5ecc98cad216adf"
+    },
+    {
+      "d2_element_id": "3844820c521c95d73b50dee1397a727ec0f8f37396d33ccf26d71b29344e9ed8",
+      "d2_version": 1,
+      "graphic_entity_id": "G-47ad7060b1fcb76e023881a8",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WINDOW_EVIDENCE",
+        "source_entity_refs": [
+          "3844820c521c95d73b50dee1397a727ec0f8f37396d33ccf26d71b29344e9ed8"
+        ],
+        "source_fingerprint": "f96c5d1669e1295f7a88843f4132384f43a36f098d22999fca7b3e58acc791c4",
+        "source_version": "1"
+      },
+      "primitive_id": "P-a12e41338423205ad0852220",
+      "svg_data_semantic_role": "WINDOW_EVIDENCE",
+      "svg_data_source_ref": "G-47ad7060b1fcb76e023881a8"
+    },
+    {
+      "d2_element_id": "46370fd7e0aad7fe0ae1fe3d6d9448cabbb8ce3b015121f5445f7b78b366af96",
+      "d2_version": 1,
+      "graphic_entity_id": "G-5f2db32e112bd4ef45d495ed",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "SPACE_BOUNDARY",
+        "source_entity_refs": [
+          "46370fd7e0aad7fe0ae1fe3d6d9448cabbb8ce3b015121f5445f7b78b366af96"
+        ],
+        "source_fingerprint": "bf4e5e71e1505e4053076434a09a55b78427f17f46a897a2f3e7494a97a58c66",
+        "source_version": "1"
+      },
+      "primitive_id": "P-d4a1a0e95fab4b9cf1961b06",
+      "svg_data_semantic_role": "SPACE_BOUNDARY",
+      "svg_data_source_ref": "G-5f2db32e112bd4ef45d495ed"
+    },
+    {
+      "d2_element_id": "5a00bde9f85a689afea81b3f8a7bf7beef52b737c46f91965ddad7577ac196d9",
+      "d2_version": 1,
+      "graphic_entity_id": "G-2969372eb7f24281fb87bbea",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "SPACE_BOUNDARY",
+        "source_entity_refs": [
+          "5a00bde9f85a689afea81b3f8a7bf7beef52b737c46f91965ddad7577ac196d9"
+        ],
+        "source_fingerprint": "d577d4018e77066a7ec2b415676c925e56852d449963a94d07e9d1454ff130f5",
+        "source_version": "1"
+      },
+      "primitive_id": "P-6317f96f48480dd615493536",
+      "svg_data_semantic_role": "SPACE_BOUNDARY",
+      "svg_data_source_ref": "G-2969372eb7f24281fb87bbea"
+    },
+    {
+      "d2_element_id": "5e5c13fa42162b5dea2c7f4cb3d955aaff3649d22f942fae6c2e28393caf50b6",
+      "d2_version": 1,
+      "graphic_entity_id": "G-9cee7caf1939951df398cc7b",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WALL_CUT",
+        "source_entity_refs": [
+          "5e5c13fa42162b5dea2c7f4cb3d955aaff3649d22f942fae6c2e28393caf50b6"
+        ],
+        "source_fingerprint": "0062094ef9a3866c7826eb0505b4758640363ea628695e04474800bfd000cb80",
+        "source_version": "1"
+      },
+      "primitive_id": "P-c5181bee87e953c545eaea27",
+      "svg_data_semantic_role": "WALL_CUT",
+      "svg_data_source_ref": "G-9cee7caf1939951df398cc7b"
+    },
+    {
+      "d2_element_id": "5ecd7888a1b3cf92bf2b2840a6895e95e6adf8b5cb3d60887ca4fa6fd9254182",
+      "d2_version": 1,
+      "graphic_entity_id": "G-45c1bb75d7345b9bee2bb964",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "SPACE_BOUNDARY",
+        "source_entity_refs": [
+          "5ecd7888a1b3cf92bf2b2840a6895e95e6adf8b5cb3d60887ca4fa6fd9254182"
+        ],
+        "source_fingerprint": "480de0757bc0a9ba100a598116aac22dd08a0c2ce4ec685ea39d295025348f2d",
+        "source_version": "1"
+      },
+      "primitive_id": "P-95289d929541590ae5eb30bf",
+      "svg_data_semantic_role": "SPACE_BOUNDARY",
+      "svg_data_source_ref": "G-45c1bb75d7345b9bee2bb964"
+    },
+    {
+      "d2_element_id": "65f6c86d74b36de0288eb7ce42c8d2eaaaf148deed3d1cc034afc1c86e236920",
+      "d2_version": 1,
+      "graphic_entity_id": "G-f1042f81a28d5758a6afe1fb",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WINDOW_EVIDENCE",
+        "source_entity_refs": [
+          "65f6c86d74b36de0288eb7ce42c8d2eaaaf148deed3d1cc034afc1c86e236920"
+        ],
+        "source_fingerprint": "b397a5c81414ab1906fc040387c55dda6c3ee496afa41be80c7c670969381527",
+        "source_version": "1"
+      },
+      "primitive_id": "P-b9e426cc6b71c860c1ced3d3",
+      "svg_data_semantic_role": "WINDOW_EVIDENCE",
+      "svg_data_source_ref": "G-f1042f81a28d5758a6afe1fb"
+    },
+    {
+      "d2_element_id": "69345f16b12aea7e38bb2909498b729ecc0d4d83846ffe8ef43b61a69565c01e",
+      "d2_version": 1,
+      "graphic_entity_id": "G-24c5f9073d521ad42ce974cf",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "DOOR_EVIDENCE",
+        "source_entity_refs": [
+          "69345f16b12aea7e38bb2909498b729ecc0d4d83846ffe8ef43b61a69565c01e"
+        ],
+        "source_fingerprint": "39d207e9c700f1abffc923a781436b9be2bba407bf7e2e14f667cc34e70e359d",
+        "source_version": "1"
+      },
+      "primitive_id": "P-4ca86c7d147996ddf88607b5",
+      "svg_data_semantic_role": "DOOR_EVIDENCE",
+      "svg_data_source_ref": "G-24c5f9073d521ad42ce974cf"
+    },
+    {
+      "d2_element_id": "79b92438df8d6897c17495a9548166a93c3e6014e7ddc3ef911cebb4892a6f35",
+      "d2_version": 1,
+      "graphic_entity_id": "G-d2cc76c07cee1423add0fb13",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WALL_CUT",
+        "source_entity_refs": [
+          "79b92438df8d6897c17495a9548166a93c3e6014e7ddc3ef911cebb4892a6f35"
+        ],
+        "source_fingerprint": "7e6e86caf84a8a19b004b1a261cd61009f7f50c11f922af1d8ffb1a214fcbe7d",
+        "source_version": "1"
+      },
+      "primitive_id": "P-6af1ca7c8392a4557c795e53",
+      "svg_data_semantic_role": "WALL_CUT",
+      "svg_data_source_ref": "G-d2cc76c07cee1423add0fb13"
+    },
+    {
+      "d2_element_id": "7bac456273148ef1577a96856a7ffaa3470e06a7ce4c69855174524d9c1414f7",
+      "d2_version": 1,
+      "graphic_entity_id": "G-1a6acabd39e7e5844d8547f3",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WALL_CUT",
+        "source_entity_refs": [
+          "7bac456273148ef1577a96856a7ffaa3470e06a7ce4c69855174524d9c1414f7"
+        ],
+        "source_fingerprint": "a0f2128eba34d56c71a4ee9e5d44e546c0c02330fb9d90911c35f8650c5006f8",
+        "source_version": "1"
+      },
+      "primitive_id": "P-ca35056556e66810c43a4208",
+      "svg_data_semantic_role": "WALL_CUT",
+      "svg_data_source_ref": "G-1a6acabd39e7e5844d8547f3"
+    },
+    {
+      "d2_element_id": "84a09eaa4238711a98bcce2b3c3632b5013094097ddc0492abfc102638777829",
+      "d2_version": 1,
+      "graphic_entity_id": "G-82307caacdc197833a0e7d86",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WALL_CUT",
+        "source_entity_refs": [
+          "84a09eaa4238711a98bcce2b3c3632b5013094097ddc0492abfc102638777829"
+        ],
+        "source_fingerprint": "250cd229ecbd9713bae0b6f9da5ee27a74f48e89d16825ca5e577c4c63e700b3",
+        "source_version": "1"
+      },
+      "primitive_id": "P-14a0ba12d08b88a7d99a0727",
+      "svg_data_semantic_role": "WALL_CUT",
+      "svg_data_source_ref": "G-82307caacdc197833a0e7d86"
+    },
+    {
+      "d2_element_id": "8544c28ef15dd0226636db6e4eadaa1af6a8058c5cbfe9b1f8c230a36e8bd412",
+      "d2_version": 1,
+      "graphic_entity_id": "G-99e97cf5b46e3e5a33251f43",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "DOOR_EVIDENCE",
+        "source_entity_refs": [
+          "8544c28ef15dd0226636db6e4eadaa1af6a8058c5cbfe9b1f8c230a36e8bd412"
+        ],
+        "source_fingerprint": "8325603ff99559114e799adf976de2d27e246b7a650de2d9718f02f1ee9d593c",
+        "source_version": "1"
+      },
+      "primitive_id": "P-a89408a680126f0c4f579397",
+      "svg_data_semantic_role": "DOOR_EVIDENCE",
+      "svg_data_source_ref": "G-99e97cf5b46e3e5a33251f43"
+    },
+    {
+      "d2_element_id": "9d866d1140b8fa70326d264f064520d4cece5b2f59c35fbb1435c62a39b5ee95",
+      "d2_version": 1,
+      "graphic_entity_id": "G-f7abc73aab8bade66d31d4c9",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WALL_CUT",
+        "source_entity_refs": [
+          "9d866d1140b8fa70326d264f064520d4cece5b2f59c35fbb1435c62a39b5ee95"
+        ],
+        "source_fingerprint": "94cffe99446c4484269d20b555b9acd09b411910ec3b11bcea31d75c0c9ede53",
+        "source_version": "1"
+      },
+      "primitive_id": "P-bb84c4f23cf9f2fbe89d7ec9",
+      "svg_data_semantic_role": "WALL_CUT",
+      "svg_data_source_ref": "G-f7abc73aab8bade66d31d4c9"
+    },
+    {
+      "d2_element_id": "a00414e10a1801236463b6b24b1e3b9c5a34a8d3a09d2e96d711c6d583275a9c",
+      "d2_version": 1,
+      "graphic_entity_id": "G-59cd9849f8cbf0ab891d7445",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WINDOW_EVIDENCE",
+        "source_entity_refs": [
+          "a00414e10a1801236463b6b24b1e3b9c5a34a8d3a09d2e96d711c6d583275a9c"
+        ],
+        "source_fingerprint": "7a202e97ad0e98f8e7f881b885b083a81d944954a7ad13661e256674b3fb30a7",
+        "source_version": "1"
+      },
+      "primitive_id": "P-5229953d7bb2385750fcb643",
+      "svg_data_semantic_role": "WINDOW_EVIDENCE",
+      "svg_data_source_ref": "G-59cd9849f8cbf0ab891d7445"
+    },
+    {
+      "d2_element_id": "b124db27ba60b6ffb2781d00a658b4d9ebbd655d5fbb7d5138e95998ade40f34",
+      "d2_version": 1,
+      "graphic_entity_id": "G-9746ddd01a0619bf6288c75a",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WINDOW_EVIDENCE",
+        "source_entity_refs": [
+          "b124db27ba60b6ffb2781d00a658b4d9ebbd655d5fbb7d5138e95998ade40f34"
+        ],
+        "source_fingerprint": "c740ad07296417d409e4240455cb95e5854fac4ba1b7bd41f2b2a9c794680b3e",
+        "source_version": "1"
+      },
+      "primitive_id": "P-00380f9e90997478b35be9c3",
+      "svg_data_semantic_role": "WINDOW_EVIDENCE",
+      "svg_data_source_ref": "G-9746ddd01a0619bf6288c75a"
+    },
+    {
+      "d2_element_id": "b64622c3206d3ea35615589e867792be3d17f745b2c304806e2404843f1b21a8",
+      "d2_version": 1,
+      "graphic_entity_id": "G-d9ccb2a86a8b3c27bfeed946",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WALL_CUT",
+        "source_entity_refs": [
+          "b64622c3206d3ea35615589e867792be3d17f745b2c304806e2404843f1b21a8"
+        ],
+        "source_fingerprint": "50252f3e89c0bc1f78340b2a7634d84a419d50983da4383596b924598bfa0704",
+        "source_version": "1"
+      },
+      "primitive_id": "P-f840f39ca0c7b85f99cf60ed",
+      "svg_data_semantic_role": "WALL_CUT",
+      "svg_data_source_ref": "G-d9ccb2a86a8b3c27bfeed946"
+    },
+    {
+      "d2_element_id": "c2817b233d50c225e7aa6c16a18c4dc8464c035364b84e1492eeac5f20c225ea",
+      "d2_version": 1,
+      "graphic_entity_id": "G-0e202928ba9f71316dee17f9",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WALL_CUT",
+        "source_entity_refs": [
+          "c2817b233d50c225e7aa6c16a18c4dc8464c035364b84e1492eeac5f20c225ea"
+        ],
+        "source_fingerprint": "ff83b6bb79b0da853584530f7f306cbec2717f4a50c364e9780355b5ae137678",
+        "source_version": "1"
+      },
+      "primitive_id": "P-873e0bfd4c0673f21ded823d",
+      "svg_data_semantic_role": "WALL_CUT",
+      "svg_data_source_ref": "G-0e202928ba9f71316dee17f9"
+    },
+    {
+      "d2_element_id": "c8d9b36c837b4f81c62c653e5ca15c3a965a6ef373c010edce5c741ee326b359",
+      "d2_version": 1,
+      "graphic_entity_id": "G-d581fa2c68b3f9af4f5c62f3",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WALL_CUT",
+        "source_entity_refs": [
+          "c8d9b36c837b4f81c62c653e5ca15c3a965a6ef373c010edce5c741ee326b359"
+        ],
+        "source_fingerprint": "464a51163c0c0f75cb4c0449c43d1403ead658f266038a6462867fba5945256d",
+        "source_version": "1"
+      },
+      "primitive_id": "P-6fc3cfc883aa903420f54770",
+      "svg_data_semantic_role": "WALL_CUT",
+      "svg_data_source_ref": "G-d581fa2c68b3f9af4f5c62f3"
+    },
+    {
+      "d2_element_id": "ca733e4325fffe6bc74500ed01f3a0c5c17c8865d79f352152696dd7660fdf43",
+      "d2_version": 1,
+      "graphic_entity_id": "G-9dd18e61a64a60257fab2db1",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "SPACE_BOUNDARY",
+        "source_entity_refs": [
+          "ca733e4325fffe6bc74500ed01f3a0c5c17c8865d79f352152696dd7660fdf43"
+        ],
+        "source_fingerprint": "a33ff84848e27d9869fbac4fe4661c0dc0c5d2a6dcbfecf57f45dd3e85f1346e",
+        "source_version": "1"
+      },
+      "primitive_id": "P-4ecc41ba0cb93b518dbdd00f",
+      "svg_data_semantic_role": "SPACE_BOUNDARY",
+      "svg_data_source_ref": "G-9dd18e61a64a60257fab2db1"
+    },
+    {
+      "d2_element_id": "d04b0be51c32c3e02b68063d0ec97e4365e074a5c5dd1a13ffca34e14e414746",
+      "d2_version": 1,
+      "graphic_entity_id": "G-c4434ae2f543cf8781b56de0",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "DOOR_EVIDENCE",
+        "source_entity_refs": [
+          "d04b0be51c32c3e02b68063d0ec97e4365e074a5c5dd1a13ffca34e14e414746"
+        ],
+        "source_fingerprint": "5c3a748b4a28bd5bc4efc5b53246bab845e3d0aa93aeee52e7906759025d13c2",
+        "source_version": "1"
+      },
+      "primitive_id": "P-0b10eb221ca793dc99e77fb4",
+      "svg_data_semantic_role": "DOOR_EVIDENCE",
+      "svg_data_source_ref": "G-c4434ae2f543cf8781b56de0"
+    },
+    {
+      "d2_element_id": "d18e05bbf0a72572aa92e50cc6438b450386ade0d709b4d850f0e8e57f937ade",
+      "d2_version": 1,
+      "graphic_entity_id": "G-046d124c41e8f2742f5f3af4",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WALL_CUT",
+        "source_entity_refs": [
+          "d18e05bbf0a72572aa92e50cc6438b450386ade0d709b4d850f0e8e57f937ade"
+        ],
+        "source_fingerprint": "b3179e9491d21ea0e43cd5edbc5548d4db27f78ac4ecc6706e4d8ca82bbd253d",
+        "source_version": "1"
+      },
+      "primitive_id": "P-771cd34d9f175ed87a709d2d",
+      "svg_data_semantic_role": "WALL_CUT",
+      "svg_data_source_ref": "G-046d124c41e8f2742f5f3af4"
+    },
+    {
+      "d2_element_id": "d561c22daf65e0db1f47c993f25602c3238cc71bab345ebf58af0af858a06cdc",
+      "d2_version": 1,
+      "graphic_entity_id": "G-9b03e1aa869d87291dd96a1c",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "SPACE_BOUNDARY",
+        "source_entity_refs": [
+          "d561c22daf65e0db1f47c993f25602c3238cc71bab345ebf58af0af858a06cdc"
+        ],
+        "source_fingerprint": "322973a3516b78ae0647b1225d167bae6d402382599dce26202f3bb5b3730f8c",
+        "source_version": "1"
+      },
+      "primitive_id": "P-8f88e9c68fd3e5b214c52851",
+      "svg_data_semantic_role": "SPACE_BOUNDARY",
+      "svg_data_source_ref": "G-9b03e1aa869d87291dd96a1c"
+    },
+    {
+      "d2_element_id": "f098742e569a068317ee31b20d8cf579624b68e99b26ef0b981322602ac8a53a",
+      "d2_version": 1,
+      "graphic_entity_id": "G-307539c157403e472b4c8198",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "DOOR_EVIDENCE",
+        "source_entity_refs": [
+          "f098742e569a068317ee31b20d8cf579624b68e99b26ef0b981322602ac8a53a"
+        ],
+        "source_fingerprint": "073247dcdcbb4716d24717f18d3128565c66d928e8cc910a7d46c88555d29403",
+        "source_version": "1"
+      },
+      "primitive_id": "P-95db1c12512f80ad7c60a436",
+      "svg_data_semantic_role": "DOOR_EVIDENCE",
+      "svg_data_source_ref": "G-307539c157403e472b4c8198"
+    },
+    {
+      "d2_element_id": "f8646a5ff02abf97d1e6e650915984b0f68907777dd7b8d32f88d69273334ec9",
+      "d2_version": 1,
+      "graphic_entity_id": "G-fc576310b1be8466bd8d3a96",
+      "graphic_trace": {
+        "operation": "ARE-003:ARCHITECTURAL_PLAN:CUT_PROJECTION",
+        "semantic_role": "WALL_CUT",
+        "source_entity_refs": [
+          "f8646a5ff02abf97d1e6e650915984b0f68907777dd7b8d32f88d69273334ec9"
+        ],
+        "source_fingerprint": "e96360ee0a0894f542beaa95e5a62c07a91fec227fb388b9a95966e62385b847",
+        "source_version": "1"
+      },
+      "primitive_id": "P-12b7576ed22dcd07c5d073a5",
+      "svg_data_semantic_role": "WALL_CUT",
+      "svg_data_source_ref": "G-fc576310b1be8466bd8d3a96"
+    }
+  ],
+  "unaffected_entities": [
+    "G-859f1a55bf513916f33d4dca",
+    "G-b045313bf0662f0170be0a22"
+  ],
+  "unsupported_capabilities": [
+    "SITE projection is NOT_APPLICABLE in ARE-003",
+    "non-rectangular geometry not used"
+  ]
+}
