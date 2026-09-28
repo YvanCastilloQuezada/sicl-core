@@ -9,6 +9,7 @@ from .paper import Margins, Orientation, PaperSize, PaperSpec
 from .title_block import Specialty, TitleBlock, TitleBlockField
 from .sheet import Sheet, Viewport
 from .svg_export import export_sheet_svg, export_view_svg
+from .scene_adapter import ADAPTER_VERSION, AdaptedGraphicScene, DrawingAdapterError, adapt_graphic_scene, export_adapted_svg, graphic_scene_to_svg
 
 # Historical RFC-030 exports remain available.
 from .drawing_rules import DrawingRule, DrawingRuleSet, load_rule_set, validate_rule_set
@@ -21,7 +22,7 @@ from .http_api import DrawingHttpService
 __all__ = [
     "Point", "Line", "Polyline", "Rect", "Arc", "Circle", "Text", "TextAnchor", "Hatch", "HatchPattern", "Dimension", "DimensionKind", "LineWeight",
     "Scale", "PaperSize", "PaperSpec", "Margins", "Orientation", "Specialty", "TitleBlock", "TitleBlockField", "Sheet", "Viewport",
-    "export_sheet_svg", "export_view_svg", "DrawingRule", "DrawingRuleSet", "load_rule_set", "validate_rule_set", "DrawingSet", "DrawingSheet",
+    "export_sheet_svg", "export_view_svg", "ADAPTER_VERSION", "AdaptedGraphicScene", "DrawingAdapterError", "adapt_graphic_scene", "export_adapted_svg", "graphic_scene_to_svg", "DrawingRule", "DrawingRuleSet", "load_rule_set", "validate_rule_set", "DrawingSet", "DrawingSheet",
     "DrawingView", "SectionCut", "BIMModelSnapshot", "create_synthetic_ifc", "import_ifc_snapshot", "validate_ifc", "compose_drawing_set",
     "export_drawing_set", "DrawingHttpService",
 ]
