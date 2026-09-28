@@ -21,7 +21,8 @@
 - Model-space D2 millimetres are mapped directly to plan view-space millimetres (`XY`); no centering, scaling, or decorative offset is applied.
 - `cut_plane` is explicit as `z_mm=<finite number>` for the initial implementation.
 - Entity identity is derived from source element, view, operation, semantic role, and projection version.
-- Visibility is classified from source `z_mm` and `height_mm` as `CUT`, `ABOVE_BEYOND`, or `NOT_VISIBLE`.
+- Cut relation and view visibility are separate. Exact model-unit boundaries use `bottom <= cut <= top` for `CUT`; `BELOW_CUT` is visible with an explicit below-cut operation; `ABOVE_CUT` is `UNKNOWN_VISIBILITY` and is not emitted without a visibility policy/evidence.
+- Plan direction is explicit: `view_direction="TOP"` is required by the initial engine.
 - `DOOR_EVIDENCE` retains only geometric evidence and hosting trace; no swing arc or handing is fabricated.
 
 ## DO_NOT_REUSE
@@ -49,6 +50,7 @@
 - Columns, beams, slabs: semantic roles are reserved, but only emitted when their supported D2 geometry and view visibility are determinable.
 - A-002 runtime integration: no operation-specific contract is required by this projection boundary yet.
 - API/frontend/render integration: later application/backend fronts.
+- `semantic_scope` is enforced as a project scope restriction; `filters`, `visibility`, and `level_scope` execution remain `DEFERRED_WITH_REASON` until ARE defines their operational semantics.
 
 ## ISOLATION INVARIANTS
 
