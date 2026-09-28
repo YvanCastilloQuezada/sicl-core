@@ -137,3 +137,60 @@ def test_malformed_trace_and_geometry_fail_closed():
     negative_geometry = replace(scene.entities[0], geometry_intent={**dict(scene.entities[0].geometry_intent), "depth_mm": -1})
     with pytest.raises(DrawingAdapterError, match="NONPOSITIVE_GEOMETRY"):
         graphic_scene_to_svg(replace(scene, entities=(negative_geometry, *scene.entities[1:])))
+
+
+def test_trace_role_and_operation_mismatches_fail_closed():
+    scene = make_scene()
+    entity = scene.entities[0]
+    role_mismatch = replace(entity, trace=replace(entity.trace, semantic_role="DOOR_EVIDENCE"))
+    with pytest.raises(DrawingAdapterError, match="GRAPHIC_TRACE_ROLE_MISMATCH"):
+        graphic_scene_to_svg(replace(scene, entities=(role_mismatch, *scene.entities[1:])))
+    operation_mismatch = replace(entity, trace=replace(entity.trace, operation="ARE-003:ARCHITECTURAL_PLAN:BELOW_CUT_PROJECTION"))
+    with pytest.raises(DrawingAdapterError, match="GRAPHIC_TRACE_OPERATION_MISMATCH"):
+        graphic_scene_to_svg(replace(scene, entities=(operation_mismatch, *scene.entities[1:])))
+
+
+def test_trace_source_fingerprint_is_deferred_without_canonical_equivalence():
+    scene = make_scene()
+    entity = scene.entities[0]
+    altered = replace(entity, trace=replace(entity.trace, source_fingerprint="b" * 64))
+    adapted, svg = graphic_scene_to_svg(replace(scene, entities=(altered, *scene.entities[1:])))
+    assert adapted.graphic_entities[altered.entity_id].trace.source_fingerprint == "b" * 64
+    assert svg
+
+
+def _primitive_svg_bounds(svg):
+    root = ET.fromstring(svg)
+    ns = {"s": "http://www.w3.org/2000/svg"}
+    points = []
+    for polygon in root.findall(".//s:polygon", ns):
+        points.extend(tuple(float(value) for value in pair.split(",")) for pair in polygon.attrib["points"].split())
+    for circle in root.findall('.//s:circle[@data-primitive-id]', ns):
+        cx, cy, radius = (float(circle.attrib[key]) for key in ("cx", "cy", "r"))
+        points.extend(((cx - radius, cy - radius), (cx + radius, cy + radius)))
+    return min(x for x, _ in points), min(y for _, y in points), max(x for x, _ in points), max(y for _, y in points)
+
+
+def test_numeric_scale_margin_and_y_axis_contract():
+    scene = make_scene()
+    _, svg = graphic_scene_to_svg(scene, scale=Scale.S_1_50, margin_mm=10.0)
+    xmin, ymin, xmax, ymax = _primitive_svg_bounds(svg)
+    root = ET.fromstring(svg)
+    width = float(root.attrib["width"].removesuffix("mm"))
+    height = float(root.attrib["height"].removesuffix("mm"))
+    assert xmin == pytest.approx(10.0, abs=0.001)
+    assert xmax == pytest.approx(width - 10.0, abs=0.001)
+    assert ymin == pytest.approx(10.0, abs=0.001)
+    assert ymax == pytest.approx(height - 10.0, abs=0.001)
+    assert xmax - xmin == pytest.approx(5000.0 / 50.0, abs=0.001)
+    ns = {"s": "http://www.w3.org/2000/svg"}
+    polygons = {item.attrib["data-source-ref"]: item for item in root.findall(".//s:polygon", ns)}
+    elements = poc_elements()
+    w01 = next(entity.entity_id for entity in scene.entities if entity.trace.source_entity_refs == (elements[0].element_id.value,))
+    w02 = next(entity.entity_id for entity in scene.entities if entity.trace.source_entity_refs == (elements[1].element_id.value,))
+    def centroid_y(polygon):
+        return sum(float(pair.split(",")[1]) for pair in polygon.attrib["points"].split()) / 4
+    assert centroid_y(polygons[w01]) > centroid_y(polygons[w02])
+    plan_delta = 4800.0 / 50.0
+    svg_delta = abs(centroid_y(polygons[w01]) - centroid_y(polygons[w02]))
+    assert svg_delta == pytest.approx(plan_delta, abs=0.001)

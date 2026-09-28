@@ -115,11 +115,23 @@ def _validate_entity(scene: GraphicScene, entity: GraphicEntity) -> None:
         raise DrawingAdapterError(f"UNSUPPORTED_GRAPHIC_ROLE:{entity.role}")
     if not isinstance(entity.trace, GraphicTrace):
         raise DrawingAdapterError(f"MALFORMED_GRAPHIC_TRACE:{entity.entity_id}")
+    if entity.trace.semantic_role != entity.role:
+        raise DrawingAdapterError(f"GRAPHIC_TRACE_ROLE_MISMATCH:{entity.entity_id}")
     intent = entity.geometry_intent
     if intent.get("visibility") != "VISIBLE":
         raise DrawingAdapterError(f"UNRESOLVED_VISIBILITY:{entity.entity_id}")
     if intent.get("cut_relation") not in {"CUT", "BELOW_CUT"}:
         raise DrawingAdapterError(f"UNRESOLVED_CUT_RELATION:{entity.entity_id}")
+    relation = intent["cut_relation"]
+    operation = entity.trace.operation.rsplit(":", 1)[-1]
+    if relation == "CUT" and operation != "CUT_PROJECTION":
+        raise DrawingAdapterError(f"GRAPHIC_TRACE_OPERATION_MISMATCH:{entity.entity_id}")
+    if relation == "BELOW_CUT" and operation != "BELOW_CUT_PROJECTION":
+        raise DrawingAdapterError(f"GRAPHIC_TRACE_OPERATION_MISMATCH:{entity.entity_id}")
+    if entity.role.endswith("_CUT") and relation != "CUT":
+        raise DrawingAdapterError(f"GRAPHIC_TRACE_OPERATION_MISMATCH:{entity.entity_id}")
+    if entity.role.endswith("_PROJECTED") and relation != "BELOW_CUT":
+        raise DrawingAdapterError(f"GRAPHIC_TRACE_OPERATION_MISMATCH:{entity.entity_id}")
     if entity.style_ref != scene.graphic_style.style_id:
         raise DrawingAdapterError(f"STYLE_REFERENCE_MISMATCH:{entity.entity_id}")
 
@@ -195,7 +207,8 @@ def adapt_graphic_scene(scene: GraphicScene, *, scale: Scale = Scale.S_1_50, mar
         primitive_sources[primitive.primitive_id] = entity.entity_id
         graphic_entities[entity.entity_id] = entity
 
-    viewport = Viewport("GRAPHICSCENE", scale, (0.0, paper_height), tuple(primitives))
+    # Standalone SVG serialization does not consume sheet placement origin.
+    viewport = Viewport("GRAPHICSCENE", scale, (0.0, 0.0), tuple(primitives))
     return AdaptedGraphicScene(scene.scene_id, viewport, primitive_sources, graphic_entities, scale, margin_mm)
 
 
