@@ -197,6 +197,7 @@ class DerivationRecord:
 
 class EventStore(Protocol):
     def add_event(self, event: Event) -> Event: ...
+    def add_events_atomic(self, events: list[Event]) -> list[Event]: ...
     def events(self, project_id: str | None = None) -> list[Event]: ...
 
 
@@ -240,6 +241,44 @@ class DerivationLedger:
                 raise DerivationValidationError(f"derivation id already exists with different content: {record.id}")
         self.store.add_event(Event(None, now_iso(), project_id, self.EVENT_TYPE, {"derivation": record.to_dict()}, actor, self.EVENT_SOURCE))
         return record
+
+    def record_batch(self, project_id: str, records: list[DerivationRecord], *, actor: str = "system") -> list[DerivationRecord]:
+        """Publish new derivations atomically, or publish none of them."""
+        _required_text(project_id, "project_id"); _required_text(actor, "actor")
+        if not isinstance(records, list):
+            raise DerivationValidationError("records must be a list")
+        existing = {item.id: item for item in self.list(project_id)}
+        pending: list[DerivationRecord] = []
+        seen: set[str] = set()
+        for record in records:
+            if not isinstance(record, DerivationRecord):
+                raise DerivationValidationError("records must contain DerivationRecord")
+            if record.id in seen:
+                raise DerivationValidationError(f"duplicate derivation id in batch: {record.id}")
+            seen.add(record.id)
+            prior = existing.get(record.id)
+            if prior is not None:
+                if prior != record:
+                    raise DerivationValidationError(f"derivation id already exists with different content: {record.id}")
+                continue
+            pending.append(record)
+        if not pending:
+            return []
+        add_events_atomic = getattr(self.store, "add_events_atomic", None)
+        events = [Event(None, now_iso(), project_id, self.EVENT_TYPE, {"derivation": record.to_dict()}, actor, self.EVENT_SOURCE) for record in pending]
+        if callable(add_events_atomic):
+            add_events_atomic(events)
+        elif isinstance(getattr(self.store, "items", None), list):
+            snapshot = list(self.store.items)
+            try:
+                for event in events:
+                    self.store.add_event(event)
+            except Exception:
+                self.store.items[:] = snapshot
+                raise
+        else:
+            raise DerivationValidationError("event store does not support atomic batch publication")
+        return pending
 
     def why(self, project_id: str, output: VersionedRef) -> list[DerivationRecord]:
         """Return every recorded justification path for output, deterministically and cycle-bounded."""

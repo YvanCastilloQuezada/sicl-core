@@ -482,12 +482,21 @@ class SQLiteRepository:
         return [self._parcel_from_row(row) for row in rows]
 
     def add_event(self, event: Event) -> Event:
+        inserted = self._insert_event(event)
+        self.conn.commit()
+        return inserted
+
+    def _insert_event(self, event: Event) -> Event:
         cur = self.conn.execute(
             "INSERT INTO events(timestamp, project_id, type, payload, actor, source) VALUES (?, ?, ?, ?, ?, ?)",
             (event.timestamp, event.project_id, event.type, json.dumps(event.payload, sort_keys=True), event.actor, event.source),
         )
-        self.conn.commit()
         return Event(cur.lastrowid, event.timestamp, event.project_id, event.type, event.payload, event.actor, event.source)
+
+    def add_events_atomic(self, events: list[Event]) -> list[Event]:
+        """Insert an event batch with all-or-zero commit semantics."""
+        with self.transaction():
+            return [self._insert_event(event) for event in events]
 
     def events(self, project_id: str | None = None) -> list[Event]:
         if project_id:
