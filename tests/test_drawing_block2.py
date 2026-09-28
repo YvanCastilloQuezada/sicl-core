@@ -102,7 +102,7 @@ def test_unknown_role_geometry_and_style_fail_closed():
     scene = make_scene()
     unknown = replace(scene.entities[0], role="UNKNOWN_ROLE")
     bad_scene = replace(scene, entities=(unknown, *scene.entities[1:]))
-    with pytest.raises(DrawingAdapterError, match="STYLE_MAPPING_REQUIRED:UNKNOWN_ROLE"):
+    with pytest.raises(DrawingAdapterError, match="UNSUPPORTED_GRAPHIC_ROLE:UNKNOWN_ROLE"):
         graphic_scene_to_svg(bad_scene)
     missing_style = GraphicStyle("MISSING", line_weights={})
     with pytest.raises(DrawingAdapterError, match="STYLE_MAPPING_REQUIRED"):
@@ -114,3 +114,42 @@ def test_empty_scene_is_explicitly_rejected():
     empty = replace(scene, entities=())
     with pytest.raises(DrawingAdapterError, match="EMPTY_GRAPHIC_SCENE"):
         graphic_scene_to_svg(empty)
+
+
+def _svg_bounds(svg):
+    root = ET.fromstring(svg)
+    ns = {"s": "http://www.w3.org/2000/svg"}
+    points = []
+    for polygon in root.findall(".//s:polygon", ns):
+        points.extend(tuple(float(value) for value in pair.split(",")) for pair in polygon.attrib["points"].split())
+    for circle in root.findall('.//s:circle[@data-primitive-id]', ns):
+        cx, cy, radius = (float(circle.attrib[key]) for key in ("cx", "cy", "r"))
+        points.extend(((cx - radius, cy - radius), (cx + radius, cy + radius)))
+    return min(x for x, _ in points), min(y for _, y in points), max(x for x, _ in points), max(y for _, y in points)
+
+
+def test_numeric_margin_scale_and_y_axis_contract():
+    scene = make_scene()
+    adapted, svg = graphic_scene_to_svg(scene, scale=Scale.S_1_50, margin_mm=10.0)
+    xmin, ymin, xmax, ymax = _svg_bounds(svg)
+    root = ET.fromstring(svg)
+    width = float(root.attrib["width"].removesuffix("mm"))
+    height = float(root.attrib["height"].removesuffix("mm"))
+    assert xmin == pytest.approx(10.0, abs=0.001)
+    assert xmax == pytest.approx(width - 10.0, abs=0.001)
+    assert ymin == pytest.approx(10.0, abs=0.001)
+    assert ymax == pytest.approx(height - 10.0, abs=0.001)
+    assert xmax - xmin == pytest.approx(5000.0 / 50.0, abs=0.001)
+    by_source = {item.attrib["data-source-ref"]: item for item in root.findall(".//s:polygon", {"s": "http://www.w3.org/2000/svg"})}
+    w01 = next(entity.entity_id for entity in scene.entities if entity.trace.source_entity_refs == (poc_elements()[0].element_id.value,))
+    w02 = next(entity.entity_id for entity in scene.entities if entity.trace.source_entity_refs == (poc_elements()[1].element_id.value,))
+    def centroid_y(polygon):
+        return sum(float(pair.split(",")[1]) for pair in polygon.attrib["points"].split()) / 4
+    assert centroid_y(by_source[w01]) > centroid_y(by_source[w02])
+
+
+def test_supported_role_may_use_valid_default_style():
+    scene = make_scene(style=GraphicStyle("DEFAULT-STYLE", line_weights={"default": "MEDIUM"}))
+    adapted, svg = graphic_scene_to_svg(scene)
+    assert len(adapted.viewport.elements) == len(scene.entities)
+    assert 'stroke-width="0.350"' in svg
