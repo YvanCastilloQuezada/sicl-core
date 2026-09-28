@@ -1,17 +1,25 @@
-"""Transactional architectural mutation boundary."""
+"""Transactional architectural mutation boundary with the real H-002..H-005 chain."""
 from __future__ import annotations
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Callable
+from typing import Callable, Mapping
 from .model import ArchiElement
 from .mutation import ArchiMutation
 from .sufficiency import snapshot_for
+from .relationships import architectural_derivation
 from ..a002 import SufficiencyEngine
+from ..derivation import DerivationLedger, VersionedRef
+from ..impact import ChangeKind, ImpactAnalyzer, ImpactChange
+from ..validity import ValidityAnalyzer
+from ..reaction import ReactionPlanner
+from ..h005 import ExecutionStatus, RecomputationRegistry, SelectiveRecomputationEngine
+from .ifc_export import export_ifc
 
 class MutationLifecycle(str, Enum):
     PROPOSED="PROPOSED"; EVALUATED="EVALUATED"; AUTHORIZED="AUTHORIZED"; APPLIED="APPLIED"; PUBLISHED="PUBLISHED"
 class MutationStatus(str, Enum):
     ALLOW="ALLOW"; BLOCKED="BLOCKED"; NEEDS_REVIEW="NEEDS_REVIEW"; FAILED="FAILED"; APPLIED="APPLIED"
+
 @dataclass(frozen=True)
 class MutationResult:
     mutation_id: str
@@ -21,22 +29,23 @@ class MutationResult:
     candidate: tuple[ArchiElement,...] = ()
     reason: str = ""
     derivation_recorded: bool = False
+    provenance: dict = None
+
+class _MemoryStore:
+    def __init__(self): self.items=[]
+    def add_event(self,event): self.items.append(event); return event
+    def events(self,project_id=None): return [e for e in self.items if project_id is None or e.project_id==project_id]
 
 class ArchiTransaction:
     def __init__(self, elements: tuple[ArchiElement,...] = (), sufficiency_engine: SufficiencyEngine | None = None):
         self._canonical=tuple(elements); self._engine=sufficiency_engine or SufficiencyEngine(); self._applied=set()
     @property
     def canonical(self): return self._canonical
-    def apply(self, mutation: ArchiMutation, *, recompute: Callable[[tuple[ArchiElement,...]], tuple[ArchiElement,...]] | None = None) -> MutationResult:
-        mid=mutation.compute_id()
-        if mid in self._applied: return MutationResult(mid, MutationStatus.APPLIED, MutationLifecycle.PUBLISHED, self._canonical, self._canonical, "REPLAY_NO_DOUBLE_APPLICATION", True)
+
+    def _candidate(self, mutation: ArchiMutation):
         target=next((e for e in self._canonical if e.element_id==mutation.target_id and e.version==mutation.target_version), None)
-        snap=snapshot_for(mutation,target,self._engine)
-        if not snap.permits: return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), ",".join(snap.result.reason_codes) or "A002_BLOCKED", False)
-        candidate=list(self._canonical)
-        if target is None: return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), "TARGET_NOT_FOUND", False)
-        idx=candidate.index(target)
-        payload=mutation.canonical_payload
+        if target is None: return None, tuple(self._canonical)
+        candidate=list(self._canonical); idx=candidate.index(target); payload=mutation.canonical_payload
         if mutation.mutation_kind.value=="MOVE":
             g=replace(target.geometry, x_mm=target.geometry.x_mm+int(payload.get("dx_mm",0)), y_mm=target.geometry.y_mm+int(payload.get("dy_mm",0)))
             candidate[idx]=replace(target, geometry=g, version=target.version+1)
@@ -45,9 +54,53 @@ class ArchiTransaction:
             candidate[idx]=replace(target, geometry=replace(target.geometry, profile=p), version=target.version+1)
         elif mutation.mutation_kind.value=="DELETE": candidate.pop(idx)
         else: candidate.append(target)
-        cand=tuple(candidate)
-        if recompute is not None: cand=tuple(recompute(cand))
-        self._canonical=cand; self._applied.add(mid)
-        return MutationResult(mid, MutationStatus.APPLIED, MutationLifecycle.PUBLISHED, self._canonical, self._canonical, "APPLIED", True)
+        return target, tuple(candidate)
+
+    def apply(self, mutation: ArchiMutation, *, recompute: Callable[[tuple[ArchiElement,...]], tuple[ArchiElement,...]] | None = None) -> MutationResult:
+        mid=mutation.compute_id()
+        if mid in self._applied: return MutationResult(mid, MutationStatus.APPLIED, MutationLifecycle.PUBLISHED, self._canonical, self._canonical, "REPLAY_NO_DOUBLE_APPLICATION", True, {"replay": True})
+        target, candidate=self._candidate(mutation)
+        snap=snapshot_for(mutation,target,self._engine)
+        if not snap.permits: return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), ",".join(snap.result.reason_codes) or "A002_BLOCKED", False, {"a002": snap.result.to_dict()})
+        if target is None: return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), "TARGET_NOT_FOUND", False, {})
+        if recompute is not None: candidate=tuple(recompute(candidate))
+        self._canonical=candidate; self._applied.add(mid)
+        return MutationResult(mid, MutationStatus.APPLIED, MutationLifecycle.PUBLISHED, self._canonical, self._canonical, "APPLIED", True, {"a002": snap.result.to_dict()})
+
+    def apply_full_chain(self, mutation: ArchiMutation, ledger: DerivationLedger, registry: RecomputationRegistry, current_refs: Mapping[tuple[str,str], VersionedRef], *, ifc_path=None) -> MutationResult:
+        """Run A-002, H-002, H-003, H-004, H-005, then publish ledger and IFC."""
+        mid=mutation.compute_id()
+        if mid in self._applied: return MutationResult(mid, MutationStatus.APPLIED, MutationLifecycle.PUBLISHED, self._canonical, self._canonical, "REPLAY_NO_DOUBLE_APPLICATION", True, {"replay": True})
+        target, candidate=self._candidate(mutation)
+        snap=snapshot_for(mutation,target,self._engine)
+        prov={"a002":snap.result.to_dict()}
+        if not snap.permits: return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), "A002_BLOCKED", False, prov)
+        if target is None: return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), "TARGET_NOT_FOUND", False, prov)
+        old_ref=target.ref(); new_target=next(e for e in candidate if e.element_id==target.element_id)
+        # H-002 CONTENT_CHANGED is a same-version WHAT-IF observation. The
+        # published architectural element receives version+1 only after H-005.
+        new_ref=VersionedRef(old_ref.entity_type, old_ref.entity_id, old_ref.version, new_target.content_hash())
+        impact=ImpactAnalyzer(ledger).analyze_change(mutation.project_id, ImpactChange(old_ref,new_ref,ChangeKind.CONTENT_CHANGED))
+        prov["h002"] = impact.canonical_dict()
+        if not impact.impacted_artifacts: return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), "H002_UNKNOWN_NO_IMPACT", False, prov)
+        changed_refs=dict(current_refs); changed_refs[old_ref.key()]=new_ref
+        validity=ValidityAnalyzer(ledger).evaluate_validity(mutation.project_id, changed_refs, {"mutationId":mid})
+        prov["h003"] = validity.canonical_dict()
+        reaction=ReactionPlanner().plan_reaction(validity); prov["h004"]=reaction.canonical_dict()
+        eligible=[a for a in reaction.planned_actions if a.action_type.value=="RECOMPUTE" and a.status.value=="PLANNED" and not a.requires_human_authority]
+        if len(eligible)!=len(reaction.planned_actions): return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), "H004_NOT_AUTOMATICALLY_ELIGIBLE", False, prov)
+        # H-005 is real, but runs against a temporary ledger so failures cannot partially publish.
+        temp=DerivationLedger(_MemoryStore())
+        for record in ledger.list(mutation.project_id): temp.record(mutation.project_id, record)
+        h005=SelectiveRecomputationEngine(temp, registry).execute(mutation.project_id, reaction, changed_refs)
+        prov["h005"]=h005.to_dict()
+        if any(r.status is not ExecutionStatus.EXECUTED for r in h005.records): return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), "H005_BLOCKED_OR_FAILED", False, prov)
+        try: export_ifc(candidate, ifc_path)
+        except Exception as exc: return MutationResult(mid, MutationStatus.FAILED, MutationLifecycle.EVALUATED, self._canonical, (), f"IFC_EXPORT:{type(exc).__name__}", False, prov)
+        # Publish only after every read-only gate and IFC export succeeded.
+        for record in temp.list(mutation.project_id):
+            if record.id not in {r.id for r in ledger.list(mutation.project_id)}: ledger.record(mutation.project_id, record, actor="ARCHI_D2")
+        self._canonical=candidate; self._applied.add(mid)
+        return MutationResult(mid, MutationStatus.APPLIED, MutationLifecycle.PUBLISHED, self._canonical, self._canonical, "APPLIED_PUBLISHED", True, prov)
 
 __all__=["MutationLifecycle","MutationStatus","MutationResult","ArchiTransaction"]
