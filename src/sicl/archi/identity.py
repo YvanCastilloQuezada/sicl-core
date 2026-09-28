@@ -28,6 +28,11 @@ class IfcGlobalId:
 
     @classmethod
     def from_archi_id(cls, archi_id: ArchiElementId) -> "IfcGlobalId":
+        """Map the first 128 deterministic ID bits to an IFC compressed GUID.
+
+        The source is a SHA-256 ArchiElementId; no random or time-based value
+        participates, so geometry changes preserve the IFC identity.
+        """
         if not isinstance(archi_id, ArchiElementId):
             raise TypeError("archi_id must be ArchiElementId")
         return cls(ifcopenshell.guid.compress(str(uuid.UUID(hex=archi_id.value[:32]))))

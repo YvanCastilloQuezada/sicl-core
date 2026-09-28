@@ -11,3 +11,14 @@ def test_content_hash_semantics():
 def test_hosting_containment_exclusive():
     a=ArchiElementId.compute('P','WALL','a'); b=ArchiElementId.compute('P','SPACE','b')
     with pytest.raises(ValueError): ArchiElement(ArchiElementId.compute('P','DOOR','d'),'P',ElementKind.DOOR,wall().geometry,hosted_in=a,contained_in=b)
+
+def test_archielement_properties_cannot_mutate_after_construction():
+    element=wall()
+    with pytest.raises(TypeError): element.properties['name']='changed'
+    assert element.properties['name']=='W-01'
+
+def test_host_version_affects_dependent_semantics():
+    host=ArchiElementId.compute('P','WALL','host'); child=ArchiElementId.compute('P','DOOR','child')
+    one=ArchiElement(child,'P',ElementKind.DOOR,wall().geometry,hosted_in=host,hosted_in_version=1)
+    two=ArchiElement(child,'P',ElementKind.DOOR,wall().geometry,hosted_in=host,hosted_in_version=2)
+    assert one.content_hash()!=two.content_hash()

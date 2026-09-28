@@ -2,7 +2,8 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Mapping
+from types import MappingProxyType
 import hashlib, json
 from .identity import ArchiElementId
 
@@ -45,16 +46,34 @@ class ArchiElement:
     project_id: str
     kind: ElementKind
     geometry: ArchiGeometry
-    properties: dict[str, PropertyValue] = field(default_factory=dict)
+    properties: Mapping[str, PropertyValue] = field(default_factory=dict)
     provenance: dict[str, Any] | None = None
     version: int = 1
     hosted_in: ArchiElementId | None = None
     contained_in: ArchiElementId | None = None
+    hosted_in_version: int | None = None
+    contained_in_version: int | None = None
     def __post_init__(self):
         if self.hosted_in is not None and self.contained_in is not None: raise ValueError("hosting and contained_in are mutually exclusive")
         if self.version < 1: raise ValueError("version must be positive")
+        for relation_name, relation_version in (("hosted_in_version", self.hosted_in_version), ("contained_in_version", self.contained_in_version)):
+            if relation_version is not None and relation_version < 1: raise ValueError(f"{relation_name} must be positive")
+        if self.hosted_in is not None and self.contained_in_version is not None: raise ValueError("contained_in_version requires contained_in")
+        if self.contained_in is not None and self.hosted_in_version is not None: raise ValueError("hosted_in_version requires hosted_in")
+        if not isinstance(self.properties, Mapping): raise TypeError("properties must be a mapping")
+        normalized = {}
+        for key, value in self.properties.items():
+            if not isinstance(key, str): raise TypeError("property keys must be strings")
+            if isinstance(value, (list, dict, set, bytearray)):
+                raise TypeError("property values must be immutable scalars or tuples")
+            if isinstance(value, tuple) and not all(isinstance(item, str) for item in value):
+                raise TypeError("tuple property values must contain strings")
+            if not isinstance(value, (str, int, float, bool, tuple, type(None))):
+                raise TypeError("unsupported mutable property value")
+            normalized[key] = value
+        object.__setattr__(self, "properties", MappingProxyType(normalized))
     def semantic_dict(self) -> dict[str, Any]:
-        return {"element_id": self.element_id.value, "project_id": self.project_id, "kind": self.kind.value, "geometry": self.geometry.to_dict(), "properties": {k: _serialize_property_value(self.properties[k]) for k in sorted(self.properties)}, "version": self.version, "hosted_in": self.hosted_in.value if self.hosted_in else None, "contained_in": self.contained_in.value if self.contained_in else None}
+        return {"element_id": self.element_id.value, "project_id": self.project_id, "kind": self.kind.value, "geometry": self.geometry.to_dict(), "properties": {k: _serialize_property_value(self.properties[k]) for k in sorted(self.properties)}, "version": self.version, "hosted_in": self.hosted_in.value if self.hosted_in else None, "hosted_in_version": self.hosted_in_version if self.hosted_in else None, "contained_in": self.contained_in.value if self.contained_in else None, "contained_in_version": self.contained_in_version if self.contained_in else None}
     def content_hash(self) -> str:
         raw = json.dumps(self.semantic_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         return hashlib.sha256(raw.encode()).hexdigest()

@@ -14,9 +14,13 @@ class Store:
 def target():
     return ArchiElement(ArchiElementId.compute('P','WALL','w'),'P',ElementKind.WALL,ArchiGeometry(GeometryKind.EXTRUDED_RECTANGLE,ProfileSpec(200,100),height_mm=2800))
 
-def test_blocked_preserves_canonical_and_replay_is_idempotent():
-    t=target(); tx=ArchiTransaction((t,)); delete=ArchiMutation('P',MutationKind.DELETE,t.element_id,1,{},'d'); blocked=tx.apply(delete); assert blocked.status is MutationStatus.BLOCKED and tx.canonical==(t,)
-    move=ArchiMutation('P',MutationKind.MOVE,t.element_id,1,{'dx_mm':100},'m'); applied=tx.apply(move); assert applied.status is MutationStatus.APPLIED and applied.canonical[0].version==2; replay=tx.apply(move); assert replay.reason=='REPLAY_NO_DOUBLE_APPLICATION' and len(tx.canonical)==1
+def test_no_public_mutation_bypass():
+    assert not hasattr(ArchiTransaction, 'apply')
+
+def test_target_not_found_returns_blocked_without_exception():
+    t=target(); tx=ArchiTransaction((t,)); missing=ArchiMutation('P',MutationKind.MOVE,ArchiElementId.compute('P','WALL','missing'),1,{'dx_mm':100},'missing-target')
+    result=tx.apply_full_chain(missing, DerivationLedger(Store()), RecomputationRegistry(), {})
+    assert result.status is MutationStatus.BLOCKED and result.reason=='TARGET_NOT_FOUND' and result.canonical==(t,)
 
 def setup_chain():
     wall=target(); door=ArchiElement(ArchiElementId.compute('P','DOOR','d'),'P',ElementKind.DOOR,wall.geometry,hosted_in=wall.element_id); space=ArchiElement(ArchiElementId.compute('P','SPACE','a'),'P',ElementKind.SPACE,wall.geometry)
@@ -41,12 +45,12 @@ def test_full_chain_h003_h004_h005_applied_published(tmp_path):
 def test_h003_invalid_canonical_unchanged():
     wall,door,_,ledger,registry,refs=setup_chain(); ledger=DerivationLedger(Store()); old=wall.ref(); out=VersionedRef('DOOR',door.element_id.value,1,'b'*64); missing=VersionedRef('SPACE','MISSING',1)
     ledger.record('P',DerivationRecord('D-01',out,(old,missing),'archi.door.recompute','1.0',(TypedRelation(out,old,'DERIVED_FROM','ARCHITECTURAL'),TypedRelation(out,missing,'DERIVED_FROM','ARCHITECTURAL'))))
-    tx=ArchiTransaction((wall,)); before=tx.canonical; m=ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'invalid'); result=tx.apply_full_chain(m,ledger,registry,refs); assert result.status is MutationStatus.BLOCKED and result.reason=='H004_NOT_AUTOMATICALLY_ELIGIBLE' and tx.canonical==before
+    tx=ArchiTransaction((wall,)); before=tx.canonical; m=ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'invalid'); result=tx.apply_full_chain(m,ledger,registry,refs); assert result.status is MutationStatus.ESCALATE and result.reason=='H004_NOT_AUTOMATICALLY_ELIGIBLE' and tx.canonical==before and 'h003' in result.provenance and 'h004' in result.provenance
 
 def test_h003_uncertain_canonical_unchanged():
     wall,door,space,_,registry,_=setup_chain(); ledger=DerivationLedger(Store()); old=VersionedRef('WALL',wall.element_id.value,1); d=VersionedRef('DOOR',door.element_id.value,1); a=VersionedRef('SPACE',space.element_id.value,1)
     ledger.record('P',DerivationRecord('D-01',d,(old,), 'archi.door.recompute','1.0',(TypedRelation(d,old,'DERIVED_FROM','ARCHITECTURAL'),))); ledger.record('P',DerivationRecord('A-01',a,(old,), 'archi.space.recompute','1.0',(TypedRelation(a,old,'DERIVED_FROM','ARCHITECTURAL'),)))
-    refs={old.key():old}; tx=ArchiTransaction((wall,)); before=tx.canonical; result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'uncertain'),ledger,registry,refs); assert result.status is MutationStatus.BLOCKED and tx.canonical==before
+    refs={old.key():old}; tx=ArchiTransaction((wall,)); before=tx.canonical; result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'uncertain'),ledger,registry,refs); assert result.status is MutationStatus.ESCALATE and tx.canonical==before
 
 def test_h004_review_canonical_unchanged():
     artifact=VersionedRef('A','1',1); dv=DerivationValidity('d',artifact,'STALE',source_checks=('integrity_checks_d',)); report=ValidityReport(artifact_validities=(ArtifactValidity(artifact,'PARTIALLY_VALID',(dv,),{},{}),)); action=ReactionPlanner().plan_reaction(report).planned_actions[0]; assert action.action_type is ActionType.REVIEW and action.status is ActionStatus.REQUIRES_AUTHORITY
@@ -70,7 +74,17 @@ def test_no_partial_canonical_state_on_failure():
     wall,_,_,ledger,_,refs=setup_chain(); tx=ArchiTransaction((wall,)); before=tx.canonical; result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'no-partial'),ledger,RecomputationRegistry(),refs); assert result.status is MutationStatus.BLOCKED and tx.canonical==before and len(ledger.list('P'))==2
 
 def test_no_double_apply_on_replay():
-    wall,door,space,ledger,registry,refs=setup_chain(); tx=ArchiTransaction((wall,door,space)); m=ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1000},'replay'); first=tx.apply_full_chain(m,ledger,registry,refs); second=tx.apply_full_chain(m,ledger,registry,refs); assert first.status is MutationStatus.APPLIED and second.reason=='REPLAY_NO_DOUBLE_APPLICATION' and tx.canonical[0].version==2
+    wall,door,space,ledger,registry,refs=setup_chain(); tx=ArchiTransaction((wall,door,space)); m=ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1000},'replay'); first=tx.apply_full_chain(m,ledger,registry,refs); second=tx.apply_full_chain(m,ledger,registry,refs); assert first.status is MutationStatus.APPLIED and second.reason=='REPLAY_NO_DOUBLE_APPLICATION' and tx.canonical[0].version==2 and second.derivation_recorded is False
+
+def test_add_opening_fails_closed_without_canonical_change():
+    t=target(); tx=ArchiTransaction((t,)); mutation=ArchiMutation('P',MutationKind.ADD_OPENING,t.element_id,1,{'host_id':t.element_id.value},'opening')
+    result=tx.apply_full_chain(mutation, DerivationLedger(Store()), RecomputationRegistry(), {})
+    assert result.status is MutationStatus.BLOCKED and result.reason=='OPERATION_NOT_IMPLEMENTED' and result.canonical==(t,)
+
+def test_invalid_ifc_path_fails_without_publication(tmp_path):
+    wall,door,space,ledger,registry,refs=setup_chain(); tx=ArchiTransaction((wall,door,space)); before=tx.canonical
+    result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'bad-ifc-path'),ledger,registry,refs,ifc_path=tmp_path/'missing'/'model.ifc')
+    assert result.status is MutationStatus.FAILED and result.reason.startswith('IFC_EXPORT:') and tx.canonical==before and len(ledger.list('P'))==2
 
 def test_no_unauthorized_execution():
     artifact=VersionedRef('A','1',1); dv=DerivationValidity('d',artifact,'REQUIRES_HUMAN_REVIEW',source_checks=('integrity_checks_d',)); action=ReactionPlanner().plan_reaction(ValidityReport(artifact_validities=(ArtifactValidity(artifact,'REQUIRES_HUMAN_REVIEW',(dv,),{},{}),))).planned_actions[0]; assert action.requires_human_authority and action.action_type is ActionType.ESCALATE

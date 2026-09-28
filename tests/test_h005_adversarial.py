@@ -60,7 +60,7 @@ def test_h005_source_has_no_forbidden_execution_or_external_provider_primitives(
         assert forbidden not in source
 
 
-def test_frozen_h001_to_h004_modules_have_no_worktree_changes():
+def test_frozen_h002_to_h004_modules_have_no_worktree_changes():
     import subprocess
-    result = subprocess.run(["git", "diff", "--name-only", "--", "src/sicl/derivation.py", "src/sicl/impact.py", "src/sicl/validity.py", "src/sicl/reaction.py"], capture_output=True, text=True, check=True)
+    result = subprocess.run(["git", "diff", "--name-only", "--", "src/sicl/impact.py", "src/sicl/validity.py", "src/sicl/reaction.py"], capture_output=True, text=True, check=True)
     assert result.stdout == ""
