@@ -78,7 +78,7 @@ def test_arc_and_circle_serialize_as_vector_geometry():
 def test_dimension_has_dimension_line_arrows_kind_and_text():
     vp = Viewport("DIM", Scale.S_1_50, (0, 100), (Dimension(DimensionKind.LINEAR_BETWEEN_AXES, (Point(0, 0), Point(1000, 0)), "1000", Point(500, 100), primitive_id="DIM-1", semantic_role="overall-dimension"),))
     svg = export_view_svg(vp, 200.0, 100.0)
-    assert 'marker-start="url(#dim-arrow)"' in svg and 'marker-end="url(#dim-arrow)"' in svg
+    assert 'marker-start="url(#dim-tick)"' in svg and 'marker-end="url(#dim-tick)"' in svg
     assert 'data-dimension-kind="linear_axes"' in svg and '1000' in svg
 
 
@@ -115,3 +115,50 @@ def test_runtime_complete_vector_output_parses_and_is_deterministic():
     ET.fromstring(svg1)
     assert svg1 == svg2 and hashlib.sha256(svg1.encode()).hexdigest() == hashlib.sha256(svg2.encode()).hexdigest()
     assert all(token in svg1 for token in ("<path", "<circle", "marker-start", "data-layer=\"WALLS\"", "data-primitive-id=\"W-1\"", "url(#concrete)"))
+
+def _dimension_svg_elements(kind, measured, text_position):
+    vp = Viewport("DIM-RT01", Scale.S_1_50, (0, 200), (Dimension(kind, tuple(measured), "DIM", text_position),))
+    import xml.etree.ElementTree as ET
+    return ET.fromstring(export_view_svg(vp, 200, 200))
+
+
+def test_linear_dimension_separates_extension_and_dimension_lines():
+    root = _dimension_svg_elements(DimensionKind.LINEAR_OVERALL, (Point(0, 0), Point(1000, 0)), Point(500, 100))
+    ns = {"s": "http://www.w3.org/2000/svg"}
+    extensions = root.findall('.//s:line[@data-dimension-part="extension"]', ns)
+    dimensions = root.findall('.//s:line[@data-dimension-part="dimension-line"]', ns)
+    assert len(extensions) == 2 and len(dimensions) == 1
+    assert extensions[0].attrib["y1"] != dimensions[0].attrib["y1"]
+
+
+def test_linear_overall_geometry_has_one_dimension_segment():
+    root = _dimension_svg_elements(DimensionKind.LINEAR_OVERALL, (Point(0, 0), Point(1000, 0)), Point(500, 100))
+    ns = {"s": "http://www.w3.org/2000/svg"}
+    segments = root.findall('.//s:line[@data-dimension-part="dimension-line"]', ns)
+    assert len(segments) == 1 and segments[0].attrib["data-dimension-kind"] == "linear_overall"
+
+
+def test_linear_chain_geometry_has_segment_per_interval():
+    root = _dimension_svg_elements(DimensionKind.LINEAR_CHAIN, (Point(0, 0), Point(1000, 0), Point(1800, 0)), Point(900, 100))
+    ns = {"s": "http://www.w3.org/2000/svg"}
+    assert len(root.findall('.//s:line[@data-dimension-part="extension"]', ns)) == 3
+    assert len(root.findall('.//s:line[@data-dimension-part="dimension-line"]', ns)) == 2
+
+
+def test_linear_between_axes_geometry_uses_ticks():
+    root = _dimension_svg_elements(DimensionKind.LINEAR_BETWEEN_AXES, (Point(100, 0), Point(900, 0)), Point(500, 100))
+    ns = {"s": "http://www.w3.org/2000/svg"}
+    segment = root.find('.//s:line[@data-dimension-part="dimension-line"]', ns)
+    assert segment is not None and segment.attrib["marker-start"] == "url(#dim-tick)" and segment.attrib["marker-end"] == "url(#dim-tick)"
+
+
+def test_radial_dimension_fails_closed():
+    vp = Viewport("RADIAL", Scale.S_1_50, (0, 100), (Dimension(DimensionKind.RADIAL, (Point(0, 0), Point(100, 0)), "R100", Point(50, 100)),))
+    with pytest.raises(ValueError, match="DIMENSION_KIND_NOT_IMPLEMENTED"):
+        export_view_svg(vp, 200, 100)
+
+
+def test_angular_dimension_fails_closed():
+    vp = Viewport("ANGULAR", Scale.S_1_50, (0, 100), (Dimension(DimensionKind.ANGULAR, (Point(0, 0), Point(100, 0)), "90°", Point(50, 100)),))
+    with pytest.raises(ValueError, match="DIMENSION_KIND_NOT_IMPLEMENTED"):
+        export_view_svg(vp, 200, 100)

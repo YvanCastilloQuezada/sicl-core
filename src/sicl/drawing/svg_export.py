@@ -2,7 +2,7 @@
 from __future__ import annotations
 from html import escape
 import math
-from .primitives import Arc, Circle, Dimension, Hatch, HatchPattern, Line, LineWeight, Point, Polyline, Rect, Text
+from .primitives import Arc, Circle, Dimension, DimensionKind, Hatch, HatchPattern, Line, LineWeight, Point, Polyline, Rect, Text
 from .sheet import Sheet, Viewport
 
 _WEIGHT_STROKE_PX = {LineWeight.CUT: .70, LineWeight.HEAVY: .50, LineWeight.MEDIUM: .35, LineWeight.THIN: .25, LineWeight.HAIR: .13, LineWeight.HIDDEN: .18}
@@ -57,14 +57,38 @@ def _hatch_svg(hatch: Hatch, dx: float, dy: float, scale_factor: float) -> str:
     return f'<polygon points="{pts}" fill="{fill if fill is not None else f"url(#{pattern_id})"}" stroke="none"{_metadata_attrs(hatch)} />'
 
 def _dimension_svg(dim: Dimension, dx: float, dy: float, scale_factor: float) -> str:
-    parts = []; pts = [_xy(p, dx, dy, scale_factor) for p in dim.extension_points]
-    for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
-        parts.append(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#000" stroke-width="{_fmt(_WEIGHT_STROKE_PX[LineWeight.HAIR])}"{_metadata_attrs(dim)} />')
-    x1, y1 = pts[0]; x2, y2 = pts[-1]
-    parts.append(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#000" stroke-width="{_fmt(_WEIGHT_STROKE_PX[LineWeight.THIN])}" marker-start="url(#dim-arrow)" marker-end="url(#dim-arrow)" data-dimension-kind="{dim.kind.value}"{_metadata_attrs(dim)} />')
-    position = dim.text_position or Point((dim.extension_points[0].x + dim.extension_points[-1].x) / 2, (dim.extension_points[0].y + dim.extension_points[-1].y) / 2)
-    tx, ty = _xy(position, dx, dy, scale_factor)
-    parts.append(f'<text x="{tx}" y="{ty}" font-family="sans-serif" font-size="2.0" text-anchor="middle" data-dimension-kind="{dim.kind.value}"{_metadata_attrs(dim)}>{escape(dim.text)}</text>')
+    if dim.kind in (DimensionKind.RADIAL, DimensionKind.ANGULAR):
+        raise ValueError(f"DIMENSION_KIND_NOT_IMPLEMENTED: {dim.kind.value}")
+    if dim.text_position is None:
+        raise ValueError("DIMENSION_POSITION_REQUIRED: linear dimensions need text_position")
+    measured = dim.extension_points
+    baseline = Point(measured[-1].x - measured[0].x, measured[-1].y - measured[0].y)
+    length = math.hypot(baseline.x, baseline.y)
+    if length == 0:
+        raise ValueError("DIMENSION_GEOMETRY_INVALID: measured points are coincident")
+    ux, uy = baseline.x / length, baseline.y / length
+    # The text position defines the parallel dimension line. Each measured
+    # point is projected onto it; measured-to-projected segments are extension
+    # lines, never the dimension line itself.
+    origin = dim.text_position
+    projected = tuple(Point(origin.x + ux * ((p.x - origin.x) * ux + (p.y - origin.y) * uy), origin.y + uy * ((p.x - origin.x) * ux + (p.y - origin.y) * uy)) for p in measured)
+    offset = abs((origin.x - measured[0].x) * (-uy) + (origin.y - measured[0].y) * ux)
+    if offset == 0:
+        raise ValueError("DIMENSION_POSITION_REQUIRED: dimension line overlaps measured points")
+    parts = []
+    for index, (point, target) in enumerate(zip(measured, projected)):
+        x1, y1 = _xy(point, dx, dy, scale_factor); x2, y2 = _xy(target, dx, dy, scale_factor)
+        parts.append(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" data-dimension-part="extension" data-dimension-index="{index}" stroke="#000" stroke-width="{_fmt(_WEIGHT_STROKE_PX[LineWeight.HAIR])}"{_metadata_attrs(dim)} />')
+    if dim.kind == DimensionKind.LINEAR_CHAIN:
+        segments = tuple(zip(projected, projected[1:]))
+    else:
+        segments = ((projected[0], projected[-1]),)
+    marker = "dim-tick" if dim.kind == DimensionKind.LINEAR_BETWEEN_AXES else "dim-arrow"
+    for index, (left, right) in enumerate(segments):
+        x1, y1 = _xy(left, dx, dy, scale_factor); x2, y2 = _xy(right, dx, dy, scale_factor)
+        parts.append(f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" data-dimension-part="dimension-line" data-dimension-segment="{index}" data-dimension-kind="{dim.kind.value}" stroke="#000" stroke-width="{_fmt(_WEIGHT_STROKE_PX[LineWeight.THIN])}" marker-start="url(#{marker})" marker-end="url(#{marker})"{_metadata_attrs(dim)} />')
+    tx, ty = _xy(origin, dx, dy, scale_factor)
+    parts.append(f'<text x="{tx}" y="{ty}" font-family="sans-serif" font-size="2.0" text-anchor="middle" data-dimension-part="text" data-dimension-kind="{dim.kind.value}"{_metadata_attrs(dim)}>{escape(dim.text)}</text>')
     return "".join(parts)
 
 def _render_element(element, dx: float, dy: float, scale_factor: float) -> str:
@@ -79,7 +103,7 @@ def _render_element(element, dx: float, dy: float, scale_factor: float) -> str:
     raise TypeError(f"Unsupported element type: {type(element).__name__}")
 
 def _hatch_defs() -> str:
-    return ('<defs><marker id="dim-arrow" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M 5 0 L 0 2.5 L 5 5 z" fill="#000" /></marker><pattern id="earth" width="4" height="4" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="4" stroke="#000" stroke-width="0.15" /><line x1="0" y1="0" x2="4" y2="0" stroke="#000" stroke-width="0.15" /></pattern><pattern id="concrete" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="0.35" fill="#000" /><circle cx="4.5" cy="4.5" r="0.35" fill="#000" /></pattern><pattern id="masonry" width="6" height="4" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="6" y2="0" stroke="#000" stroke-width="0.15" /><line x1="3" y1="0" x2="3" y2="4" stroke="#000" stroke-width="0.15" /></pattern><pattern id="wood" width="4" height="4" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="4" y2="0" stroke="#000" stroke-width="0.12" /></pattern><pattern id="insulation" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0,3 Q1.5,1 3,3 T6,3" fill="none" stroke="#000" stroke-width="0.15" /></pattern><pattern id="glass" width="4" height="4" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="4" y2="4" stroke="#000" stroke-width="0.10" /></pattern></defs>')
+    return ('<defs><marker id="dim-arrow" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M 5 0 L 0 2.5 L 5 5 z" fill="#000" /></marker><marker id="dim-tick" markerWidth="5" markerHeight="5" refX="2.5" refY="2.5" orient="auto"><path d="M 0 5 L 5 0" stroke="#000" stroke-width="0.7" /></marker><pattern id="earth" width="4" height="4" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="0" y2="4" stroke="#000" stroke-width="0.15" /><line x1="0" y1="0" x2="4" y2="0" stroke="#000" stroke-width="0.15" /></pattern><pattern id="concrete" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="0.35" fill="#000" /><circle cx="4.5" cy="4.5" r="0.35" fill="#000" /></pattern><pattern id="masonry" width="6" height="4" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="6" y2="0" stroke="#000" stroke-width="0.15" /><line x1="3" y1="0" x2="3" y2="4" stroke="#000" stroke-width="0.15" /></pattern><pattern id="wood" width="4" height="4" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="4" y2="0" stroke="#000" stroke-width="0.12" /></pattern><pattern id="insulation" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0,3 Q1.5,1 3,3 T6,3" fill="none" stroke="#000" stroke-width="0.15" /></pattern><pattern id="glass" width="4" height="4" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="4" y2="4" stroke="#000" stroke-width="0.10" /></pattern></defs>')
 
 def _layer_groups(elements, dx: float, dy: float, scale_factor: float) -> list[str]:
     groups: dict[str, list[str]] = {}

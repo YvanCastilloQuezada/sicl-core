@@ -13,7 +13,7 @@
 | SVG pipeline | `export_view_svg()` and `export_sheet_svg()` | Runtime verified |
 | Viewport | `Viewport` with scale and paper origin | Implemented; collision checked at sheet export |
 | Sheet/title block | `Sheet`, `PaperSpec`, `TitleBlock` | Implemented; collision fail-closed |
-| Dimensions | Extension segments, dimension line, arrow markers, text, `DimensionKind` metadata | Runtime verified |
+| Dimensions | Linear chain/overall/between-axes geometry with separate extensions, dimension segments, arrows/ticks and text | Runtime verified; radial/angular explicitly fail-closed |
 | Hatch | SVG pattern definitions and polygon-bounded patterned fills | Runtime verified |
 | Layers | Deterministic SVG `<g>` groups and `data-layer` attributes | Runtime verified |
 | Semantic metadata | `primitive_id`, `semantic_role`, `source_ref` as `data-*` attributes | Runtime verified |
@@ -24,7 +24,7 @@
 
 | ID | Finding | Classification | Disposition |
 |---|---|---|---|
-| B1-01 | Dimensions previously emitted only extension segments and optional text | `MATERIAL_FINDING` | Corrected with dimension line, arrow markers, kind metadata and deterministic text fallback |
+| B1-01 | Dimension kind was metadata-only and extension lines overlapped the measured geometry | `MATERIAL_FINDING` | Linear kinds now project measured points to a distinct dimension line; chain/overall/between-axes have distinct geometry. Radial/angular raise `DIMENSION_KIND_NOT_IMPLEMENTED` because the current model lacks radius/angle data |
 | B1-02 | Hatch representation required runtime confirmation | `MATERIAL_FINDING` | Existing vector patterns retained; complete runtime hatch output verified |
 | B1-03 | No `Arc` primitive or SVG serialization | `MATERIAL_FINDING` | Added validated `Arc` primitive and SVG path serialization |
 | B1-04 | No `Circle` primitive or SVG serialization | `MATERIAL_FINDING` | Added validated `Circle` primitive and SVG circle serialization |
