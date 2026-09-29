@@ -40,6 +40,20 @@ class V1Envelope(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
 
 
+class D2SnapshotMetadata(BaseModel):
+    snapshot_id: str
+    project_id: str
+    version: int
+    content_hash: str
+    actor: str
+    source_event_id: int | None = None
+    created_at: str
+
+
+class D2SnapshotResponse(D2SnapshotMetadata):
+    elements: list[dict[str, Any]]
+
+
 class CanonicalProjectCreateRequest(BaseModel):
     project_id: str = Field(min_length=1)
     name: str = Field(min_length=1)

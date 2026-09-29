@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from api.deps import get_repository
 from api.main import app
 from sicl.repository import SQLiteRepository
+from sicl.archi import ArchiElement, ArchiElementId, ArchiGeometry, ElementKind, GeometryKind, ProfileSpec
 
 
 @pytest.fixture(autouse=True)
@@ -115,4 +116,60 @@ def test_legacy_endpoints_remain_available(tmp_path: Path):
     response = client.post("/projects", json={"project_id": "LEGACY", "name": "Legacy"})
     assert response.status_code == 201
     assert client.get("/projects/LEGACY").status_code == 200
+    close(repo)
+
+
+def _api_d2_element(project_id: str, nonce: str = "site") -> ArchiElement:
+    return ArchiElement(
+        ArchiElementId.compute(project_id, "SITE", nonce),
+        project_id,
+        ElementKind.SITE,
+        ArchiGeometry(GeometryKind.EXTRUDED_RECTANGLE, ProfileSpec(1000, 1000), height_mm=1),
+        {"name": "Site"},
+        {"source": "api-test"},
+    )
+
+
+def test_v1_d2_without_snapshot_is_404(tmp_path: Path):
+    client, repo = client_for(tmp_path)
+    client.post("/v1/projects", json={"project_id": "V1-D2-EMPTY", "name": "D2"})
+    response = client.get("/v1/projects/V1-D2-EMPTY/d2")
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "D2_NOT_COMMITTED"
+    close(repo)
+
+
+def test_v1_d2_reads_current_history_and_specific_version(tmp_path: Path):
+    client, repo = client_for(tmp_path)
+    client.post("/v1/projects", json={"project_id": "V1-D2", "name": "D2"})
+    first = repo.insert_d2_snapshot_and_event("V1-D2", (_api_d2_element("V1-D2", "one"),), "architect", "TEST")
+    second = repo.insert_d2_snapshot_and_event("V1-D2", (_api_d2_element("V1-D2", "two"),), "architect", "TEST")
+
+    current = client.get("/v1/projects/V1-D2/d2")
+    assert current.status_code == 200
+    assert current.json()["data"]["snapshot"]["version"] == 2
+    assert current.json()["data"]["snapshot"]["snapshot_id"] == second.snapshot_id
+    assert current.json()["observed_version"] == 1
+
+    history = client.get("/v1/projects/V1-D2/d2/history")
+    assert history.status_code == 200
+    assert [item["version"] for item in history.json()["data"]["snapshots"]] == [1, 2]
+
+    old = client.get("/v1/projects/V1-D2/d2/snapshots/1")
+    assert old.status_code == 200
+    assert old.json()["data"]["snapshot"]["snapshot_id"] == first.snapshot_id
+    assert len(old.json()["data"]["snapshot"]["elements"]) == 1
+
+    missing = client.get("/v1/projects/V1-D2/d2/snapshots/99")
+    assert missing.status_code == 404
+    assert missing.json()["detail"]["code"] == "D2_SNAPSHOT_NOT_FOUND"
+    close(repo)
+
+
+def test_v1_d2_has_no_public_write_endpoint(tmp_path: Path):
+    client, repo = client_for(tmp_path)
+    client.post("/v1/projects", json={"project_id": "V1-D2-NO-WRITE", "name": "D2"})
+    response = client.post("/v1/projects/V1-D2-NO-WRITE/d2", json={"elements": []})
+    assert response.status_code in {404, 405}
+    assert repo.get_d2("V1-D2-NO-WRITE") is None
     close(repo)
