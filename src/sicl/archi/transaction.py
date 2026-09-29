@@ -244,7 +244,10 @@ class ArchiTransaction:
                 },
             }
         }
-        publication_candidate = tuple(self._canonical) + candidate_elements
+        publication_candidate = tuple(sorted(
+            tuple(self._canonical) + candidate_elements,
+            key=lambda element: element.element_id.value,
+        ))
         pub = self._publish_candidate(
             project_id=project_id,
             candidate=publication_candidate,
