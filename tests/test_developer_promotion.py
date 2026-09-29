@@ -214,6 +214,36 @@ def test_conversion_is_deterministic_and_preserves_provenance(monkeypatch):
     assert out.committed is True
 
 
+def test_structural_validation_failure_is_rejected_without_snapshot(monkeypatch):
+    repo = setup_repo()
+    monkeypatch.setattr(
+        dp,
+        "validate_creation",
+        lambda **kwargs: SimpleNamespace(valid=False, errors=("TEST_STRUCTURAL_FAILURE",)),
+    )
+    out = run(repo)
+    assert (out.committed, out.effects_status, out.reason) == (
+        False, "NOT_ATTEMPTED", "STRUCTURAL_VALIDATION_FAILED"
+    )
+    assert repo.get_d2(PROJECT) is None
+    assert "STRUCTURAL_VALIDATION_FAILED" in reasons(repo)
+
+
+def test_sufficiency_not_permitted_is_rejected_without_snapshot(monkeypatch):
+    repo = setup_repo()
+    monkeypatch.setattr(
+        dp,
+        "snapshot_for_creation",
+        lambda **kwargs: SimpleNamespace(permits=False),
+    )
+    out = run(repo)
+    assert (out.committed, out.effects_status, out.reason) == (
+        False, "NOT_ATTEMPTED", "SUFFICIENCY_NOT_PERMITTED"
+    )
+    assert repo.get_d2(PROJECT) is None
+    assert "SUFFICIENCY_NOT_PERMITTED" in reasons(repo)
+
+
 def test_persist_failure_does_not_run_effects(monkeypatch):
     repo = setup_repo()
     called = {"effects": False}
