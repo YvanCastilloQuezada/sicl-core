@@ -6,13 +6,13 @@ from dataclasses import dataclass
 
 from .mutation import ArchiMutation, MutationKind
 from .model import ArchiElement
+from ..a002.model import SpatialScope
 from ..a002 import (
     EvidenceRef,
     HumanAuthorityRef,
     KnowledgeItem,
     KnowledgeState,
     OperationRequirement,
-    SpatialScope,
     SufficiencyEngine,
     SufficiencyRequest,
     SufficiencyResult,
