@@ -1,6 +1,6 @@
 """Transactional architectural mutation boundary with the real H-002..H-005 chain."""
 from __future__ import annotations
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Mapping
 import hashlib
@@ -10,14 +10,15 @@ from pathlib import Path
 from .model import ArchiElement
 from .integrity import ReferentialIntegrityError, validate_references
 from .mutation import ArchiMutation
-from .sufficiency import snapshot_for
-from ..a002 import SufficiencyEngine
-from ..derivation import DerivationLedger, VersionedRef
+from .sufficiency import ArchiSufficiencySnapshot, snapshot_for
+from ..a002 import HumanAuthorityRef, SufficiencyEngine
+from ..derivation import DerivationLedger, DerivationRecord, VersionedRef
 from ..impact import ChangeKind, ImpactAnalyzer, ImpactChange
 from ..validity import ValidityAnalyzer
 from ..reaction import ReactionPlanner
 from ..h005 import ExecutionStatus, RecomputationRegistry, SelectiveRecomputationEngine
 from .ifc_export import export_ifc
+from .creation_validation import StructuralValidationResult
 
 class MutationLifecycle(str, Enum):
     PROPOSED="PROPOSED"; EVALUATED="EVALUATED"; AUTHORIZED="AUTHORIZED"; APPLIED="APPLIED"; PUBLISHED="PUBLISHED"
@@ -35,6 +36,19 @@ class MutationResult:
     reason: str = ""
     derivation_recorded: bool = False
     provenance: dict = None
+
+@dataclass(frozen=True)
+class PromotionResult:
+    proposal_id: str
+    status: MutationStatus
+    lifecycle: MutationLifecycle
+    canonical: tuple[ArchiElement, ...]
+    candidate: tuple[ArchiElement, ...] = ()
+    reason: str = ""
+    derivation_recorded: bool = False
+    provenance: dict = field(default_factory=dict)
+    structural_validation: StructuralValidationResult | None = None
+    sufficiency_snapshot: ArchiSufficiencySnapshot | None = None
 
 @dataclass(frozen=True)
 class PublishResult:
@@ -170,6 +184,103 @@ class ArchiTransaction:
         prov["cleanup"]={"status":cleanup_status,"errors":list(cleanup_errors)}
         return PublishResult(True, self._canonical, prepared_derivations, ifc_sha256, final is not None, ifc_path is not None, cleanup_status, cleanup_errors, "PUBLISHED", prov)
 
+    def promote_initial_elements(
+        self,
+        *,
+        project_id: str,
+        proposal_id: str,
+        candidate_elements: tuple[ArchiElement, ...],
+        prepared_derivations: tuple[DerivationRecord, ...],
+        structural_validation: StructuralValidationResult,
+        sufficiency_snapshot: ArchiSufficiencySnapshot,
+        human_authority_ref: HumanAuthorityRef,
+        ledger: DerivationLedger,
+        ifc_path: str | None = None,
+    ) -> PromotionResult:
+        """Publish structurally valid, A-002-authorized initial D-2 elements."""
+        if not isinstance(project_id, str) or not project_id.strip():
+            raise ValueError("project_id must be non-empty")
+        if not isinstance(proposal_id, str) or not proposal_id.strip():
+            raise ValueError("proposal_id must be non-empty")
+
+        candidate_elements = tuple(candidate_elements)
+        if not structural_validation.valid:
+            return PromotionResult(
+                proposal_id=proposal_id,
+                status=MutationStatus.BLOCKED,
+                lifecycle=MutationLifecycle.EVALUATED,
+                canonical=tuple(self._canonical),
+                candidate=candidate_elements,
+                reason="STRUCTURAL_VALIDATION_FAILED: " + "; ".join(structural_validation.errors),
+                derivation_recorded=False,
+                provenance={"structural_errors": list(structural_validation.errors)},
+                structural_validation=structural_validation,
+                sufficiency_snapshot=sufficiency_snapshot,
+            )
+
+        if not sufficiency_snapshot.permits:
+            status = sufficiency_snapshot.result.overall_status.value
+            return PromotionResult(
+                proposal_id=proposal_id,
+                status=MutationStatus.BLOCKED,
+                lifecycle=MutationLifecycle.EVALUATED,
+                canonical=tuple(self._canonical),
+                candidate=candidate_elements,
+                reason=f"SUFFICIENCY_NOT_PERMITTED: {status}",
+                derivation_recorded=False,
+                provenance={"sufficiency_status": status},
+                structural_validation=structural_validation,
+                sufficiency_snapshot=sufficiency_snapshot,
+            )
+
+        prov = {
+            "promotion": {
+                "proposal_id": proposal_id,
+                "human_authority_ref": {
+                    "actor_id": human_authority_ref.actor_id,
+                    "decision_context": human_authority_ref.decision_context,
+                    "recorded_at_iso": human_authority_ref.recorded_at_iso,
+                    "reference": human_authority_ref.reference,
+                },
+            }
+        }
+        publication_candidate = tuple(self._canonical) + candidate_elements
+        pub = self._publish_candidate(
+            project_id=project_id,
+            candidate=publication_candidate,
+            prepared_derivations=prepared_derivations,
+            ledger=ledger,
+            prov=prov,
+            ifc_path=ifc_path,
+        )
+        if not pub.success:
+            return PromotionResult(
+                proposal_id=proposal_id,
+                status=MutationStatus.FAILED,
+                lifecycle=MutationLifecycle.EVALUATED,
+                canonical=tuple(self._canonical),
+                candidate=(),
+                reason=pub.reason,
+                derivation_recorded=False,
+                provenance=pub.provenance,
+                structural_validation=structural_validation,
+                sufficiency_snapshot=sufficiency_snapshot,
+            )
+
+        reason = "PROMOTED_CLEANUP_DEFERRED" if pub.cleanup_status == "DEFERRED" else "PROMOTED"
+        return PromotionResult(
+            proposal_id=proposal_id,
+            status=MutationStatus.APPLIED,
+            lifecycle=MutationLifecycle.PUBLISHED,
+            canonical=tuple(self._canonical),
+            candidate=tuple(self._canonical),
+            reason=reason,
+            derivation_recorded=True,
+            provenance=pub.provenance,
+            structural_validation=structural_validation,
+            sufficiency_snapshot=sufficiency_snapshot,
+        )
+
     def apply_full_chain(self, mutation: ArchiMutation, ledger: DerivationLedger, registry: RecomputationRegistry, current_refs: Mapping[tuple[str,str], VersionedRef], *, ifc_path=None) -> MutationResult:
         """Run A-002, H-002, H-003, H-004, H-005, then publish ledger and IFC."""
         mid=mutation.compute_id()
@@ -220,4 +331,4 @@ class ArchiTransaction:
         reason = "APPLIED_PUBLISHED_CLEANUP_DEFERRED" if pub.cleanup_status=="DEFERRED" else "APPLIED_PUBLISHED"
         return MutationResult(mid, MutationStatus.APPLIED, MutationLifecycle.PUBLISHED, self._canonical, self._canonical, reason, True, pub.provenance)
 
-__all__=["MutationLifecycle","MutationStatus","MutationResult","PublishResult","ArchiTransaction"]
+__all__=["MutationLifecycle","MutationStatus","MutationResult","PromotionResult","PublishResult","ArchiTransaction"]
