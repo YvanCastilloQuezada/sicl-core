@@ -146,7 +146,7 @@ class ArchiTransaction:
                 stage = self._stage_ifc(final, ifc_bytes)
                 backup = self._promote_ifc(stage, final)
                 promoted = True
-            ledger.record_batch(project_id, prepared_derivations, actor="ARCHI_D2")
+            ledger.record_batch(project_id, list(prepared_derivations), actor="ARCHI_D2")
         except Exception as exc:
             if promoted and final is not None:
                 try:
