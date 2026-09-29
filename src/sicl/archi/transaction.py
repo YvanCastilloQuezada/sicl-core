@@ -35,6 +35,19 @@ class MutationResult:
     derivation_recorded: bool = False
     provenance: dict = None
 
+@dataclass(frozen=True)
+class PublishResult:
+    success: bool
+    canonical: tuple[ArchiElement,...]
+    prepared_derivations: tuple = ()
+    ifc_sha256: str | None = None
+    ifc_published: bool = False
+    ifc_staged: bool = False
+    cleanup_status: str = "NOT_ATTEMPTED"
+    cleanup_errors: tuple[str,...] = ()
+    reason: str = ""
+    provenance: dict = None
+
 class _MemoryStore:
     def __init__(self): self.items=[]
     def add_event(self,event): self.items.append(event); return event
@@ -114,6 +127,41 @@ class ArchiTransaction:
             except OSError as exc:
                 errors.append(f"{artifact.name}:{type(exc).__name__}")
         return errors
+
+    def _publish_candidate(self, *, project_id: str, candidate: tuple[ArchiElement,...], prepared_derivations: tuple, ledger: DerivationLedger, prov: dict, ifc_path=None) -> PublishResult:
+        """Publish an already-evaluated candidate without mutation-specific bookkeeping."""
+        try:
+            ifc_bytes=export_ifc(candidate, None)
+            ifc_sha256=hashlib.sha256(ifc_bytes).hexdigest()
+            prov["ifc"]={"sha256":ifc_sha256,"published":False,"staged":ifc_path is not None}
+        except Exception as exc:
+            return PublishResult(False, self._canonical, prepared_derivations, reason=f"IFC_EXPORT:{type(exc).__name__}", provenance=prov)
+
+        stage = None
+        final = Path(ifc_path) if ifc_path is not None else None
+        backup = None
+        promoted = False
+        try:
+            if final is not None:
+                stage = self._stage_ifc(final, ifc_bytes)
+                backup = self._promote_ifc(stage, final)
+                promoted = True
+            ledger.record_batch(project_id, prepared_derivations, actor="ARCHI_D2")
+        except Exception as exc:
+            if promoted and final is not None:
+                try:
+                    self._rollback_ifc(final, backup)
+                except Exception as rollback_exc:
+                    return PublishResult(False, self._canonical, prepared_derivations, ifc_sha256, False, ifc_path is not None, reason=f"TRANSACTION_ROLLBACK_FAILED:{type(rollback_exc).__name__}", provenance=prov)
+            return PublishResult(False, self._canonical, prepared_derivations, ifc_sha256, False, ifc_path is not None, reason=f"PUBLICATION:{type(exc).__name__}", provenance=prov)
+
+        # COMMIT POINT: ledger, optional IFC, and canonical state are now new.
+        self._canonical=candidate
+        prov["ifc"]["published"] = final is not None
+        cleanup_errors=tuple(self._cleanup_ifc(stage, backup))
+        cleanup_status="DEFERRED" if cleanup_errors else "COMPLETE"
+        prov["cleanup"]={"status":cleanup_status,"errors":list(cleanup_errors)}
+        return PublishResult(True, self._canonical, prepared_derivations, ifc_sha256, final is not None, ifc_path is not None, cleanup_status, cleanup_errors, "PUBLISHED", prov)
 
     def apply_full_chain(self, mutation: ArchiMutation, ledger: DerivationLedger, registry: RecomputationRegistry, current_refs: Mapping[tuple[str,str], VersionedRef], *, ifc_path=None) -> MutationResult:
         """Run A-002, H-002, H-003, H-004, H-005, then publish ledger and IFC."""
@@ -196,6 +244,14 @@ class ArchiTransaction:
         else:
             prov["cleanup"] = {"status": "COMPLETE", "errors": []}
             reason = "APPLIED_PUBLISHED"
-        return MutationResult(mid, MutationStatus.APPLIED, MutationLifecycle.PUBLISHED, self._canonical, self._canonical, reason, True, prov)
+        existing_ids={record.id for record in ledger.list(mutation.project_id)}
+        prepared_derivations=tuple(record for record in temp.list(mutation.project_id) if record.id not in existing_ids)
+        pub=self._publish_candidate(project_id=mutation.project_id, candidate=candidate, prepared_derivations=prepared_derivations, ledger=ledger, prov=prov, ifc_path=ifc_path)
+        if not pub.success:
+            return MutationResult(mid, MutationStatus.FAILED, MutationLifecycle.EVALUATED, self._canonical, (), pub.reason, False, pub.provenance)
 
-__all__=["MutationLifecycle","MutationStatus","MutationResult","ArchiTransaction"]
+        self._applied.add(mid)
+        reason = "APPLIED_PUBLISHED_CLEANUP_DEFERRED" if pub.cleanup_status=="DEFERRED" else "APPLIED_PUBLISHED"
+        return MutationResult(mid, MutationStatus.APPLIED, MutationLifecycle.PUBLISHED, self._canonical, self._canonical, reason, True, pub.provenance)
+
+__all__=["MutationLifecycle","MutationStatus","MutationResult","PublishResult","ArchiTransaction"]
