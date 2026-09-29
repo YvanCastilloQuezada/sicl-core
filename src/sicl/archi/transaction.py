@@ -8,6 +8,7 @@ import os
 import tempfile
 from pathlib import Path
 from .model import ArchiElement
+from .integrity import ReferentialIntegrityError, validate_references
 from .mutation import ArchiMutation
 from .sufficiency import snapshot_for
 from ..a002 import SufficiencyEngine
@@ -76,7 +77,13 @@ class ArchiTransaction:
             # candidate representation is implemented.
             pass
         else: raise ValueError(f"unsupported mutation kind: {mutation.mutation_kind!r}")
-        return target, tuple(candidate)
+        new_tuple=tuple(candidate)
+        ref_errors=validate_references(new_tuple)
+        if ref_errors:
+            raise ReferentialIntegrityError(
+                "REFERENTIAL_INTEGRITY_VIOLATION: " + "; ".join(ref_errors)
+            )
+        return target, new_tuple
 
     @staticmethod
     def _stage_ifc(path: Path, payload: bytes) -> Path:
@@ -167,7 +174,10 @@ class ArchiTransaction:
         """Run A-002, H-002, H-003, H-004, H-005, then publish ledger and IFC."""
         mid=mutation.compute_id()
         if mid in self._applied: return MutationResult(mid, MutationStatus.APPLIED, MutationLifecycle.PUBLISHED, self._canonical, self._canonical, "REPLAY_NO_DOUBLE_APPLICATION", False, {"replay": True})
-        target, candidate=self._candidate(mutation)
+        try:
+            target, candidate=self._candidate(mutation)
+        except ReferentialIntegrityError as exc:
+            return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), str(exc), False, {})
         if target is None: return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), "TARGET_NOT_FOUND", False, {})
         if mutation.mutation_kind.value=="ADD_OPENING": return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), "OPERATION_NOT_IMPLEMENTED", False, {"operation": mutation.mutation_kind.value})
         snap=snapshot_for(mutation,target,self._engine)

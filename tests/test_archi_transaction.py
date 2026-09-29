@@ -3,6 +3,7 @@ import hashlib
 import pytest
 from sicl.archi import *
 from sicl.archi.transaction import PublishResult
+from sicl.archi.integrity import ReferentialIntegrityError
 from sicl.derivation import DerivationLedger, DerivationRecord, TypedRelation, VersionedRef
 from sicl.h005 import RecomputationRegistry
 from sicl.reaction import ActionStatus, ActionType, ReactionPlanner
@@ -178,4 +179,41 @@ def test_8b2_fix_apply_full_chain_calls_export_ifc_once(monkeypatch):
     result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'8b2-ifc-once'),ledger,registry,refs)
     assert result.status is MutationStatus.APPLIED
     assert calls["n"]==1
+
+def test_delete_host_with_dependent_is_blocked_by_referential_integrity():
+    wall=target()
+    door=ArchiElement(ArchiElementId.compute('P','DOOR','dependent'),'P',ElementKind.DOOR,wall.geometry,hosted_in=wall.element_id)
+    tx=ArchiTransaction((wall,door))
+    before=tx.canonical
+    mutation=ArchiMutation('P',MutationKind.DELETE,wall.element_id,1,{},'delete-host')
+    result=tx.apply_full_chain(mutation,DerivationLedger(Store()),RecomputationRegistry(),{})
+    assert result.status is MutationStatus.BLOCKED
+    assert result.reason.startswith('REFERENTIAL_INTEGRITY_VIOLATION: ORPHAN_HOSTED_IN:')
+    assert tx.canonical==before
+
+
+def test_candidate_raises_on_direct_orphaning_delete():
+    wall=target()
+    door=ArchiElement(ArchiElementId.compute('P','DOOR','dependent-direct'),'P',ElementKind.DOOR,wall.geometry,hosted_in=wall.element_id)
+    tx=ArchiTransaction((wall,door))
+    mutation=ArchiMutation('P',MutationKind.DELETE,wall.element_id,1,{},'delete-host-direct')
+    with pytest.raises(ReferentialIntegrityError,match='REFERENTIAL_INTEGRITY_VIOLATION'):
+        tx._candidate(mutation)
+
+
+def test_delete_without_dependents_preserves_referential_integrity():
+    wall=target()
+    tx=ArchiTransaction((wall,))
+    target_element,candidate=tx._candidate(ArchiMutation('P',MutationKind.DELETE,wall.element_id,1,{},'delete-alone'))
+    assert target_element==wall
+    assert candidate==()
+
+
+def test_move_preserves_existing_valid_references():
+    wall=target()
+    door=ArchiElement(ArchiElementId.compute('P','DOOR','move-dependent'),'P',ElementKind.DOOR,wall.geometry,hosted_in=wall.element_id)
+    tx=ArchiTransaction((wall,door))
+    _,candidate=tx._candidate(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':10},'move-valid'))
+    assert len(candidate)==2
+    assert candidate[1].hosted_in==candidate[0].element_id
 

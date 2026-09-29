@@ -195,3 +195,19 @@ def test_existing_database_gets_d2_schema_without_data_loss(tmp_path):
     names = {row["name"] for row in reopened.conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert "d2_snapshots" in names
     assert reopened.get_project("P") is not None
+
+from sicl.archi.integrity import ReferentialIntegrityError
+
+
+def test_deserialize_rejects_orphan_reference():
+    missing=aid("P","WALL","missing")
+    door=ArchiElement(aid("P","DOOR","orphan"),"P",ElementKind.DOOR,geometry(),hosted_in=missing)
+    raw=serialize_elements((door,))
+    with pytest.raises(ReferentialIntegrityError,match="SNAPSHOT_REFERENTIAL_INTEGRITY_VIOLATION"):
+        deserialize_elements(raw)
+
+
+def test_deserialize_valid_references_still_round_trip():
+    original=elements()
+    assert deserialize_elements(serialize_elements(original)) == tuple(sorted(original,key=lambda item:item.element_id.value))
+

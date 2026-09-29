@@ -16,3 +16,19 @@ def test_declared_circle_geometry_is_not_silently_exported():
     circle=ArchiElement(w,'P',ElementKind.WALL,ArchiGeometry(GeometryKind.EXTRUDED_CIRCLE,ProfileSpec(200,200,100),height_mm=2800))
     with pytest.raises(ValueError, match='GEOMETRY_KIND_NOT_IMPLEMENTED'):
         export_ifc((circle,))
+
+from sicl.archi.integrity import ReferentialIntegrityError
+
+
+def test_ifc_export_rejects_orphan_reference():
+    missing=ArchiElementId.compute('P','WALL','missing-host')
+    d=ArchiElementId.compute('P','DOOR','orphan-door')
+    g=ArchiGeometry(GeometryKind.EXTRUDED_RECTANGLE,ProfileSpec(200,100),height_mm=2800)
+    door=ArchiElement(d,'P',ElementKind.DOOR,g,hosted_in=missing)
+    with pytest.raises(ReferentialIntegrityError,match='IFC_EXPORT_REFERENTIAL_INTEGRITY_VIOLATION'):
+        export_ifc((door,))
+
+
+def test_ifc_export_valid_references_remain_supported():
+    assert export_ifc(elements())
+
