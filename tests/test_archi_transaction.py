@@ -132,3 +132,18 @@ def test_rt17_stage_cleanup_failure_cannot_leave_canonical_old(tmp_path, monkeyp
 
 def test_no_unauthorized_execution():
     artifact=VersionedRef('A','1',1); dv=DerivationValidity('d',artifact,'REQUIRES_HUMAN_REVIEW',source_checks=('integrity_checks_d',)); action=ReactionPlanner().plan_reaction(ValidityReport(artifact_validities=(ArtifactValidity(artifact,'REQUIRES_HUMAN_REVIEW',(dv,),{},{}),))).planned_actions[0]; assert action.requires_human_authority and action.action_type is ActionType.ESCALATE
+
+
+def test_publish_candidate_is_reusable_without_mutation():
+    space=ArchiElement(ArchiElementId.compute('P-1','SPACE','initial'),'P-1',ElementKind.SPACE,ArchiGeometry(GeometryKind.EXTRUDED_RECTANGLE,ProfileSpec(3000,3000),height_mm=2800))
+    tx=ArchiTransaction(())
+    ledger=DerivationLedger(Store())
+    prov={}
+    pub=tx._publish_candidate(project_id='P-1', candidate=(space,), prepared_derivations=(), ledger=ledger, prov=prov, ifc_path=None)
+    assert pub.success is True
+    assert isinstance(pub, PublishResult)
+    assert pub.canonical==tx.canonical==(space,)
+    assert pub.prepared_derivations==()
+    assert pub.cleanup_status=='COMPLETE'
+    assert isinstance(pub.provenance, dict)
+    assert tx._applied==set()
