@@ -132,7 +132,7 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "BIM_SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED", "EXAMPLE_NOT_FOUND", "D2_NOT_COMMITTED", "D2_SNAPSHOT_NOT_FOUND"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "BIM_SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED", "EXAMPLE_NOT_FOUND", "D2_NOT_COMMITTED", "D2_SNAPSHOT_NOT_FOUND", "REVIEW_TARGET_NOT_FOUND"}:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
@@ -142,7 +142,7 @@ def _status_for(code: str) -> int:
         return 404
     if code in {"PROJECT_ALREADY_EXISTS", "INVALID_STATE", "CONFLICT", "SOURCE_ALREADY_EXISTS", "BIM_SNAPSHOT_ALREADY_EXISTS", "PLANNING_INSTRUMENT_ALREADY_LINKED", "INVALID_SCOPE_RELATION", "LOCATION_ALREADY_EXISTS"}:
         return 409
-    if code in {"HUMAN_REVIEW_REQUIRED", "HUMAN_AUTHORITY_REQUIRED", "HUMAN_CONFIRMATION_REQUIRED", "MEMORY_REVOKED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED", "INVALID_SOURCE_TYPE", "INVALID_LOCATION", "BIM_PREVIEW_ONLY"}:
+    if code in {"HUMAN_REVIEW_REQUIRED", "HUMAN_AUTHORITY_REQUIRED", "HUMAN_CONFIRMATION_REQUIRED", "MEMORY_REVOKED", "SEMANTIC_REJECTION", "OBJECTIVE_DIRECTION_REQUIRED", "INVALID_SOURCE_TYPE", "INVALID_LOCATION", "BIM_PREVIEW_ONLY", "REVIEW_TARGET_FINGERPRINT_MISMATCH"}:
         return 422
     return 400
 
@@ -1154,14 +1154,64 @@ def human_review(project_id: str, request: CanonicalWriteRequest, repo: SQLiteRe
     if repo.get_project(project_id) is None:
         _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
     p = request.payload
-    args = [str(p.get("actor", "")), str(p.get("timestamp", "")), str(p.get("review", "")), str(p.get("reason", "")), str(p.get("authority", ""))]
-    cli = CLI(repo, actor=args[0] or "api")
-    result = cli.execute("/PROJECT OPEN " + project_id)
-    _error(result, project_id)
-    result = cli.execute('/HUMAN REVIEW ' + ' '.join(f'"{item}"' for item in args))
-    _error(result, project_id)
+    actor = str(p.get("actor", ""))
+    timestamp = str(p.get("timestamp", ""))
+    review_text = str(p.get("review", ""))
+    reason = str(p.get("reason", ""))
+    authority = str(p.get("authority", ""))
+    referenced_entity_type = p.get("referenced_entity_type")
+    referenced_entity_id = p.get("referenced_entity_id")
+    referenced_fingerprint = p.get("referenced_fingerprint")
+    if referenced_entity_type is None and referenced_entity_id is None and referenced_fingerprint is None:
+        cli = CLI(repo, actor=actor or "api")
+        result = cli.execute("/PROJECT OPEN " + project_id)
+        _error(result, project_id)
+        result = cli.execute('/HUMAN REVIEW ' + ' '.join(f'"{item}"' for item in [actor, timestamp, review_text, reason, authority]))
+        _error(result, project_id)
+        project = repo.get_project(project_id)
+        return _ok({"human_review": result.get("data", {})}, project_id, project.version if project else None)
+
+    try:
+        review = HumanReview(
+            f"REV-{uuid.uuid4().hex[:10]}",
+            project_id,
+            actor,
+            timestamp,
+            review_text,
+            reason,
+            authority,
+            "APPROVED",
+            1,
+            referenced_entity_type,
+            referenced_entity_id,
+            referenced_fingerprint,
+        )
+    except (TypeError, ValueError) as exc:
+        _error({"code": "INVALID_ARGUMENT", "message": str(exc)}, project_id)
+    if review.referenced_entity_type == "DEVELOPER_PROPOSAL":
+        existing_event, existing_envelope = _find_existing_reasoning_event(repo, project_id, review.referenced_entity_id)
+        if existing_event is None or existing_envelope.get("kind") != "DEVELOPER_PROPOSAL":
+            _error({"code": "REVIEW_TARGET_NOT_FOUND", "message": review.referenced_entity_id}, project_id)
+        if existing_envelope.get("fingerprint") != review.referenced_fingerprint:
+            _error({"code": "REVIEW_TARGET_FINGERPRINT_MISMATCH", "message": review.referenced_entity_id}, project_id)
     project = repo.get_project(project_id)
-    return _ok({"human_review": result.get("data", {})}, project_id, project.version if project else None)
+    project.human_reviews[review.review_id] = review
+    project.version += 1
+    cli = CLI(repo, actor=actor or "api")
+    repo.insert_entity_and_event(
+        """INSERT INTO human_reviews(
+            review_id, project_id, actor, timestamp, review, reason, authority, status, version,
+            referenced_entity_type, referenced_entity_id, referenced_fingerprint
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            review.review_id, project_id, actor, timestamp, review_text, reason, authority,
+            review.status, review.version, review.referenced_entity_type,
+            review.referenced_entity_id, review.referenced_fingerprint,
+        ),
+        project,
+        cli._event(project_id, "HUMAN_REVIEW_RECORDED", asdict(review)),
+    )
+    return _ok({"human_review": asdict(review)}, project_id, project.version)
 
 
 @router.post("/projects/{project_id}/decisions", dependencies=[Depends(_auth)])
