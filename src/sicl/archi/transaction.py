@@ -200,50 +200,6 @@ class ArchiTransaction:
         h005=SelectiveRecomputationEngine(temp, registry).execute(mutation.project_id, reaction, changed_refs)
         prov["h005"]=h005.to_dict()
         if any(r.status is not ExecutionStatus.EXECUTED for r in h005.records): return MutationResult(mid, MutationStatus.BLOCKED, MutationLifecycle.EVALUATED, self._canonical, (), "H005_BLOCKED_OR_FAILED", False, prov)
-        try:
-            # Serialization is in-memory. A supplied path is an external
-            # publication target, not the serialization boundary.
-            ifc_bytes=export_ifc(candidate, None)
-            prov["ifc"]={"sha256":hashlib.sha256(ifc_bytes).hexdigest(),"published":False,"staged":ifc_path is not None}
-        except Exception as exc: return MutationResult(mid, MutationStatus.FAILED, MutationLifecycle.EVALUATED, self._canonical, (), f"IFC_EXPORT:{type(exc).__name__}", False, prov)
-
-        stage = None
-        final = Path(ifc_path) if ifc_path is not None else None
-        backup = None
-        promoted = False
-        try:
-            if final is not None:
-                stage = self._stage_ifc(final, ifc_bytes)
-                # Promotion precedes ledger publication. If it fails, the
-                # ledger is untouched; if ledger publication fails, the prior
-                # final file is restored below.
-                backup = self._promote_ifc(stage, final)
-                promoted = True
-
-            existing_ids = {record.id for record in ledger.list(mutation.project_id)}
-            new_records = [record for record in temp.list(mutation.project_id) if record.id not in existing_ids]
-            ledger.record_batch(mutation.project_id, new_records, actor="ARCHI_D2")
-        except Exception as exc:
-            if promoted and final is not None:
-                try:
-                    self._rollback_ifc(final, backup)
-                except Exception as rollback_exc:
-                    return MutationResult(mid, MutationStatus.FAILED, MutationLifecycle.EVALUATED, self._canonical, (), f"TRANSACTION_ROLLBACK_FAILED:{type(rollback_exc).__name__}", False, prov)
-            return MutationResult(mid, MutationStatus.FAILED, MutationLifecycle.EVALUATED, self._canonical, (), f"PUBLICATION:{type(exc).__name__}", False, prov)
-
-        # COMMIT POINT: from here ledger, IFC and canonical state are new.
-        self._canonical=candidate; self._applied.add(mid)
-        prov["ifc"]["published"] = final is not None
-
-        # POST-COMMIT HOUSEKEEPING: never allow cleanup to turn a committed
-        # transaction into FAILED or to roll back canonical state.
-        cleanup_errors = self._cleanup_ifc(stage, backup)
-        if cleanup_errors:
-            prov["cleanup"] = {"status": "DEFERRED", "errors": cleanup_errors}
-            reason = "APPLIED_PUBLISHED_CLEANUP_DEFERRED"
-        else:
-            prov["cleanup"] = {"status": "COMPLETE", "errors": []}
-            reason = "APPLIED_PUBLISHED"
         existing_ids={record.id for record in ledger.list(mutation.project_id)}
         prepared_derivations=tuple(record for record in temp.list(mutation.project_id) if record.id not in existing_ids)
         pub=self._publish_candidate(project_id=mutation.project_id, candidate=candidate, prepared_derivations=prepared_derivations, ledger=ledger, prov=prov, ifc_path=ifc_path)
