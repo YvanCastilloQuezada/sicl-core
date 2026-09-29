@@ -100,7 +100,7 @@ def _already_committed(repo: SQLiteRepository, project_id: str, proposal_id: str
             )
             return PromotionOutcome(
                 True, proposal_id, snapshot_id, version, snapshot.elements,
-                "FAILED" if failed else "PARTIAL",
+                "FAILED" if failed else "NOT_ATTEMPTED",
                 "ALREADY_COMMITTED",
             )
     return None
