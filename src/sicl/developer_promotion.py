@@ -115,14 +115,17 @@ def _int_field(value: Any, field: str) -> int:
 def _geometry(raw: dict[str, Any] | None) -> ArchiGeometry:
     if raw is None:
         raise ValueError("MISSING_GEOMETRY")
-    if raw.get("type") == "Polygon":
+    if not isinstance(raw, dict):
+        raise ValueError("GEOMETRY_CONTRACT_NOT_MAPPED")
+    geometry_fields = {"kind", "profile", "x_mm", "y_mm", "z_mm", "height_mm"}
+    if set(raw) != geometry_fields:
         raise ValueError("GEOMETRY_CONTRACT_NOT_MAPPED")
     try:
         kind = GeometryKind(raw.get("kind"))
     except (TypeError, ValueError):
         raise ValueError("GEOMETRY_CONTRACT_NOT_MAPPED") from None
     profile = raw.get("profile")
-    if not isinstance(profile, dict):
+    if not isinstance(profile, dict) or set(profile) != {"width_mm", "depth_mm", "radius_mm"}:
         raise ValueError("GEOMETRY_CONTRACT_NOT_MAPPED")
     try:
         radius = profile.get("radius_mm")
