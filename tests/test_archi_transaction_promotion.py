@@ -101,7 +101,8 @@ def test_promote_initial_elements_applies_and_merges_with_existing_canonical():
     assert result.lifecycle is MutationLifecycle.PUBLISHED
     assert result.reason == "PROMOTED"
     assert result.derivation_recorded is True
-    assert tx.canonical == (existing, created)
+    expected = tuple(sorted((existing, created), key=lambda item: item.element_id.value))
+    assert tx.canonical == expected
     assert result.canonical == result.candidate == tx.canonical
 
 
@@ -189,7 +190,7 @@ def test_cleanup_deferred_is_applied_not_rolled_back(monkeypatch):
     assert result.status is MutationStatus.APPLIED
     assert result.reason == "PROMOTED_CLEANUP_DEFERRED"
     assert result.provenance["cleanup"]["status"] == "DEFERRED"
-    assert tx.canonical == (existing, created)
+    assert tx.canonical == tuple(sorted((existing, created), key=lambda item: item.element_id.value))
 
 
 def test_promotion_never_touches_applied_replay_bookkeeping():
@@ -234,7 +235,23 @@ def test_project_id_and_merged_candidate_reach_single_publisher(monkeypatch):
     assert result.status is MutationStatus.APPLIED
     assert len(calls) == 1
     assert calls[0]["project_id"] == "P"
-    assert calls[0]["candidate"] == (existing, created)
+    assert calls[0]["candidate"] == tuple(sorted((existing, created), key=lambda item: item.element_id.value))
+
+
+def test_promotion_canonicalizes_multiple_elements_by_element_id():
+    existing = element("z-existing")
+    created_b = element("b-created")
+    created_a = element("a-created")
+    tx = ArchiTransaction((existing,))
+    result = tx.promote_initial_elements(
+        **valid_inputs(tx, (created_b, created_a))
+    )
+    expected = tuple(
+        sorted((existing, created_b, created_a), key=lambda item: item.element_id.value)
+    )
+    assert result.status is MutationStatus.APPLIED
+    assert result.canonical == expected
+    assert tx.canonical == expected
 
 
 def test_promotion_does_not_require_or_create_archi_mutation():
