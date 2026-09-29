@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import date, datetime
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator, Mapping
 
 from .domain import Actor, ActorPosition, ActorRole, ActorState, Assumption, AuthorityLevel, Constraint, CycleHorizon, CycleState, Decision, Evidence, EvidenceType, Event, EvolutionState, GeneratedAlternative, GenerationMethod, GenerationState, InstitutionalMemory, MemoryConfidence, MemoryState, MemoryType, Fact, HumanReview, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Regulation, RegulationStatus, Role, ScenarioBranch, ScenarioEvolution, ScenarioState, ScaleRelation, ScaleRelationType, Source, SourceType, SpatialScope, Stance, SubjectType, TemporalCycle, TemporalScope, now_iso
 from .errors import SICLError
@@ -17,6 +17,12 @@ from .gis import ParcelSnapshot
 from .spatial_location import SpatialLocation, LocationStatus
 from .archi.model import ArchiElement
 from .archi.persistence import D2Snapshot, deserialize_elements, deterministic_snapshot_id, elements_content_hash, serialize_elements
+
+
+_D2_RESERVED_EVENT_FIELDS = frozenset({
+    "snapshot_id", "project_id", "version", "content_hash",
+    "element_count", "actor", "source",
+})
 
 
 class SQLiteRepository:
@@ -535,12 +541,30 @@ class SQLiteRepository:
         elements: tuple[ArchiElement, ...],
         actor: str,
         source: str,
+        *,
+        event_type: str = "D2_SNAPSHOT_COMMITTED",
+        event_payload: Mapping[str, Any] | None = None,
     ) -> D2Snapshot:
-        """Atomically append one canonical D-2 snapshot and its audit event."""
+        """Atomically append one canonical D-2 snapshot and its audit event.
+
+        Additional event metadata may be supplied through event_payload.
+        Canonical snapshot-binding fields are repository-owned and cannot be
+        overridden by callers.
+        """
         if not isinstance(actor, str) or not actor.strip():
             raise ValueError("actor must be non-empty")
         if not isinstance(source, str) or not source.strip():
             raise ValueError("source must be non-empty")
+        if not isinstance(event_type, str) or not event_type.strip():
+            raise ValueError("event_type must be non-empty")
+        if event_payload is not None and not isinstance(event_payload, Mapping):
+            raise TypeError("event_payload must be a mapping or None")
+        extra_payload = dict(event_payload or {})
+        forbidden = set(extra_payload) & _D2_RESERVED_EVENT_FIELDS
+        if forbidden:
+            raise ValueError(
+                f"event_payload cannot override reserved fields: {sorted(forbidden)}"
+            )
         if self.get_project(project_id) is None:
             raise ValueError(f"PROJECT_NOT_FOUND:{project_id}")
         raw = serialize_elements(elements)
@@ -555,20 +579,22 @@ class SQLiteRepository:
             ).fetchone()
             version = int(row["version"]) + 1
             snapshot_id = deterministic_snapshot_id(project_id, version, content_hash)
+            payload = {
+                "snapshot_id": snapshot_id,
+                "project_id": project_id,
+                "version": version,
+                "content_hash": content_hash,
+                "element_count": len(elements),
+                "actor": actor.strip(),
+                "source": source.strip(),
+            }
+            payload.update(extra_payload)
             event = self._insert_event(Event(
                 None,
                 created_at,
                 project_id,
-                "D2_SNAPSHOT_COMMITTED",
-                {
-                    "snapshot_id": snapshot_id,
-                    "project_id": project_id,
-                    "version": version,
-                    "content_hash": content_hash,
-                    "element_count": len(elements),
-                    "actor": actor.strip(),
-                    "source": source.strip(),
-                },
+                event_type.strip(),
+                payload,
                 actor.strip(),
                 "ARKI_D2_STORE",
             ))

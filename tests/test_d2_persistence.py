@@ -211,3 +211,135 @@ def test_deserialize_valid_references_still_round_trip():
     original=elements()
     assert deserialize_elements(serialize_elements(original)) == tuple(sorted(original,key=lambda item:item.element_id.value))
 
+
+
+
+def test_custom_d2_event_type_is_persisted_and_bound_to_snapshot():
+    repo = SQLiteRepository()
+    project(repo)
+    committed = repo.insert_d2_snapshot_and_event(
+        "P",
+        elements(),
+        "architect",
+        "ARKI_DEVELOPER_PROMOTION",
+        event_type="DEVELOPER_PROMOTION_COMMITTED",
+    )
+    event = next(item for item in repo.events("P") if item.type == "DEVELOPER_PROMOTION_COMMITTED")
+    assert event.id == committed.source_event_id
+    assert event.payload["snapshot_id"] == committed.snapshot_id
+    assert event.payload["version"] == committed.version
+
+
+def test_custom_d2_event_payload_preserves_additional_metadata():
+    repo = SQLiteRepository()
+    project(repo)
+    repo.insert_d2_snapshot_and_event(
+        "P",
+        elements(),
+        "review.actor",
+        "ARKI_DEVELOPER_PROMOTION",
+        event_type="DEVELOPER_PROMOTION_COMMITTED",
+        event_payload={
+            "proposal_id": "dev-prop-1",
+            "proposal_fingerprint": "a" * 64,
+            "human_review_id": "review-1",
+        },
+    )
+    event = next(item for item in repo.events("P") if item.type == "DEVELOPER_PROMOTION_COMMITTED")
+    assert event.payload["proposal_id"] == "dev-prop-1"
+    assert event.payload["proposal_fingerprint"] == "a" * 64
+    assert event.payload["human_review_id"] == "review-1"
+
+
+@pytest.mark.parametrize(
+    "reserved_field",
+    [
+        "snapshot_id",
+        "project_id",
+        "version",
+        "content_hash",
+        "element_count",
+        "actor",
+        "source",
+    ],
+)
+def test_custom_d2_event_payload_cannot_override_canonical_fields(reserved_field):
+    repo = SQLiteRepository()
+    project(repo)
+    before = len(repo.events("P"))
+    with pytest.raises(ValueError, match="event_payload cannot override reserved fields"):
+        repo.insert_d2_snapshot_and_event(
+            "P",
+            elements(),
+            "architect",
+            "ARKI_DEVELOPER_PROMOTION",
+            event_type="DEVELOPER_PROMOTION_COMMITTED",
+            event_payload={reserved_field: "forged"},
+        )
+    assert repo.get_d2("P") is None
+    assert len(repo.events("P")) == before
+
+
+def test_custom_d2_event_is_atomic_when_snapshot_insert_fails():
+    repo = SQLiteRepository()
+    project(repo)
+    repo.conn.executescript("""
+    CREATE TRIGGER force_custom_d2_insert_failure
+    BEFORE INSERT ON d2_snapshots
+    BEGIN SELECT RAISE(ABORT, 'forced custom D-2 failure'); END;
+    """)
+    before = len(repo.events("P"))
+    with pytest.raises(sqlite3.IntegrityError):
+        repo.insert_d2_snapshot_and_event(
+            "P",
+            elements(),
+            "architect",
+            "ARKI_DEVELOPER_PROMOTION",
+            event_type="DEVELOPER_PROMOTION_COMMITTED",
+            event_payload={"proposal_id": "dev-prop-1"},
+        )
+    assert repo.get_d2("P") is None
+    assert len(repo.events("P")) == before
+
+
+def test_custom_d2_event_keeps_project_version_and_advances_only_d2_version():
+    repo = SQLiteRepository()
+    project(repo)
+    project_version = repo.get_project("P").version
+    first = repo.insert_d2_snapshot_and_event(
+        "P",
+        elements(),
+        "architect",
+        "ARKI_DEVELOPER_PROMOTION",
+        event_type="DEVELOPER_PROMOTION_COMMITTED",
+    )
+    second = repo.insert_d2_snapshot_and_event(
+        "P",
+        elements(),
+        "architect",
+        "ARKI_DEVELOPER_PROMOTION",
+        event_type="DEVELOPER_PROMOTION_COMMITTED",
+    )
+    assert repo.get_project("P").version == project_version
+    assert first.version == 1
+    assert second.version == 2
+
+
+def test_d2_event_type_must_be_non_empty():
+    repo = SQLiteRepository()
+    project(repo)
+    with pytest.raises(ValueError, match="event_type must be non-empty"):
+        repo.insert_d2_snapshot_and_event(
+            "P", elements(), "architect", "TEST", event_type=" "
+        )
+    assert repo.get_d2("P") is None
+
+
+def test_d2_event_payload_must_be_mapping_or_none():
+    repo = SQLiteRepository()
+    project(repo)
+    with pytest.raises(TypeError, match="event_payload must be a mapping or None"):
+        repo.insert_d2_snapshot_and_event(
+            "P", elements(), "architect", "TEST", event_payload=["invalid"]
+        )
+    assert repo.get_d2("P") is None
