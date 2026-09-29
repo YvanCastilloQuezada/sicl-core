@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from api.deps import get_repository
 from api.main import app
+from api.routes.v1 import _status_for
 from sicl.repository import SQLiteRepository
 from sicl.archi import ArchiElement, ArchiElementId, ArchiGeometry, ElementKind, GeometryKind, ProfileSpec
 
@@ -295,3 +296,225 @@ def test_v1_legacy_human_review_remains_valid_for_decision_after_binding_migrati
     })
     assert decision.status_code == 200
     close(repo)
+
+PROMOTION_FP = "c" * 64
+
+
+def _record_promotable_developer_proposal(client, project_id: str, proposal_id: str = "dev-promote-1"):
+    payload = {
+        "proposalId": proposal_id,
+        "parentProposalId": None,
+        "sourceExecutionId": "d63-exec",
+        "sourceD63": "D63-A",
+        "fingerprint": PROMOTION_FP,
+        "epistemicStatus": "PROPOSAL",
+        "proposedElements": [{
+            "provisionalId": "space-1",
+            "kind": "SPACE",
+            "geometry": {
+                "kind": "EXTRUDED_RECTANGLE",
+                "profile": {"width_mm": 4000, "depth_mm": 3000, "radius_mm": None},
+                "x_mm": 0,
+                "y_mm": 0,
+                "z_mm": 0,
+                "height_mm": 2800,
+            },
+            "properties": {"name": "Space"},
+            "provenance": [{"source": "test", "ref": "D63-A"}],
+            "epistemicStatus": "HYPOTHESIS",
+        }],
+        "proposedRelations": [],
+        "proposedDerivations": [],
+        "unresolvedUnknowns": [],
+        "requiredHumanActions": [{"action": "review", "reason": "required"}],
+        "provenance": [{"source": "test", "ref": "proposal"}],
+        "reviewRequired": True,
+        "mutation": None,
+        "rejectedBecause": None,
+        "feedbackLoops": [],
+    }
+    response = client.post(
+        f"/v1/projects/{project_id}/reasoning-executions",
+        json={
+            "execution_id": proposal_id,
+            "kind": "DEVELOPER_PROPOSAL",
+            "fingerprint": PROMOTION_FP,
+            "input_fingerprint": None,
+            "payload": payload,
+            "epistemic_status": "PROPOSAL",
+            "human_authority_ref": None,
+            "source_refs": [],
+            "actor": "ARKI_DEVELOPER",
+            "created_at": "2026-09-29T12:00:00Z",
+        },
+    )
+    assert response.status_code == 200
+
+
+def _approve_promotable_developer_proposal(client, project_id: str, proposal_id: str = "dev-promote-1") -> str:
+    response = client.post(
+        f"/v1/projects/{project_id}/human-reviews",
+        json={
+            "actor": "architect",
+            "timestamp": "2026-09-29T12:01:00Z",
+            "review": "Approved proposal",
+            "reason": "Architecture review",
+            "authority": "PRODUCT_OWNER",
+            "referenced_entity_type": "DEVELOPER_PROPOSAL",
+            "referenced_entity_id": proposal_id,
+            "referenced_fingerprint": PROMOTION_FP,
+        },
+    )
+    assert response.status_code == 200
+    return response.json()["data"]["human_review"]["review_id"]
+
+
+def _promotion_body(review_id: str, proposal_id: str = "dev-promote-1") -> dict:
+    return {
+        "proposal_id": proposal_id,
+        "proposal_fingerprint": PROMOTION_FP,
+        "human_review_id": review_id,
+    }
+
+
+@pytest.mark.parametrize(
+    "code,status",
+    [
+        ("PROJECT_NOT_FOUND", 404),
+        ("PROPOSAL_NOT_FOUND", 404),
+        ("HUMAN_REVIEW_NOT_FOUND", 404),
+        ("PROPOSAL_FINGERPRINT_MISMATCH", 409),
+        ("PROPOSAL_FINGERPRINT_INCONSISTENT", 409),
+        ("HUMAN_REVIEW_BINDING_MISMATCH", 409),
+        ("SUFFICIENCY_NOT_PERMITTED", 409),
+        ("INVALID_DEVELOPER_PROPOSAL", 400),
+        ("STRUCTURAL_VALIDATION_FAILED", 400),
+        ("RELATIONS_NOT_YET_SUPPORTED", 400),
+        ("DERIVATIONS_NOT_YET_SUPPORTED", 400),
+        ("UNKNOWN_ELEMENT_KIND", 400),
+        ("MISSING_GEOMETRY", 400),
+        ("GEOMETRY_CONTRACT_NOT_MAPPED", 400),
+        ("GEOMETRY_CONTRACT_NOT_MAPPED:x_mm", 400),
+        ("UNSUPPORTED_PROPERTY_VALUE:d63_labels", 400),
+        ("PROMOTION_PERSIST_FAILED", 500),
+        ("PROMOTION_FAILED", 500),
+    ],
+)
+def test_v1_developer_promotion_status_mapping(code, status):
+    assert _status_for(code) == status
+
+
+def test_v1_developer_promotion_commits_d2_without_advancing_project_version(tmp_path: Path):
+    client, repo = client_for(tmp_path)
+    project_id = "V1-PROMOTE"
+    client.post("/v1/projects", json={"project_id": project_id, "name": "Promotion"})
+    _record_promotable_developer_proposal(client, project_id)
+    review_id = _approve_promotable_developer_proposal(client, project_id)
+    before = repo.get_project(project_id).version
+
+    response = client.post(
+        f"/v1/projects/{project_id}/developer-promotions",
+        json=_promotion_body(review_id),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["observed_version"] == before
+    assert body["data"]["status"] == "COMMITTED"
+    assert body["data"]["proposal_id"] == "dev-promote-1"
+    assert body["data"]["d2_version"] == 1
+    assert body["data"]["effects_status"] == "COMPLETE"
+    assert repo.get_project(project_id).version == before
+    assert repo.get_d2(project_id) is not None
+    close(repo)
+
+
+def test_v1_developer_promotion_is_idempotent_over_http(tmp_path: Path):
+    client, repo = client_for(tmp_path)
+    project_id = "V1-PROMOTE-IDEMP"
+    client.post("/v1/projects", json={"project_id": project_id, "name": "Promotion"})
+    _record_promotable_developer_proposal(client, project_id)
+    review_id = _approve_promotable_developer_proposal(client, project_id)
+    body = _promotion_body(review_id)
+
+    first = client.post(f"/v1/projects/{project_id}/developer-promotions", json=body)
+    second = client.post(f"/v1/projects/{project_id}/developer-promotions", json=body)
+
+    assert first.status_code == second.status_code == 200
+    assert second.json()["data"]["snapshot_id"] == first.json()["data"]["snapshot_id"]
+    assert second.json()["data"]["d2_version"] == first.json()["data"]["d2_version"]
+    assert second.json()["data"]["effects_status"] == "NOT_ATTEMPTED"
+    assert second.json()["data"]["reason"] == "ALREADY_COMMITTED"
+    assert len([e for e in repo.events(project_id) if e.type == "DEVELOPER_PROMOTION_COMMITTED"]) == 1
+    close(repo)
+
+
+def test_v1_developer_promotion_restart_durability(tmp_path: Path):
+    db_path = tmp_path / "promotion-restart.sqlite"
+    repo = SQLiteRepository(db_path, check_same_thread=False)
+    app.dependency_overrides[get_repository] = lambda: repo
+    client = TestClient(app)
+    project_id = "V1-PROMOTE-RESTART"
+    client.post("/v1/projects", json={"project_id": project_id, "name": "Promotion"})
+    _record_promotable_developer_proposal(client, project_id)
+    review_id = _approve_promotable_developer_proposal(client, project_id)
+    request = _promotion_body(review_id)
+    first = client.post(f"/v1/projects/{project_id}/developer-promotions", json=request)
+    assert first.status_code == 200
+    snapshot_id = first.json()["data"]["snapshot_id"]
+    observed_version = first.json()["observed_version"]
+    repo.close()
+
+    reopened = SQLiteRepository(db_path, check_same_thread=False)
+    app.dependency_overrides[get_repository] = lambda: reopened
+    restarted_client = TestClient(app)
+    replay = restarted_client.post(
+        f"/v1/projects/{project_id}/developer-promotions",
+        json=request,
+    )
+
+    assert replay.status_code == 200
+    assert replay.json()["data"]["snapshot_id"] == snapshot_id
+    assert replay.json()["data"]["d2_version"] == 1
+    assert replay.json()["data"]["effects_status"] == "NOT_ATTEMPTED"
+    assert replay.json()["observed_version"] == observed_version
+    assert reopened.get_d2(project_id) is not None
+    close(reopened)
+
+
+def test_v1_developer_promotion_rejection_uses_error_envelope(tmp_path: Path):
+    client, repo = client_for(tmp_path)
+    project_id = "V1-PROMOTE-REJECT"
+    client.post("/v1/projects", json={"project_id": project_id, "name": "Promotion"})
+    response = client.post(
+        f"/v1/projects/{project_id}/developer-promotions",
+        json={
+            "proposal_id": "missing",
+            "proposal_fingerprint": PROMOTION_FP,
+            "human_review_id": "missing-review",
+        },
+    )
+    assert response.status_code == 404
+    detail = response.json()["detail"]
+    assert detail["code"] == "PROPOSAL_NOT_FOUND"
+    assert detail["data"]["status"] == "REJECTED"
+    assert repo.get_d2(project_id) is None
+    close(repo)
+
+
+def test_v1_developer_promotion_request_is_strict(tmp_path: Path):
+    client, repo = client_for(tmp_path)
+    client.post("/v1/projects", json={"project_id": "V1-PROMOTE-STRICT", "name": "Promotion"})
+    response = client.post(
+        "/v1/projects/V1-PROMOTE-STRICT/developer-promotions",
+        json={
+            "proposal_id": "p",
+            "proposal_fingerprint": "A" * 64,
+            "human_review_id": "r",
+            "unexpected": True,
+        },
+    )
+    assert response.status_code == 422
+    assert repo.get_d2("V1-PROMOTE-STRICT") is None
+    close(repo)
+
