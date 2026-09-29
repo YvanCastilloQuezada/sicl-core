@@ -254,7 +254,11 @@ def promote_developer_proposal(
                        str(exc), review.actor)
 
     existing_canonical = repo.get_d2(project_id) or ()
-    structural = validate_creation(\n        project_id=project_id,\n        candidate_elements=candidate_elements,\n        existing_canonical=existing_canonical,\n    )
+    structural = validate_creation(
+        project_id=project_id,
+        candidate_elements=candidate_elements,
+        existing_canonical=existing_canonical,
+    )
     if not structural.valid:
         return _reject(repo, project_id, proposal_id, proposal_fingerprint, human_review_id,
                        "STRUCTURAL_VALIDATION_FAILED", review.actor)
