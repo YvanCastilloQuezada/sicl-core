@@ -862,7 +862,7 @@ class CLI:
             raise SICLError("INVALID_ARGUMENT", "status must be APPROVED, REJECTED or PENDING")
         review = HumanReview(f"REV-{uuid.uuid4().hex[:10]}", p.project_id, actor, timestamp, review_text, reason, authority, status)
         p.human_reviews[review.review_id] = review; p.version += 1
-        self.repo.insert_entity_and_event("INSERT INTO human_reviews VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (review.review_id, p.project_id, actor, timestamp, review_text, reason, authority, status, review.version), p, self._event(p.project_id, "HUMAN_REVIEW_RECORDED", asdict(review)))
+        self.repo.insert_entity_and_event("INSERT INTO human_reviews(review_id, project_id, actor, timestamp, review, reason, authority, status, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (review.review_id, p.project_id, actor, timestamp, review_text, reason, authority, status, review.version), p, self._event(p.project_id, "HUMAN_REVIEW_RECORDED", asdict(review)))
         return self._ok(asdict(review))
 
     def alternative_create(self, args: list[str]) -> dict:

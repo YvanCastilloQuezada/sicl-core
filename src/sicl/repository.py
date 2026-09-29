@@ -134,7 +134,10 @@ class SQLiteRepository:
           review_id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
           actor TEXT NOT NULL, timestamp TEXT NOT NULL, review TEXT NOT NULL, reason TEXT NOT NULL,
           authority TEXT NOT NULL,
-          status TEXT NOT NULL, version INTEGER NOT NULL
+          status TEXT NOT NULL, version INTEGER NOT NULL,
+          referenced_entity_type TEXT,
+          referenced_entity_id TEXT,
+          referenced_fingerprint TEXT
         );
         CREATE TABLE IF NOT EXISTS alternatives (
           id TEXT PRIMARY KEY, project_id TEXT NOT NULL REFERENCES projects(project_id),
@@ -405,6 +408,13 @@ class SQLiteRepository:
         objective_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(objectives)")}
         if "source_parent_objective_id" not in objective_columns:
             self.conn.execute("ALTER TABLE objectives ADD COLUMN source_parent_objective_id TEXT NULL")
+        review_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(human_reviews)")}
+        if "referenced_entity_type" not in review_columns:
+            self.conn.execute("ALTER TABLE human_reviews ADD COLUMN referenced_entity_type TEXT NULL")
+        if "referenced_entity_id" not in review_columns:
+            self.conn.execute("ALTER TABLE human_reviews ADD COLUMN referenced_entity_id TEXT NULL")
+        if "referenced_fingerprint" not in review_columns:
+            self.conn.execute("ALTER TABLE human_reviews ADD COLUMN referenced_fingerprint TEXT NULL")
         self.conn.commit()
 
     @contextmanager

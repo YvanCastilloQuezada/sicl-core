@@ -173,3 +173,125 @@ def test_v1_d2_has_no_public_write_endpoint(tmp_path: Path):
     assert response.status_code in {404, 405}
     assert repo.get_d2("V1-D2-NO-WRITE") is None
     close(repo)
+
+
+def _record_developer_proposal(client, project_id: str, execution_id: str, fingerprint: str):
+    return client.post(
+        f"/v1/projects/{project_id}/reasoning-executions",
+        json={
+            "execution_id": execution_id,
+            "kind": "DEVELOPER_PROPOSAL",
+            "fingerprint": fingerprint,
+            "input_fingerprint": None,
+            "payload": {"proposal_id": execution_id},
+            "epistemic_status": "PROPOSAL",
+            "human_authority_ref": None,
+            "source_refs": [],
+            "actor": "ARKI_DEVELOPER",
+            "created_at": "2026-09-29T12:00:00Z",
+        },
+    )
+
+
+def test_v1_bound_human_review_round_trip_and_event(tmp_path: Path):
+    client, repo = client_for(tmp_path)
+    client.post("/v1/projects", json={"project_id": "V1-HRB", "name": "Review binding"})
+    fingerprint = "a" * 64
+    proposal = _record_developer_proposal(client, "V1-HRB", "dev-prop-1", fingerprint)
+    assert proposal.status_code == 200
+
+    review = client.post("/v1/projects/V1-HRB/human-reviews", json={
+        "actor": "Yvan",
+        "timestamp": "2026-09-29T12:01:00Z",
+        "review": "Approved proposal",
+        "reason": "Architecture review",
+        "authority": "PRODUCT_OWNER",
+        "referenced_entity_type": "DEVELOPER_PROPOSAL",
+        "referenced_entity_id": "dev-prop-1",
+        "referenced_fingerprint": fingerprint,
+    })
+    assert review.status_code == 200
+    data = review.json()["data"]["human_review"]
+    assert data["referenced_entity_type"] == "DEVELOPER_PROPOSAL"
+    assert data["referenced_entity_id"] == "dev-prop-1"
+    assert data["referenced_fingerprint"] == fingerprint
+
+    hydrated = repo.get_project("V1-HRB").human_reviews[data["review_id"]]
+    assert hydrated.referenced_entity_id == "dev-prop-1"
+    event = next(item for item in repo.events("V1-HRB") if item.type == "HUMAN_REVIEW_RECORDED")
+    assert event.payload["referenced_fingerprint"] == fingerprint
+    close(repo)
+
+
+def test_v1_bound_human_review_rejects_missing_proposal_without_persistence(tmp_path: Path):
+    client, repo = client_for(tmp_path)
+    client.post("/v1/projects", json={"project_id": "V1-HRB-MISSING", "name": "Review binding"})
+    before = len(repo.events("V1-HRB-MISSING"))
+    response = client.post("/v1/projects/V1-HRB-MISSING/human-reviews", json={
+        "actor": "Yvan", "timestamp": "2026-09-29T12:01:00Z",
+        "review": "Approved", "reason": "Review", "authority": "PRODUCT_OWNER",
+        "referenced_entity_type": "DEVELOPER_PROPOSAL",
+        "referenced_entity_id": "missing", "referenced_fingerprint": "a" * 64,
+    })
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "REVIEW_TARGET_NOT_FOUND"
+    assert repo.get_project("V1-HRB-MISSING").human_reviews == {}
+    assert len(repo.events("V1-HRB-MISSING")) == before
+    close(repo)
+
+
+def test_v1_bound_human_review_rejects_fingerprint_mismatch_without_persistence(tmp_path: Path):
+    client, repo = client_for(tmp_path)
+    client.post("/v1/projects", json={"project_id": "V1-HRB-FP", "name": "Review binding"})
+    assert _record_developer_proposal(client, "V1-HRB-FP", "dev-prop-2", "a" * 64).status_code == 200
+    before = len(repo.events("V1-HRB-FP"))
+    response = client.post("/v1/projects/V1-HRB-FP/human-reviews", json={
+        "actor": "Yvan", "timestamp": "2026-09-29T12:01:00Z",
+        "review": "Approved", "reason": "Review", "authority": "PRODUCT_OWNER",
+        "referenced_entity_type": "DEVELOPER_PROPOSAL",
+        "referenced_entity_id": "dev-prop-2", "referenced_fingerprint": "b" * 64,
+    })
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "REVIEW_TARGET_FINGERPRINT_MISMATCH"
+    assert repo.get_project("V1-HRB-FP").human_reviews == {}
+    assert len(repo.events("V1-HRB-FP")) == before
+    close(repo)
+
+
+def test_v1_bound_human_review_rejects_partial_or_malformed_binding(tmp_path: Path):
+    client, repo = client_for(tmp_path)
+    client.post("/v1/projects", json={"project_id": "V1-HRB-BAD", "name": "Review binding"})
+    common = {
+        "actor": "Yvan", "timestamp": "2026-09-29T12:01:00Z",
+        "review": "Approved", "reason": "Review", "authority": "PRODUCT_OWNER",
+    }
+    partial = client.post("/v1/projects/V1-HRB-BAD/human-reviews", json={
+        **common, "referenced_entity_type": "DEVELOPER_PROPOSAL",
+    })
+    assert partial.status_code == 400
+    malformed = client.post("/v1/projects/V1-HRB-BAD/human-reviews", json={
+        **common,
+        "referenced_entity_type": "DEVELOPER_PROPOSAL",
+        "referenced_entity_id": "dev-prop",
+        "referenced_fingerprint": "NOT-SHA256",
+    })
+    assert malformed.status_code == 400
+    assert repo.get_project("V1-HRB-BAD").human_reviews == {}
+    close(repo)
+
+
+def test_v1_legacy_human_review_remains_valid_for_decision_after_binding_migration(tmp_path: Path):
+    client, repo = client_for(tmp_path)
+    client.post("/v1/projects", json={"project_id": "V1-HRB-LEGACY", "name": "Legacy"})
+    review = client.post("/v1/projects/V1-HRB-LEGACY/human-reviews", json={
+        "actor": "Yvan", "timestamp": "2026-09-29T12:00:00Z",
+        "review": "Reviewed", "reason": "Legacy", "authority": "PRODUCT_OWNER",
+    })
+    assert review.status_code == 200
+    data = review.json()["data"]["human_review"]
+    assert data["referenced_entity_type"] is None
+    decision = client.post("/v1/projects/V1-HRB-LEGACY/decisions", json={
+        "statement": "Proceed", "actor": "Yvan", "authority": "PRODUCT_OWNER",
+    })
+    assert decision.status_code == 200
+    close(repo)
