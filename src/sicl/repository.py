@@ -8,13 +8,15 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Iterator
 
-from .domain import Actor, ActorPosition, ActorRole, ActorState, Assumption, AuthorityLevel, Constraint, CycleHorizon, CycleState, Decision, Evidence, EvidenceType, Event, EvolutionState, GeneratedAlternative, GenerationMethod, GenerationState, InstitutionalMemory, MemoryConfidence, MemoryState, MemoryType, Fact, HumanReview, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Regulation, RegulationStatus, Role, ScenarioBranch, ScenarioEvolution, ScenarioState, ScaleRelation, ScaleRelationType, Source, SourceType, SpatialScope, Stance, SubjectType, TemporalCycle, TemporalScope
+from .domain import Actor, ActorPosition, ActorRole, ActorState, Assumption, AuthorityLevel, Constraint, CycleHorizon, CycleState, Decision, Evidence, EvidenceType, Event, EvolutionState, GeneratedAlternative, GenerationMethod, GenerationState, InstitutionalMemory, MemoryConfidence, MemoryState, MemoryType, Fact, HumanReview, InterpretationConfidence, InterpretationState, MultiobjectiveResult, MultiobjectiveState, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, Objective, PlanningInstrument, PlanningInstrumentStatus, PlanningInstrumentType, Preference, Project, Regulation, RegulationStatus, Role, ScenarioBranch, ScenarioEvolution, ScenarioState, ScaleRelation, ScaleRelationType, Source, SourceType, SpatialScope, Stance, SubjectType, TemporalCycle, TemporalScope, now_iso
 from .errors import SICLError
 from .v11 import Alternative, Comparison, Evaluation, Recommendation
 from .simulation import Simulation, SimulationState, SimulationType
 from .bim import BIMChangeSet, BIMChangeSetMode, BIMElementReference, BIMFormat, BIMModelSnapshot, BIMReviewState
 from .gis import ParcelSnapshot
 from .spatial_location import SpatialLocation, LocationStatus
+from .archi.model import ArchiElement
+from .archi.persistence import D2Snapshot, deserialize_elements, deterministic_snapshot_id, elements_content_hash, serialize_elements
 
 
 class SQLiteRepository:
@@ -369,6 +371,25 @@ class SQLiteRepository:
         CREATE TRIGGER IF NOT EXISTS events_no_delete
         BEFORE DELETE ON events
         BEGIN SELECT RAISE(ABORT, 'events are append-only'); END;
+        CREATE TABLE IF NOT EXISTS d2_snapshots (
+          snapshot_id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(project_id),
+          version INTEGER NOT NULL,
+          elements_json TEXT NOT NULL,
+          content_hash TEXT NOT NULL,
+          actor TEXT NOT NULL,
+          source_event_id INTEGER REFERENCES events(id),
+          created_at TEXT NOT NULL,
+          UNIQUE(project_id, version)
+        );
+        CREATE INDEX IF NOT EXISTS idx_d2_snapshots_project_version
+        ON d2_snapshots(project_id, version DESC);
+        CREATE TRIGGER IF NOT EXISTS d2_snapshots_no_update
+        BEFORE UPDATE ON d2_snapshots
+        BEGIN SELECT RAISE(ABORT, 'D-2 snapshots are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS d2_snapshots_no_delete
+        BEFORE DELETE ON d2_snapshots
+        BEGIN SELECT RAISE(ABORT, 'D-2 snapshots are append-only'); END;
         """)
         columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(events)")}
         if "source" not in columns:
@@ -497,6 +518,100 @@ class SQLiteRepository:
         """Insert an event batch with all-or-zero commit semantics."""
         with self.transaction():
             return [self._insert_event(event) for event in events]
+
+    def insert_d2_snapshot_and_event(
+        self,
+        project_id: str,
+        elements: tuple[ArchiElement, ...],
+        actor: str,
+        source: str,
+    ) -> D2Snapshot:
+        """Atomically append one canonical D-2 snapshot and its audit event."""
+        if not isinstance(actor, str) or not actor.strip():
+            raise ValueError("actor must be non-empty")
+        if not isinstance(source, str) or not source.strip():
+            raise ValueError("source must be non-empty")
+        if self.get_project(project_id) is None:
+            raise ValueError(f"PROJECT_NOT_FOUND:{project_id}")
+        raw = serialize_elements(elements)
+        if any(element.project_id != project_id for element in elements):
+            raise ValueError("all D-2 elements must belong to project_id")
+        content_hash = elements_content_hash(raw)
+        created_at = now_iso()
+        with self.transaction():
+            row = self.conn.execute(
+                "SELECT COALESCE(MAX(version), 0) AS version FROM d2_snapshots WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            version = int(row["version"]) + 1
+            snapshot_id = deterministic_snapshot_id(project_id, version, content_hash)
+            event = self._insert_event(Event(
+                None,
+                created_at,
+                project_id,
+                "D2_SNAPSHOT_COMMITTED",
+                {
+                    "snapshot_id": snapshot_id,
+                    "project_id": project_id,
+                    "version": version,
+                    "content_hash": content_hash,
+                    "element_count": len(elements),
+                    "actor": actor.strip(),
+                    "source": source.strip(),
+                },
+                actor.strip(),
+                "ARKI_D2_STORE",
+            ))
+            self.conn.execute(
+                """INSERT INTO d2_snapshots(
+                    snapshot_id, project_id, version, elements_json, content_hash,
+                    actor, source_event_id, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (snapshot_id, project_id, version, raw, content_hash, actor.strip(), event.id, created_at),
+            )
+        return D2Snapshot(snapshot_id, project_id, version, deserialize_elements(raw), content_hash, actor.strip(), event.id, created_at)
+
+    @staticmethod
+    def _d2_snapshot_from_row(row: sqlite3.Row) -> D2Snapshot:
+        raw = row["elements_json"]
+        expected = row["content_hash"]
+        actual = elements_content_hash(raw)
+        if actual != expected:
+            raise ValueError(f"D2_SNAPSHOT_HASH_MISMATCH:{row['snapshot_id']}")
+        elements = deserialize_elements(raw)
+        if any(element.project_id != row["project_id"] for element in elements):
+            raise ValueError(f"D2_SNAPSHOT_PROJECT_MISMATCH:{row['snapshot_id']}")
+        return D2Snapshot(
+            row["snapshot_id"], row["project_id"], row["version"], elements,
+            expected, row["actor"], row["source_event_id"], row["created_at"],
+        )
+
+    def get_d2_snapshot(self, project_id: str, version: int) -> D2Snapshot | None:
+        row = self.conn.execute(
+            "SELECT * FROM d2_snapshots WHERE project_id=? AND version=?",
+            (project_id, version),
+        ).fetchone()
+        return self._d2_snapshot_from_row(row) if row else None
+
+    def get_d2_current_snapshot(self, project_id: str) -> D2Snapshot | None:
+        row = self.conn.execute(
+            "SELECT * FROM d2_snapshots WHERE project_id=? ORDER BY version DESC LIMIT 1",
+            (project_id,),
+        ).fetchone()
+        return self._d2_snapshot_from_row(row) if row else None
+
+    def get_d2(self, project_id: str) -> tuple[ArchiElement, ...] | None:
+        snapshot = self.get_d2_current_snapshot(project_id)
+        return snapshot.elements if snapshot else None
+
+    def get_d2_history(self, project_id: str) -> list[dict]:
+        rows = self.conn.execute(
+            """SELECT snapshot_id, project_id, version, content_hash, actor,
+                      source_event_id, created_at
+               FROM d2_snapshots WHERE project_id=? ORDER BY version""",
+            (project_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
 
     def events(self, project_id: str | None = None) -> list[Event]:
         if project_id:
