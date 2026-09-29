@@ -776,7 +776,7 @@ class CLI:
             existing = self._project()
             for statement in statements:
                 if not any(a.statement == statement for a in existing.assumptions.values()):
-                    recorded.append(self.assumption_set([statement, source])["data"])
+                    recorded.append(self.assumption_set([statement, source], event_source=source)["data"])
                     existing = self._project()
         else:
             facts = [
@@ -792,10 +792,10 @@ class CLI:
                     existing = self._project()
         return self._ok({"location": location, "source": source, "records": recorded, "simulated": observation.simulated, "state": observation.state, "latitude": observation.latitude, "longitude": observation.longitude})
 
-    def assumption_set(self, args: list[str]) -> dict:
+    def assumption_set(self, args: list[str], *, event_source: str = "USER_COMMAND") -> dict:
         if not args: raise SICLError("INVALID_ARGUMENT", "statement required")
         p = self._require_open(); statement, basis = args[0], " ".join(args[1:]); aid = f"ASM-{uuid.uuid4().hex[:10]}"; a = Assumption(aid, p.project_id, statement, basis); p.assumptions[aid] = a; p.version += 1
-        self.repo.insert_entity_and_event("INSERT INTO assumptions VALUES (?, ?, ?, ?, ?)", (aid, p.project_id, statement, basis, 1), p, self._event(p.project_id, "ASSUMPTION_SET", asdict(a)))
+        self.repo.insert_entity_and_event("INSERT INTO assumptions VALUES (?, ?, ?, ?, ?)", (aid, p.project_id, statement, basis, 1), p, self._event(p.project_id, "ASSUMPTION_SET", asdict(a), event_source))
         return self._ok(asdict(a))
 
     def evidence_add(self, args: list[str]) -> dict:
