@@ -108,9 +108,7 @@ def test_project_not_found_has_no_snapshot():
 
 def test_proposal_not_found():
     repo = setup_repo()
-    repo.conn.execute("DELETE FROM events WHERE type='REASONING_EXECUTION_RECORDED'")
-    repo.conn.commit()
-    out = run(repo)
+    out = run(repo, proposal_id="missing-proposal")
     assert out.reason == "PROPOSAL_NOT_FOUND"
     assert "PROPOSAL_NOT_FOUND" in reasons(repo)
 
