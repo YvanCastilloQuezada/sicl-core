@@ -187,6 +187,17 @@ def test_polygon_geometry_is_not_mapped():
     assert run(repo).reason == "GEOMETRY_CONTRACT_NOT_MAPPED"
 
 
+@pytest.mark.parametrize("extra_path", ["geometry", "profile"])
+def test_geometry_with_extra_fields_is_not_mapped(extra_path):
+    bad = proposal()
+    if extra_path == "geometry":
+        bad["proposedElements"][0]["geometry"]["coordinates"] = []
+    else:
+        bad["proposedElements"][0]["geometry"]["profile"]["units"] = "mm"
+    repo = setup_repo(payload=bad)
+    assert run(repo).reason == "GEOMETRY_CONTRACT_NOT_MAPPED"
+
+
 @pytest.mark.parametrize("key,value", [
     ("d63_labels", {"en": "space"}),
     ("bad_list", ["x"]),
