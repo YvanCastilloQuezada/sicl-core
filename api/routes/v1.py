@@ -63,6 +63,7 @@ from sicl.temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
 from sicl.memory import memory_to_dict, memory_types
 from sicl.repository import SQLiteRepository
+from sicl.archi.persistence import serialize_elements
 from sicl.site_intelligence import fetch_open_meteo_solar, fetch_open_meteo_solar_coordinates, get_site_observation
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
 from sicl.design_principles import get_principle, list_principles
@@ -131,7 +132,7 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "BIM_SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED", "EXAMPLE_NOT_FOUND"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "BIM_SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED", "EXAMPLE_NOT_FOUND", "D2_NOT_COMMITTED", "D2_SNAPSHOT_NOT_FOUND"}:
         return 404
     if code == "METHOD_TYPE_MISMATCH":
         return 409
@@ -1028,6 +1029,49 @@ def snapshot(project_id: str, repo: SQLiteRepository = Depends(get_repository)) 
 def history(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
     _snapshot(repo, project_id)
     return _ok({"events": [asdict(event) for event in repo.events(project_id)]}, project_id, repo.get_project(project_id).version)
+
+
+def _d2_snapshot_payload(snapshot) -> dict[str, Any]:
+    return {
+        "snapshot_id": snapshot.snapshot_id,
+        "project_id": snapshot.project_id,
+        "version": snapshot.version,
+        "elements": json.loads(serialize_elements(snapshot.elements)),
+        "content_hash": snapshot.content_hash,
+        "actor": snapshot.actor,
+        "source_event_id": snapshot.source_event_id,
+        "created_at": snapshot.created_at,
+    }
+
+
+@router.get("/projects/{project_id}/d2", dependencies=[Depends(_auth)])
+def get_d2(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    snapshot = repo.get_d2_current_snapshot(project_id)
+    if snapshot is None:
+        _error({"code": "D2_NOT_COMMITTED", "message": "project has no committed D-2 snapshot"}, project_id)
+    return _ok({"snapshot": _d2_snapshot_payload(snapshot)}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/d2/history", dependencies=[Depends(_auth)])
+def get_d2_history(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    return _ok({"snapshots": repo.get_d2_history(project_id)}, project_id, project.version)
+
+
+@router.get("/projects/{project_id}/d2/snapshots/{version}", dependencies=[Depends(_auth)])
+def get_d2_snapshot(project_id: str, version: int, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    snapshot = repo.get_d2_snapshot(project_id, version)
+    if snapshot is None:
+        _error({"code": "D2_SNAPSHOT_NOT_FOUND", "message": f"D-2 snapshot version {version} not found"}, project_id)
+    return _ok({"snapshot": _d2_snapshot_payload(snapshot)}, project_id, project.version)
 
 
 
