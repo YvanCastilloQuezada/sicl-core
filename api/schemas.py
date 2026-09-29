@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, Literal
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ProjectCreateRequest(BaseModel):
@@ -362,3 +362,39 @@ class SpatialLocationConfirmRequest(BaseModel):
     actor_id: str = Field(min_length=1)
     authority: str = Field(min_length=1)
     confirm: bool = True
+
+
+ReasoningKind = Literal["PROJECT_BRAIN", "D6_2", "D6_3", "DEVELOPER_PROPOSAL"]
+EpistemicStatus = Literal["FACT", "ASSUMPTION", "HYPOTHESIS", "UNKNOWN", "CONFLICT", "PROPOSAL"]
+
+
+class ReasoningExecutionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    execution_id: str = Field(min_length=1)
+    kind: ReasoningKind
+    fingerprint: str = Field(min_length=64, max_length=64)
+    input_fingerprint: str | None = Field(default=None, min_length=64, max_length=64)
+    payload: dict[str, Any]
+    epistemic_status: EpistemicStatus
+    human_authority_ref: dict[str, Any] | None = None
+    source_refs: list[Any] = Field(default_factory=list)
+    actor: str = Field(min_length=1)
+    created_at: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _validate_fingerprints(self):
+        for value in (self.fingerprint, self.input_fingerprint):
+            if value is not None and not all(c in "0123456789abcdef" for c in value):
+                raise ValueError("fingerprint must be lowercase sha256 hex")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_kind_status_compat(self):
+        if self.kind == "D6_3" and self.epistemic_status != "HYPOTHESIS":
+            raise ValueError("D6_3 must have epistemic_status=HYPOTHESIS")
+        if self.kind == "DEVELOPER_PROPOSAL" and self.epistemic_status not in ("HYPOTHESIS", "PROPOSAL"):
+            raise ValueError("DEVELOPER_PROPOSAL must have epistemic_status in {HYPOTHESIS, PROPOSAL}")
+        if self.kind in ("PROJECT_BRAIN", "D6_2") and self.epistemic_status == "PROPOSAL":
+            raise ValueError(f"{self.kind} cannot have epistemic_status=PROPOSAL")
+        return self

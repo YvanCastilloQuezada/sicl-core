@@ -54,9 +54,10 @@ from api.schemas import (
     BIMSnapshotCreateRequest,
     BIMChangeSetCreateRequest,
     V1Envelope,
+    ReasoningExecutionRequest,
 )
 from sicl.cli import CLI
-from sicl.domain import Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, Source, SourceType, SpatialScope
+from sicl.domain import Event, now_iso, Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, Source, SourceType, SpatialScope
 from sicl.actors import actor_to_dict, position_to_dict
 from sicl.temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
@@ -79,6 +80,46 @@ from sicl.capabilities import resolve_example_capability
 
 CONTRACT_VERSION = "1.0"
 router = APIRouter(prefix="/v1", tags=["canonical-v1"])
+
+
+_FORBIDDEN_REASONING_PAYLOAD_KEYS = frozenset({
+    "d2_commit",
+    "d2_mutation",
+    "archi_transaction_committed",
+})
+
+
+def _canonical_reasoning_envelope(body: ReasoningExecutionRequest) -> dict[str, Any]:
+    return {
+        "execution_id": body.execution_id,
+        "kind": body.kind,
+        "fingerprint": body.fingerprint,
+        "input_fingerprint": body.input_fingerprint,
+        "payload": body.payload,
+        "epistemic_status": body.epistemic_status,
+        "human_authority_ref": body.human_authority_ref,
+        "source_refs": body.source_refs,
+        "actor": body.actor,
+        "created_at": body.created_at,
+    }
+
+
+def _reasoning_envelope_matches(existing: dict[str, Any], candidate: dict[str, Any]) -> bool:
+    return json.dumps(existing, sort_keys=True, separators=(",", ":")) == json.dumps(candidate, sort_keys=True, separators=(",", ":"))
+
+
+def _payload_has_forbidden_keys(payload: dict[str, Any]) -> bool:
+    return any(key in _FORBIDDEN_REASONING_PAYLOAD_KEYS for key in payload)
+
+
+def _find_existing_reasoning_event(repo: SQLiteRepository, project_id: str, execution_id: str):
+    for event in repo.events(project_id):
+        if event.type != "REASONING_EXECUTION_RECORDED":
+            continue
+        envelope = (event.payload or {}).get("execution")
+        if isinstance(envelope, dict) and envelope.get("execution_id") == execution_id:
+            return event, envelope
+    return None, None
 
 
 def _auth(authorization: str | None = Header(default=None)) -> None:
@@ -987,6 +1028,46 @@ def snapshot(project_id: str, repo: SQLiteRepository = Depends(get_repository)) 
 def history(project_id: str, repo: SQLiteRepository = Depends(get_repository)) -> V1Envelope:
     _snapshot(repo, project_id)
     return _ok({"events": [asdict(event) for event in repo.events(project_id)]}, project_id, repo.get_project(project_id).version)
+
+
+
+
+@router.post("/projects/{project_id}/reasoning-executions", dependencies=[Depends(_auth)])
+def record_reasoning_execution(
+    project_id: str,
+    body: ReasoningExecutionRequest,
+    repo: SQLiteRepository = Depends(get_repository),
+) -> V1Envelope:
+    project = repo.get_project(project_id)
+    if project is None:
+        _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
+    observed_version = project.version
+    candidate = _canonical_reasoning_envelope(body)
+    existing_event, existing_envelope = _find_existing_reasoning_event(repo, project_id, body.execution_id)
+    if existing_event is not None:
+        if _reasoning_envelope_matches(existing_envelope, candidate):
+            return _ok(
+                {"status": "RECORDED", "execution_id": body.execution_id, "event_id": existing_event.id},
+                project_id,
+                observed_version,
+            )
+        _error({"code": "CONFLICT", "message": "execution_id already exists with different content"}, project_id)
+    if _payload_has_forbidden_keys(body.payload):
+        _error({"code": "PAYLOAD_CANNOT_CLAIM_D2_COMMIT", "message": "reasoning payload cannot claim a D-2 commit"}, project_id)
+    stored = repo.add_event(Event(
+        None,
+        now_iso(),
+        project_id,
+        "REASONING_EXECUTION_RECORDED",
+        {"execution": candidate},
+        body.actor,
+        "ARKI_REASONING",
+    ))
+    return _ok(
+        {"status": "RECORDED", "execution_id": body.execution_id, "event_id": stored.id},
+        project_id,
+        observed_version,
+    )
 
 
 @router.post("/projects/{project_id}/commands", dependencies=[Depends(_auth)])
