@@ -148,3 +148,34 @@ def test_publish_candidate_is_reusable_without_mutation():
     assert pub.cleanup_status=='COMPLETE'
     assert isinstance(pub.provenance, dict)
     assert tx._applied==set()
+
+def test_8b2_fix_apply_full_chain_calls_publish_candidate_once(monkeypatch):
+    """8b.2-FIX: _publish_candidate is the single publication path."""
+    wall,door,space,ledger,registry,refs=setup_chain()
+    tx=ArchiTransaction((wall,door,space))
+    calls={"n":0}
+    original=ArchiTransaction._publish_candidate
+    def counted(self,*args,**kwargs):
+        calls["n"]+=1
+        return original(self,*args,**kwargs)
+    monkeypatch.setattr(ArchiTransaction,"_publish_candidate",counted)
+    result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'8b2-publish-once'),ledger,registry,refs)
+    assert result.status is MutationStatus.APPLIED
+    assert calls["n"]==1
+
+
+def test_8b2_fix_apply_full_chain_calls_export_ifc_once(monkeypatch):
+    """8b.2-FIX: export_ifc is reached once through _publish_candidate only."""
+    import sicl.archi.transaction as transaction_module
+    wall,door,space,ledger,registry,refs=setup_chain()
+    tx=ArchiTransaction((wall,door,space))
+    calls={"n":0}
+    original=transaction_module.export_ifc
+    def counted(*args,**kwargs):
+        calls["n"]+=1
+        return original(*args,**kwargs)
+    monkeypatch.setattr(transaction_module,"export_ifc",counted)
+    result=tx.apply_full_chain(ArchiMutation('P',MutationKind.MOVE,wall.element_id,1,{'dx_mm':1},'8b2-ifc-once'),ledger,registry,refs)
+    assert result.status is MutationStatus.APPLIED
+    assert calls["n"]==1
+
