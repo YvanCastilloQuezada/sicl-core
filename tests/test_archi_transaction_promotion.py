@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from sicl.a002 import HumanAuthorityRef, SufficiencyStatus
@@ -144,8 +146,10 @@ def test_sufficiency_failure_blocks_without_publication(monkeypatch):
         human_review_timestamp="2026-09-29T12:01:00Z",
         knowledge=(),
     )
-    object.__setattr__(blocked.result, "overall_status", SufficiencyStatus.INSUFFICIENT)
-    args["sufficiency_snapshot"] = blocked
+    args["sufficiency_snapshot"] = replace(
+        blocked,
+        result=replace(blocked.result, overall_status=SufficiencyStatus.INSUFFICIENT),
+    )
     monkeypatch.setattr(
         tx,
         "_publish_candidate",
