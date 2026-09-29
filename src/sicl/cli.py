@@ -766,18 +766,31 @@ class CLI:
         except ValueError:
             return {"status": "REQUIRES_HUMAN_DECISION", "code": "LOCATION_NOT_RECOGNIZED", "message": "Ubicación no reconocida. Ingrese datos manualmente.", "data": {"location": location}}
         source = observation.source
-        facts = [
-            (f"Coordenadas: {observation.latitude}, {observation.longitude}", source),
-            (f"Temperatura media observada: {observation.temperature_mean_c} °C", source),
-            (f"Viento máximo medio: {observation.wind_speed_kmh} km/h; radiación: {observation.radiation_kwh_m2_day} kWh/m²/día", source),
-        ]
-        recorded = []
-        existing = self._project()
-        for statement, evidence_source in facts:
-            if not any(f.statement == statement for f in existing.facts.values()):
-                recorded.append(self.fact_set([statement, evidence_source], event_source=source)["data"])
-                existing = self._project()
-        return self._ok({"location": location, "source": source, "records": recorded, "simulated": observation.simulated, "latitude": observation.latitude, "longitude": observation.longitude})
+        if observation.simulated:
+            statements = [
+                f"Coordenadas simuladas: {observation.latitude}, {observation.longitude}",
+                f"Temperatura media simulada: {observation.temperature_mean_c} °C",
+                f"Viento máximo medio simulado: {observation.wind_speed_kmh} km/h; radiación simulada: {observation.radiation_kwh_m2_day} kWh/m²/día",
+            ]
+            recorded = []
+            existing = self._project()
+            for statement in statements:
+                if not any(a.statement == statement for a in existing.assumptions.values()):
+                    recorded.append(self.assumption_set([statement, source])["data"])
+                    existing = self._project()
+        else:
+            facts = [
+                (f"Coordenadas: {observation.latitude}, {observation.longitude}", source),
+                (f"Temperatura media observada: {observation.temperature_mean_c} °C", source),
+                (f"Viento máximo medio: {observation.wind_speed_kmh} km/h; radiación: {observation.radiation_kwh_m2_day} kWh/m²/día", source),
+            ]
+            recorded = []
+            existing = self._project()
+            for statement, evidence_source in facts:
+                if not any(f.statement == statement for f in existing.facts.values()):
+                    recorded.append(self.fact_set([statement, evidence_source], event_source=source)["data"])
+                    existing = self._project()
+        return self._ok({"location": location, "source": source, "records": recorded, "simulated": observation.simulated, "state": observation.state, "latitude": observation.latitude, "longitude": observation.longitude})
 
     def assumption_set(self, args: list[str]) -> dict:
         if not args: raise SICLError("INVALID_ARGUMENT", "statement required")
