@@ -16,6 +16,7 @@ from ..a002 import (
     SufficiencyEngine,
     SufficiencyRequest,
     SufficiencyResult,
+    policy_for,
 )
 
 _OPERATIONS={MutationKind.MOVE:"archi.move",MutationKind.RESIZE:"archi.resize",MutationKind.ADD_OPENING:"archi.add_opening",MutationKind.DELETE:"archi.delete"}
@@ -187,7 +188,7 @@ def snapshot_for_creation(
         context=None,
         jurisdiction=jurisdiction,
         policy_allow_assumptions=policy_allow_assumptions,
-        policy=None,
+        policy=policy_for(_CREATION_OPERATION),
         human_authority_ref=human_authority_ref,
     )
     evaluator = engine or SufficiencyEngine()
