@@ -364,6 +364,31 @@ def test_idempotent_replay_returns_same_snapshot_without_second_publication(monk
     assert len([e for e in repo.events(PROJECT) if e.type == "DEVELOPER_PROMOTION_COMMITTED"]) == 1
 
 
+def test_idempotent_replay_reports_prior_effect_failure_without_replaying(monkeypatch):
+    repo = setup_repo()
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("effects")
+
+    monkeypatch.setattr(dp.ArchiTransaction, "promote_initial_elements", fail)
+    first = run(repo)
+    assert first.committed is True
+    assert first.effects_status == "FAILED"
+    assert any(e.type == "D2_EFFECTS_FAILED" for e in repo.events(PROJECT))
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("effects must not replay")
+
+    monkeypatch.setattr(dp.ArchiTransaction, "promote_initial_elements", forbidden)
+    second = run(repo)
+    assert second.committed is True
+    assert second.snapshot_id == first.snapshot_id
+    assert second.d2_version == first.d2_version
+    assert second.reason == "ALREADY_COMMITTED"
+    assert second.effects_status == "FAILED"
+    assert len([e for e in repo.events(PROJECT) if e.type == "DEVELOPER_PROMOTION_COMMITTED"]) == 1
+
+
 def test_success_event_metadata_binds_proposal_review_and_snapshot():
     repo = setup_repo()
     out = run(repo)
