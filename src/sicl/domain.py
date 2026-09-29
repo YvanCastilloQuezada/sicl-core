@@ -444,6 +444,28 @@ class HumanReview:
     authority: str
     status: str = "APPROVED"
     version: int = 1
+    referenced_entity_type: str | None = None
+    referenced_entity_id: str | None = None
+    referenced_fingerprint: str | None = None
+
+    def __post_init__(self):
+        bound = self.referenced_entity_type is not None
+        if not bound:
+            if self.referenced_entity_id is not None or self.referenced_fingerprint is not None:
+                raise ValueError("reference id/fingerprint require referenced_entity_type")
+            return
+        if self.referenced_entity_type != "DEVELOPER_PROPOSAL":
+            raise ValueError("unsupported referenced_entity_type")
+        if not isinstance(self.referenced_entity_id, str) or not self.referenced_entity_id.strip():
+            raise ValueError("referenced_entity_id is required for bound HumanReview")
+        fingerprint = self.referenced_fingerprint
+        if (
+            not isinstance(fingerprint, str)
+            or len(fingerprint) != 64
+            or fingerprint != fingerprint.lower()
+            or any(char not in "0123456789abcdef" for char in fingerprint)
+        ):
+            raise ValueError("referenced_fingerprint must be lowercase sha256 hex")
 
 
 @dataclass(frozen=True)
