@@ -8,16 +8,14 @@ ArchiGeometry.__post_init__.
 Structural validity is a precondition for A-002 evaluation. It is not itself
 an epistemic sufficiency judgment.
 
-CURRENT_MUTATION_REFERENTIAL_INTEGRITY_GAP is out of scope here: mutations
-via apply_full_chain and deserialize_elements do not currently enforce
-referential integrity. This module enforces it only at the initial creation
-boundary.
+Referential integrity is delegated to the shared D-2 integrity validator.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 from .model import ArchiElement
+from .integrity import validate_references
 
 
 @dataclass(frozen=True)
@@ -68,18 +66,7 @@ def validate_creation(
             errors.append(f"PROVENANCE_MISSING:{element.element_id.value}")
 
     known_ids = seen_ids | canonical_ids
-    for element in candidate_elements:
-        element_id = element.element_id
-        if element.hosted_in is not None:
-            if element.hosted_in == element_id:
-                errors.append(f"SELF_HOSTED_IN:{element_id.value}")
-            elif element.hosted_in not in known_ids:
-                errors.append(f"ORPHAN_HOSTED_IN:{element_id.value}->{element.hosted_in.value}")
-        if element.contained_in is not None:
-            if element.contained_in == element_id:
-                errors.append(f"SELF_CONTAINED_IN:{element_id.value}")
-            elif element.contained_in not in known_ids:
-                errors.append(f"ORPHAN_CONTAINED_IN:{element_id.value}->{element.contained_in.value}")
+    errors.extend(validate_references(tuple(candidate_elements), known_ids=known_ids))
 
     return StructuralValidationResult(
         valid=not errors,
