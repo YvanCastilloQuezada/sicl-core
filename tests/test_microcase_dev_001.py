@@ -1,11 +1,17 @@
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from api.deps import get_repository
 from api.main import app
 from sicl.archi import ArchiElementId, ElementKind, GeometryKind
 from sicl.repository import SQLiteRepository
+
+
+@pytest.fixture(autouse=True)
+def clear_service_token(monkeypatch):
+    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
 
 
 PROJECT_ID = "ARK-DEV-001-001"
