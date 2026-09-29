@@ -378,6 +378,20 @@ class SpatialLocationConfirmRequest(BaseModel):
     confirm: bool = True
 
 
+class DeveloperPromotionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    proposal_id: str = Field(min_length=1)
+    proposal_fingerprint: str = Field(min_length=64, max_length=64)
+    human_review_id: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _validate_fingerprint(self):
+        if not all(c in "0123456789abcdef" for c in self.proposal_fingerprint):
+            raise ValueError("proposal_fingerprint must be lowercase sha256 hex")
+        return self
+
+
 ReasoningKind = Literal["PROJECT_BRAIN", "D6_2", "D6_3", "DEVELOPER_PROPOSAL"]
 EpistemicStatus = Literal["FACT", "ASSUMPTION", "HYPOTHESIS", "UNKNOWN", "CONFLICT", "PROPOSAL"]
 
