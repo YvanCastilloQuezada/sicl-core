@@ -2,6 +2,7 @@ import json
 import hashlib
 import pytest
 from sicl.archi import *
+from sicl.archi.transaction import PublishResult
 from sicl.derivation import DerivationLedger, DerivationRecord, TypedRelation, VersionedRef
 from sicl.h005 import RecomputationRegistry
 from sicl.reaction import ActionStatus, ActionType, ReactionPlanner
