@@ -360,6 +360,7 @@ def test_idempotent_replay_returns_same_snapshot_without_second_publication(monk
     assert second.snapshot_id == first.snapshot_id
     assert second.d2_version == first.d2_version
     assert second.reason == "ALREADY_COMMITTED"
+    assert second.effects_status == "NOT_ATTEMPTED"
     assert len([e for e in repo.events(PROJECT) if e.type == "DEVELOPER_PROMOTION_COMMITTED"]) == 1
 
 
