@@ -1,6 +1,7 @@
 import pytest
 
 from sicl.a002 import (
+    EvidenceRef,
     HumanAuthorityRef,
     KnowledgeItem,
     KnowledgeState,
@@ -84,27 +85,30 @@ def test_snapshot_for_creation_operation_is_creation_operation():
 
 
 def test_engine_blocks_creation_requirements_without_human_authority():
-    snapshot = snapshot_for_creation(**BASE)
+    evidence = (
+        EvidenceRef.from_statement("E-ID", "proposal id", "TEST", "P"),
+        EvidenceRef.from_statement("E-FP", "proposal fingerprint", "TEST", "P"),
+        EvidenceRef.from_statement("E-REVIEW", "review binding", "TEST", "P"),
+    )
+    knowledge = (
+        KnowledgeItem("developer_proposal_id", "dev-prop-1", KnowledgeState.KNOWN, ("E-ID",)),
+        KnowledgeItem(
+            "developer_proposal_fingerprint", "a" * 64, KnowledgeState.KNOWN, ("E-FP",)
+        ),
+        KnowledgeItem("human_review_binding", "review-1", KnowledgeState.KNOWN, ("E-REVIEW",)),
+    )
     result = SufficiencyEngine().evaluate(
         SufficiencyRequest(
             project_id="P",
-            operation=snapshot.operation,
-            knowledge=tuple(
-                KnowledgeItem(
-                    assessment.field,
-                    "value",
-                    KnowledgeState.KNOWN,
-                    assessment.evidence_ids,
-                )
-                for assessment in snapshot.result.assessments
-            ),
+            operation="archi.promote_initial_elements",
+            knowledge=knowledge,
             requirements=creation_requirements(),
-            evidence=tuple(),
+            evidence=evidence,
             human_authority_ref=None,
         )
     )
     assert result.overall_status is SufficiencyStatus.INSUFFICIENT
-
+    assert "HUMAN_AUTHORITY_REQUIRED" in result.reason_codes
 
 def test_known_without_evidence_is_downgraded_for_creation_requirement():
     result = SufficiencyEngine().evaluate(
