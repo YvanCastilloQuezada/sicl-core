@@ -4,6 +4,7 @@ from pathlib import Path
 import ifcopenshell
 from .identity import IfcGlobalId
 from .model import ArchiElement, ElementKind, GeometryKind
+from .integrity import ReferentialIntegrityError, validate_references
 
 _IFC_CLASS={ElementKind.SITE:"IfcSite",ElementKind.SPACE:"IfcSpace",ElementKind.WALL:"IfcWallStandardCase",ElementKind.SLAB:"IfcSlab",ElementKind.COLUMN:"IfcColumn",ElementKind.BEAM:"IfcBeam",ElementKind.OPENING:"IfcOpeningElement",ElementKind.DOOR:"IfcDoor",ElementKind.WINDOW:"IfcWindow"}
 _IMPLEMENTED_GEOMETRY_KINDS=frozenset((GeometryKind.EXTRUDED_RECTANGLE,))
@@ -16,6 +17,11 @@ def export_ifc(elements: tuple[ArchiElement,...] | list[ArchiElement], path: str
     fail closed. ``EXTRUDED_CIRCLE`` is declared for future use but is not
     implemented by this exporter and therefore raises explicitly.
     """
+    ref_errors = validate_references(tuple(elements))
+    if ref_errors:
+        raise ReferentialIntegrityError(
+            "IFC_EXPORT_REFERENTIAL_INTEGRITY_VIOLATION: " + "; ".join(ref_errors)
+        )
     unsupported = [e.geometry.kind.value for e in elements if e.geometry.kind not in _IMPLEMENTED_GEOMETRY_KINDS]
     if unsupported: raise ValueError(f"GEOMETRY_KIND_NOT_IMPLEMENTED:{unsupported[0]}")
     model=ifcopenshell.file(schema="IFC4")
