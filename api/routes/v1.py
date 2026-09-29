@@ -55,6 +55,7 @@ from api.schemas import (
     BIMChangeSetCreateRequest,
     V1Envelope,
     ReasoningExecutionRequest,
+    DeveloperPromotionRequest,
 )
 from sicl.cli import CLI
 from sicl.domain import Event, HumanReview, now_iso, Evidence, EvidenceType, InterpretationConfidence, InterpretationState, KNOWLEDGE_STATES, NormativeInterpretation, NormativeSnapshot, NormativeSnapshotState, PlanningInstrumentType, Preference, Regulation, RegulationStatus, ScaleRelationType, Source, SourceType, SpatialScope
@@ -63,6 +64,8 @@ from sicl.temporal import cycle_to_dict, evolution_to_dict, scenario_to_dict
 from sicl.generation import generation_to_dict, list_generation_methods
 from sicl.memory import memory_to_dict, memory_types
 from sicl.repository import SQLiteRepository
+from sicl.derivation import DerivationLedger
+from sicl.developer_promotion import promote_developer_proposal
 from sicl.archi.persistence import serialize_elements
 from sicl.site_intelligence import fetch_open_meteo_solar, fetch_open_meteo_solar_coordinates, get_site_observation
 from sicl.simulation import METHODS, SimulationType, list_methods, simulation_to_dict
@@ -132,10 +135,14 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
-    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "BIM_SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED", "EXAMPLE_NOT_FOUND", "D2_NOT_COMMITTED", "D2_SNAPSHOT_NOT_FOUND", "REVIEW_TARGET_NOT_FOUND"}:
+    if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "BIM_SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED", "EXAMPLE_NOT_FOUND", "D2_NOT_COMMITTED", "D2_SNAPSHOT_NOT_FOUND", "REVIEW_TARGET_NOT_FOUND", "PROPOSAL_NOT_FOUND", "HUMAN_REVIEW_NOT_FOUND"}:
         return 404
-    if code in {"METHOD_TYPE_MISMATCH", "REVIEW_TARGET_FINGERPRINT_MISMATCH"}:
+    if code in {"METHOD_TYPE_MISMATCH", "REVIEW_TARGET_FINGERPRINT_MISMATCH", "PROPOSAL_FINGERPRINT_MISMATCH", "PROPOSAL_FINGERPRINT_INCONSISTENT", "HUMAN_REVIEW_BINDING_MISMATCH", "SUFFICIENCY_NOT_PERMITTED"}:
         return 409
+    if code in {"PROMOTION_PERSIST_FAILED", "PROMOTION_FAILED"}:
+        return 500
+    if code in {"INVALID_DEVELOPER_PROPOSAL", "STRUCTURAL_VALIDATION_FAILED", "RELATIONS_NOT_YET_SUPPORTED", "DERIVATIONS_NOT_YET_SUPPORTED", "UNKNOWN_ELEMENT_KIND", "MISSING_GEOMETRY", "GEOMETRY_CONTRACT_NOT_MAPPED"} or code.startswith("GEOMETRY_CONTRACT_NOT_MAPPED:") or code.startswith("UNSUPPORTED_PROPERTY_VALUE:"):
+        return 400
     if code in {"INSUFFICIENT_INPUTS", "INVALID_INPUTS", "INVALID_DISTRIBUTION", "PARAMETER_NOT_FOUND"}:
         return 422
     if code == "PROJECT_NOT_FOUND":
@@ -1074,6 +1081,52 @@ def get_d2_snapshot(project_id: str, version: int, repo: SQLiteRepository = Depe
     return _ok({"snapshot": _d2_snapshot_payload(snapshot)}, project_id, project.version)
 
 
+
+
+@router.post("/projects/{project_id}/developer-promotions", dependencies=[Depends(_auth)])
+def developer_promotion(
+    project_id: str,
+    body: DeveloperPromotionRequest,
+    repo: SQLiteRepository = Depends(get_repository),
+) -> V1Envelope:
+    outcome = promote_developer_proposal(
+        repo=repo,
+        project_id=project_id,
+        proposal_id=body.proposal_id,
+        proposal_fingerprint=body.proposal_fingerprint,
+        human_review_id=body.human_review_id,
+        ledger=DerivationLedger(repo),
+    )
+    project = repo.get_project(project_id)
+    observed_version = project.version if project is not None else None
+    if not outcome.committed:
+        _error(
+            {
+                "code": outcome.reason or "PROMOTION_FAILED",
+                "message": outcome.reason or "Developer promotion failed",
+                "data": {
+                    "status": "REJECTED",
+                    "proposal_id": outcome.proposal_id,
+                    "snapshot_id": outcome.snapshot_id,
+                    "d2_version": outcome.d2_version,
+                    "effects_status": outcome.effects_status,
+                    "reason": outcome.reason or None,
+                },
+            },
+            project_id,
+        )
+    return _ok(
+        {
+            "status": "COMMITTED",
+            "proposal_id": outcome.proposal_id,
+            "snapshot_id": outcome.snapshot_id,
+            "d2_version": outcome.d2_version,
+            "effects_status": outcome.effects_status,
+            "reason": outcome.reason or None,
+        },
+        project_id,
+        observed_version,
+    )
 
 
 @router.post("/projects/{project_id}/reasoning-executions", dependencies=[Depends(_auth)])
