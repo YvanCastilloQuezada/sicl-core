@@ -36,6 +36,8 @@ class SiteObservation:
     def __post_init__(self) -> None:
         if self.state not in KNOWLEDGE_STATES:
             raise ValueError(f"invalid knowledge state: {self.state}")
+        if self.simulated and self.state == "OBSERVED":
+            raise ValueError("simulated site intelligence cannot be OBSERVED")
         if not self.captured_at:
             object.__setattr__(self, "captured_at", _now_iso())
         if not self.evidence_hash and self.raw_response:
@@ -52,6 +54,7 @@ FALLBACK_TRUJILLO = SiteObservation(
     radiation_kwh_m2_day=5.5,
     source="SITE_INTELLIGENCE_FIXTURE",
     simulated=True,
+    state="INSUFFICIENT",
     method_version="DETERMINISTIC_FIXTURE/1",
     raw_response={"fixture": "FALLBACK_TRUJILLO"},
     evidence_url="fixture://FALLBACK_TRUJILLO",
