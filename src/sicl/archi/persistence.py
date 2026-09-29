@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from .identity import ArchiElementId
 from .model import ArchiElement, ArchiGeometry, ElementKind, GeometryKind, ProfileSpec
+from .integrity import ReferentialIntegrityError, validate_references
 
 
 @dataclass(frozen=True)
@@ -139,6 +140,11 @@ def deserialize_elements(raw: str) -> tuple[ArchiElement, ...]:
         raise ValueError("D-2 elements must be ordered by element_id")
     if len(ids) != len(set(ids)):
         raise ValueError("D-2 elements must have unique element_id values")
+    ref_errors = validate_references(elements)
+    if ref_errors:
+        raise ReferentialIntegrityError(
+            "SNAPSHOT_REFERENTIAL_INTEGRITY_VIOLATION: " + "; ".join(ref_errors)
+        )
     return elements
 
 
