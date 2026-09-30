@@ -349,24 +349,33 @@ def promote_developer_proposal(
     ifc_path: str | None = None,
 ) -> PromotionOutcome:
     deadline = time.monotonic() + _PROMOTION_RETRY_DEADLINE_SECONDS
-    while True:
-        try:
-            return _promote_developer_proposal_once(
-                repo=repo, project_id=project_id, proposal_id=proposal_id,
-                proposal_fingerprint=proposal_fingerprint,
-                human_review_id=human_review_id, ledger=ledger, ifc_path=ifc_path,
-            )
-        except RuntimeError as exc:
-            if str(exc) != "STALE_BASE_VERSION":
-                raise
-        except sqlite3.OperationalError as exc:
-            code = getattr(exc, "sqlite_errorcode", None)
-            if code not in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}:
-                raise
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            return PromotionOutcome(False, proposal_id, reason="RETRIABLE_BUSY_EXHAUSTED")
-        time.sleep(min(0.01, remaining))
+    original_busy_timeout = int(repo.conn.execute("PRAGMA busy_timeout").fetchone()[0])
+    try:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return PromotionOutcome(False, proposal_id, reason="RETRIABLE_BUSY_EXHAUSTED")
+            attempt_timeout_ms = max(1, min(10, int(remaining * 1000)))
+            repo.conn.execute(f"PRAGMA busy_timeout = {attempt_timeout_ms}")
+            try:
+                return _promote_developer_proposal_once(
+                    repo=repo, project_id=project_id, proposal_id=proposal_id,
+                    proposal_fingerprint=proposal_fingerprint,
+                    human_review_id=human_review_id, ledger=ledger, ifc_path=ifc_path,
+                )
+            except RuntimeError as exc:
+                if str(exc) != "STALE_BASE_VERSION":
+                    raise
+            except sqlite3.OperationalError as exc:
+                code = getattr(exc, "sqlite_errorcode", None)
+                if code not in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}:
+                    raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return PromotionOutcome(False, proposal_id, reason="RETRIABLE_BUSY_EXHAUSTED")
+            time.sleep(min(0.01, remaining))
+    finally:
+        repo.conn.execute(f"PRAGMA busy_timeout = {original_busy_timeout}")
 
 
 __all__ = ["PromotionOutcome", "promote_developer_proposal"]
