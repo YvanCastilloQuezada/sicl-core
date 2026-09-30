@@ -6,6 +6,7 @@ IFC/ledger publication is a convergent effect after the D-2 snapshot commit.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 import sqlite3
 import time
 from typing import Any, Literal
@@ -30,7 +31,10 @@ _LEDGER_BINDING_INTEGRITY_ERRORS = {
     "LEDGER_BINDING_SNAPSHOT_NOT_FOUND",
     "LEDGER_BINDING_PROJECT_MISMATCH",
     "LEDGER_BINDING_VERSION_MISMATCH",
+    "PROMOTION_SNAPSHOT_UNIQUE_INTEGRITY_FAILURE",
 }
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -355,7 +359,20 @@ def _promote_developer_proposal_once(
                             snapshot.elements, effects, result.reason or "PROMOTED")
 
 
-_PROMOTION_RETRY_DEADLINE_SECONDS = 2.0
+PROMOTION_DEADLINE_MS = 5000
+BUSY_TIMEOUT_CAP_MS = 1000
+SAFETY_MAX_ATTEMPTS = 100
+BACKOFF_BASE_MS = 50
+BACKOFF_FACTOR = 2
+BACKOFF_CAP_MS = 500
+
+
+def _promotion_backoff_seconds(attempt: int) -> float:
+    backoff_ms = min(
+        BACKOFF_CAP_MS,
+        BACKOFF_BASE_MS * (BACKOFF_FACTOR ** max(0, attempt - 1)),
+    )
+    return backoff_ms / 1000.0
 
 
 def promote_developer_proposal(
@@ -368,14 +385,30 @@ def promote_developer_proposal(
     ledger: DerivationLedger,
     ifc_path: str | None = None,
 ) -> PromotionOutcome:
-    deadline = time.monotonic() + _PROMOTION_RETRY_DEADLINE_SECONDS
+    deadline = time.monotonic() + (PROMOTION_DEADLINE_MS / 1000.0)
+    attempts = 0
     original_busy_timeout = int(repo.conn.execute("PRAGMA busy_timeout").fetchone()[0])
     try:
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 return PromotionOutcome(False, proposal_id, reason="RETRIABLE_BUSY_EXHAUSTED")
-            attempt_timeout_ms = max(1, min(10, int(remaining * 1000)))
+
+            if attempts >= SAFETY_MAX_ATTEMPTS:
+                _logger.error(
+                    "SAFETY_MAX_ATTEMPTS triggered: attempts=%d "
+                    "remaining=%.6fs project_id=%s proposal_id=%s "
+                    "fingerprint=%s review_id=%s",
+                    attempts, remaining, project_id, proposal_id,
+                    proposal_fingerprint, human_review_id,
+                )
+                return PromotionOutcome(False, proposal_id, reason="RETRIABLE_BUSY_EXHAUSTED")
+
+            attempts += 1
+            attempt_timeout_ms = max(
+                1,
+                min(BUSY_TIMEOUT_CAP_MS, int(remaining * 1000)),
+            )
             repo.conn.execute(f"PRAGMA busy_timeout = {attempt_timeout_ms}")
             try:
                 return _promote_developer_proposal_once(
@@ -390,10 +423,12 @@ def promote_developer_proposal(
                 code = getattr(exc, "sqlite_errorcode", None)
                 if code not in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}:
                     raise
+
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 return PromotionOutcome(False, proposal_id, reason="RETRIABLE_BUSY_EXHAUSTED")
-            time.sleep(min(0.01, remaining))
+
+            time.sleep(min(_promotion_backoff_seconds(attempts), remaining))
     finally:
         repo.conn.execute(f"PRAGMA busy_timeout = {original_busy_timeout}")
 

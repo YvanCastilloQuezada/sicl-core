@@ -95,6 +95,60 @@ class SQLiteRepository:
         if state != "MIGRATED":
             raise RuntimeError(f"core migration validation failed: {state}")
 
+        invalid_order = conn.execute(
+            """
+            SELECT snapshot_id
+            FROM d2_snapshots
+            WHERE based_on_version IS NOT NULL
+              AND based_on_version >= version
+            LIMIT 1
+            """
+        ).fetchone()
+        if invalid_order is not None:
+            raise RuntimeError("D2_BASED_ON_VERSION_NOT_PREDECESSOR")
+
+        invalid_zero = conn.execute(
+            """
+            SELECT snapshot_id
+            FROM d2_snapshots
+            WHERE version > 1
+              AND based_on_version = 0
+            LIMIT 1
+            """
+        ).fetchone()
+        if invalid_zero is not None:
+            raise RuntimeError("D2_BASED_ON_ZERO_INVALID_FOR_VERSION")
+
+        missing_base = conn.execute(
+            """
+            SELECT child.snapshot_id
+            FROM d2_snapshots AS child
+            LEFT JOIN d2_snapshots AS base
+              ON base.project_id = child.project_id
+             AND base.version = child.based_on_version
+            WHERE child.based_on_version > 0
+              AND base.snapshot_id IS NULL
+            LIMIT 1
+            """
+        ).fetchone()
+        if missing_base is not None:
+            raise RuntimeError("D2_BASED_ON_SNAPSHOT_NOT_FOUND")
+
+        invalid_ledger_binding = conn.execute(
+            """
+            SELECT ledger.snapshot_id
+            FROM developer_promotion_idempotency AS ledger
+            LEFT JOIN d2_snapshots AS snapshot
+              ON snapshot.snapshot_id = ledger.snapshot_id
+            WHERE snapshot.snapshot_id IS NULL
+               OR snapshot.project_id != ledger.project_id
+               OR snapshot.version != ledger.d2_version
+            LIMIT 1
+            """
+        ).fetchone()
+        if invalid_ledger_binding is not None:
+            raise RuntimeError("PROMOTION_LEDGER_BINDING_INTEGRITY_FAILURE")
+
     @classmethod
     def _migrate_legacy_to_v1(cls, conn: sqlite3.Connection) -> None:
         try:
@@ -119,6 +173,7 @@ class SQLiteRepository:
             self._migrate_legacy_to_v1(self.conn)
             return
         if schema_state == "MIGRATED":
+            self._assert_migrated_v1(self.conn)
             return
 
         self.conn.executescript("""
@@ -703,13 +758,33 @@ class SQLiteRepository:
                 snapshot_id, project_id, version, deserialize_elements(raw),
                 content_hash, actor.strip(), event.id, created_at,
             )
-        except sqlite3.IntegrityError:
+        except sqlite3.IntegrityError as exc:
             self.conn.rollback()
             prior = self.get_developer_promotion_commit(
                 project_id, proposal_id, proposal_fingerprint, human_review_id
             )
             if prior is not None:
                 return "ALREADY_COMMITTED", prior
+
+            message = str(exc)
+            snapshot_version_unique = (
+                message
+                == "UNIQUE constraint failed: "
+                   "d2_snapshots.project_id, d2_snapshots.version"
+            )
+            if snapshot_version_unique:
+                row = self.conn.execute(
+                    "SELECT COALESCE(MAX(version), 0) AS version "
+                    "FROM d2_snapshots WHERE project_id=?",
+                    (project_id,),
+                ).fetchone()
+                authoritative_version = int(row["version"])
+                if authoritative_version > based_on_version:
+                    raise RuntimeError("STALE_BASE_VERSION") from exc
+                raise RuntimeError(
+                    "PROMOTION_SNAPSHOT_UNIQUE_INTEGRITY_FAILURE"
+                ) from exc
+
             raise
         except Exception:
             self.conn.rollback()

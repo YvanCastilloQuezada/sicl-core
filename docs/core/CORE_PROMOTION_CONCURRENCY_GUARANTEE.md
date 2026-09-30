@@ -68,6 +68,24 @@ Status: IMPLEMENTATION AUTHORIZED — CONTROLLED GATES
 - SIMULATED != OBSERVED != FACT.
 - UNKNOWN remains UNKNOWN until evidence resolves it.
 
+## 7.1 Retry and integrity materialization
+The following values and behaviors materialize the V1.4 concurrency contract in Core:
+
+- PROMOTION_DEADLINE_MS = 5000.
+- BUSY_TIMEOUT_CAP_MS = 1000; each attempt MUST also be bounded by the remaining shared deadline.
+- SAFETY_MAX_ATTEMPTS = 100.
+- BACKOFF_BASE_MS = 50, BACKOFF_FACTOR = 2, BACKOFF_CAP_MS = 500.
+- Retry backoff is deterministic; JITTER = NO.
+- BUSY, SQLITE_LOCKED, and STALE_BASE_VERSION consume the same monotonic deadline. No retry may reset or extend it.
+- Every STALE_BASE_VERSION retry MUST reread the authoritative current D-2, recompute based_on_version, revalidate creation, and rebuild the candidate snapshot. Attempt-local architectural state MUST NOT be reused.
+- The known snapshot race is classified only from the exact SQLite error `UNIQUE constraint failed: d2_snapshots.project_id, d2_snapshots.version`.
+- After that exact UNIQUE, authoritative version > based_on_version means STALE_BASE_VERSION; authoritative version <= based_on_version means PROMOTION_SNAPSHOT_UNIQUE_INTEGRITY_FAILURE.
+- Unknown IntegrityError variants MUST NOT be silently reclassified as the known snapshot race.
+- Startup MUST fail closed for migrated schemas containing invalid D-2 ancestry or inconsistent developer-promotion ledger bindings.
+- INTEGRITY_FAILURE is terminal and MUST NOT be retried.
+- Reaching SAFETY_MAX_ATTEMPTS is anomalous, MUST emit an ERROR log, and does not replace the monotonic deadline as normal termination authority.
+- Materialization decision for the existing public wire: if SAFETY_MAX_ATTEMPTS is reached before the deadline, the promotion terminates as RETRIABLE_BUSY_EXHAUSTED. This output choice is an implementation materialization; it is not represented as recovered historical wording.
+
 ## 8. Scope candidates — verify again before functional edits
 - src/sicl/repository.py
 - src/sicl/developer_promotion.py
