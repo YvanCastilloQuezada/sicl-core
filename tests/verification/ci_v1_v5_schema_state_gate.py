@@ -124,7 +124,8 @@ def v1_legacy() -> bool:
             initial = _snapshot(conn)
 
         try:
-            SQLiteRepository(path)
+            repo = SQLiteRepository(path)
+            repo.close()
         except Exception as exc:
             _print_case(
                 "V-1 LEGACY uv=0",
@@ -163,7 +164,8 @@ def v2_new() -> bool:
         # Crear el archivo vacío pero sin esquema.
         # SQLiteRepository debe construirlo.
         try:
-            SQLiteRepository(path)
+            repo = SQLiteRepository(path)
+            repo.close()
         except Exception as exc:
             _print_case(
                 "V-2 NEW",
@@ -194,7 +196,8 @@ def v3_migrated() -> bool:
     path = _mk_tmp_db()
     try:
         try:
-            SQLiteRepository(path)
+            repo = SQLiteRepository(path)
+            repo.close()
         except Exception as exc:
             _print_case(
                 "V-3 MIGRATED",
@@ -208,7 +211,8 @@ def v3_migrated() -> bool:
 
         # Segunda apertura: idempotente
         try:
-            SQLiteRepository(path)
+            repo = SQLiteRepository(path)
+            repo.close()
         except Exception as exc:
             _print_case(
                 "V-3 MIGRATED",

@@ -30,7 +30,11 @@ class SQLiteRepository:
         self.path = str(path)
         self.conn = sqlite3.connect(self.path, check_same_thread=check_same_thread)
         self.conn.row_factory = sqlite3.Row
-        self._create_schema()
+        try:
+            self._create_schema()
+        except Exception:
+            self.conn.close()
+            raise
 
     def close(self) -> None:
         self.conn.close()
