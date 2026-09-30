@@ -35,7 +35,64 @@ class SQLiteRepository:
     def close(self) -> None:
         self.conn.close()
 
+    @staticmethod
+    def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (table_name,),
+        ).fetchone()
+        return row is not None
+
+    @staticmethod
+    def _column_exists(conn: sqlite3.Connection, table_name: str, column_name: str) -> bool:
+        return any(row["name"] == column_name for row in conn.execute(f"PRAGMA table_info({table_name})"))
+
+    @classmethod
+    def _detect_schema_state(cls, conn: sqlite3.Connection) -> str:
+        user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if user_version not in (0, 1):
+            return "UNSUPPORTED"
+
+        has_d2 = cls._table_exists(conn, "d2_snapshots")
+        has_ledger = cls._table_exists(conn, "developer_promotion_idempotency")
+        has_based_on = has_d2 and cls._column_exists(conn, "d2_snapshots", "based_on_version")
+
+        if not has_d2:
+            return "NEW" if user_version == 0 and not has_ledger else "PARTIAL"
+        if user_version == 0 and not has_ledger and not has_based_on:
+            return "LEGACY"
+        if user_version == 1 and has_ledger and has_based_on:
+            return "MIGRATED"
+        return "PARTIAL"
+
+    @staticmethod
+    def _ddl_create_developer_promotion_idempotency(conn: sqlite3.Connection) -> None:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS developer_promotion_idempotency (
+              project_id TEXT NOT NULL,
+              proposal_id TEXT NOT NULL,
+              proposal_fingerprint TEXT NOT NULL,
+              human_review_id TEXT NOT NULL,
+              snapshot_id TEXT NOT NULL REFERENCES d2_snapshots(snapshot_id),
+              d2_version INTEGER NOT NULL,
+              committed_at TEXT NOT NULL,
+              PRIMARY KEY (project_id, proposal_id, proposal_fingerprint, human_review_id)
+            )
+        """)
+
+    @classmethod
+    def _ddl_add_based_on_version(cls, conn: sqlite3.Connection) -> None:
+        if not cls._column_exists(conn, "d2_snapshots", "based_on_version"):
+            conn.execute("ALTER TABLE d2_snapshots ADD COLUMN based_on_version INTEGER NULL")
+
     def _create_schema(self) -> None:
+        self.conn.execute("PRAGMA foreign_keys = ON")
+        schema_state = self._detect_schema_state(self.conn)
+        if schema_state in ("PARTIAL", "UNSUPPORTED"):
+            raise RuntimeError(f"core schema state not supported: {schema_state}")
+        if schema_state in ("LEGACY", "MIGRATED"):
+            return
+
         self.conn.executescript("""
         PRAGMA foreign_keys = ON;
         CREATE TABLE IF NOT EXISTS projects (
@@ -393,16 +450,6 @@ class SQLiteRepository:
         );
         CREATE INDEX IF NOT EXISTS idx_d2_snapshots_project_version
         ON d2_snapshots(project_id, version DESC);
-        CREATE TABLE IF NOT EXISTS developer_promotion_idempotency (
-          project_id TEXT NOT NULL,
-          proposal_id TEXT NOT NULL,
-          proposal_fingerprint TEXT NOT NULL,
-          human_review_id TEXT NOT NULL,
-          snapshot_id TEXT NOT NULL REFERENCES d2_snapshots(snapshot_id),
-          d2_version INTEGER NOT NULL,
-          committed_at TEXT NOT NULL,
-          PRIMARY KEY (project_id, proposal_id, proposal_fingerprint, human_review_id)
-        );
         CREATE TRIGGER IF NOT EXISTS d2_snapshots_no_update
         BEFORE UPDATE ON d2_snapshots
         BEGIN SELECT RAISE(ABORT, 'D-2 snapshots are append-only'); END;
@@ -424,12 +471,6 @@ class SQLiteRepository:
         objective_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(objectives)")}
         if "source_parent_objective_id" not in objective_columns:
             self.conn.execute("ALTER TABLE objectives ADD COLUMN source_parent_objective_id TEXT NULL")
-        # D-2 causal base semantics:
-        # NULL = legacy snapshot whose causal base was not recorded.
-        # 0 = known empty D-2 base; N > 0 = known D-2 base version N.
-        d2_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(d2_snapshots)")}
-        if "based_on_version" not in d2_columns:
-            self.conn.execute("ALTER TABLE d2_snapshots ADD COLUMN based_on_version INTEGER NULL")
         review_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(human_reviews)")}
         if "referenced_entity_type" not in review_columns:
             self.conn.execute("ALTER TABLE human_reviews ADD COLUMN referenced_entity_type TEXT NULL")
@@ -437,6 +478,12 @@ class SQLiteRepository:
             self.conn.execute("ALTER TABLE human_reviews ADD COLUMN referenced_entity_id TEXT NULL")
         if "referenced_fingerprint" not in review_columns:
             self.conn.execute("ALTER TABLE human_reviews ADD COLUMN referenced_fingerprint TEXT NULL")
+
+        # Fresh databases are born at schema V1. Legacy databases returned above
+        # untouched and are upgraded only by the atomic migration in [6.11.5].
+        self._ddl_add_based_on_version(self.conn)
+        self._ddl_create_developer_promotion_idempotency(self.conn)
+        self.conn.execute("PRAGMA user_version = 1")
         self.conn.commit()
 
     @contextmanager
