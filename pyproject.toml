@@ -7,7 +7,7 @@ name = "sicl-core-v1"
 version = "1.0.0"
 description = "SICL Core v1.0 CLI ontology MVP"
 requires-python = ">=3.11"
-dependencies = ["jsonschema>=4,<5"]
+dependencies = ["jsonschema>=4,<5", "tzdata>=2025.2"]
 
 [project.optional-dependencies]
 test = ["pytest>=8,<9", "ifcopenshell>=0.8.5,<1", "reportlab>=4,<5", "pypdf>=5,<7"]

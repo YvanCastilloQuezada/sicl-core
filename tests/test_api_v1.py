@@ -5,7 +5,10 @@ from fastapi.testclient import TestClient
 
 from api.deps import get_repository
 from api.main import app
+import api.routes.v1 as v1_routes
 from api.routes.v1 import _status_for
+import sicl.developer_promotion as developer_promotion_module
+from sicl.developer_promotion import PromotionOutcome
 from sicl.repository import SQLiteRepository
 from sicl.archi import ArchiElement, ArchiElementId, ArchiGeometry, ElementKind, GeometryKind, ProfileSpec
 
@@ -398,6 +401,8 @@ def _promotion_body(review_id: str, proposal_id: str = "dev-promote-1") -> dict:
         ("UNSUPPORTED_PROPERTY_VALUE:d63_labels", 400),
         ("PROMOTION_PERSIST_FAILED", 500),
         ("PROMOTION_FAILED", 500),
+        ("RETRIABLE_BUSY_EXHAUSTED", 503),
+        ("INTEGRITY_FAILURE", 500),
     ],
 )
 def test_v1_developer_promotion_status_mapping(code, status):
@@ -445,6 +450,7 @@ def test_v1_developer_promotion_is_idempotent_over_http(tmp_path: Path):
     assert second.json()["data"]["d2_version"] == first.json()["data"]["d2_version"]
     assert second.json()["data"]["effects_status"] == "NOT_ATTEMPTED"
     assert second.json()["data"]["reason"] == "ALREADY_COMMITTED"
+    assert second.json()["data"]["status"] == "ALREADY_COMMITTED"
     assert len([e for e in repo.events(project_id) if e.type == "DEVELOPER_PROMOTION_COMMITTED"]) == 1
     close(repo)
 
@@ -502,6 +508,70 @@ def test_v1_developer_promotion_rejection_uses_error_envelope(tmp_path: Path):
     close(repo)
 
 
+def test_v1_developer_promotion_busy_exhaustion_uses_503_retry_after(tmp_path: Path, monkeypatch):
+    client, repo = client_for(tmp_path)
+    project_id = "V1-PROMOTE-BUSY"
+    client.post("/v1/projects", json={"project_id": project_id, "name": "Promotion"})
+
+    monkeypatch.setattr(
+        v1_routes,
+        "promote_developer_proposal",
+        lambda **kwargs: PromotionOutcome(
+            False,
+            kwargs["proposal_id"],
+            reason="RETRIABLE_BUSY_EXHAUSTED",
+        ),
+    )
+
+    response = client.post(
+        f"/v1/projects/{project_id}/developer-promotions",
+        json={
+            "proposal_id": "busy-proposal",
+            "proposal_fingerprint": PROMOTION_FP,
+            "human_review_id": "busy-review",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "1"
+    detail = response.json()["detail"]
+    assert detail["code"] == "RETRIABLE_BUSY_EXHAUSTED"
+    assert detail["data"]["status"] == "RETRIABLE_BUSY_EXHAUSTED"
+    close(repo)
+
+
+def test_v1_developer_promotion_integrity_failure_uses_500(tmp_path: Path, monkeypatch):
+    client, repo = client_for(tmp_path)
+    project_id = "V1-PROMOTE-INTEGRITY"
+    client.post("/v1/projects", json={"project_id": project_id, "name": "Promotion"})
+
+    monkeypatch.setattr(
+        v1_routes,
+        "promote_developer_proposal",
+        lambda **kwargs: PromotionOutcome(
+            False,
+            kwargs["proposal_id"],
+            reason="INTEGRITY_FAILURE",
+        ),
+    )
+
+    response = client.post(
+        f"/v1/projects/{project_id}/developer-promotions",
+        json={
+            "proposal_id": "integrity-proposal",
+            "proposal_fingerprint": PROMOTION_FP,
+            "human_review_id": "integrity-review",
+        },
+    )
+
+    assert response.status_code == 500
+    assert "Retry-After" not in response.headers
+    detail = response.json()["detail"]
+    assert detail["code"] == "INTEGRITY_FAILURE"
+    assert detail["data"]["status"] == "INTEGRITY_FAILURE"
+    close(repo)
+
+
 def test_v1_developer_promotion_request_is_strict(tmp_path: Path):
     client, repo = client_for(tmp_path)
     client.post("/v1/projects", json={"project_id": "V1-PROMOTE-STRICT", "name": "Promotion"})
@@ -516,5 +586,44 @@ def test_v1_developer_promotion_request_is_strict(tmp_path: Path):
     )
     assert response.status_code == 422
     assert repo.get_d2("V1-PROMOTE-STRICT") is None
+    close(repo)
+
+def test_v1_developer_promotion_stale_is_retried_and_never_reaches_wire(tmp_path: Path, monkeypatch):
+    client, repo = client_for(tmp_path)
+    project_id = "V1-PROMOTE-STALE-WIRE"
+    client.post("/v1/projects", json={"project_id": project_id, "name": "Promotion"})
+    _record_promotable_developer_proposal(client, project_id)
+    review_id = _approve_promotable_developer_proposal(client, project_id)
+
+    real_commit = repo.commit_developer_promotion
+    calls = 0
+
+    def stale_once(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("STALE_BASE_VERSION")
+        return real_commit(*args, **kwargs)
+
+    monkeypatch.setattr(repo, "commit_developer_promotion", stale_once)
+    monkeypatch.setattr(developer_promotion_module, "BACKOFF_BASE_MS", 0)
+    monkeypatch.setattr(developer_promotion_module, "BACKOFF_CAP_MS", 0)
+
+    response = client.post(
+        f"/v1/projects/{project_id}/developer-promotions",
+        json=_promotion_body(review_id),
+    )
+
+    assert calls == 2
+    assert response.status_code == 200
+
+    data = response.json()["data"]
+    assert data["status"] == "COMMITTED"
+    assert data["snapshot_id"] is not None
+    assert data["d2_version"] == 1
+
+    assert "STALE_BASE_VERSION" not in response.text
+    assert "STALE_BASE_VERSION" not in str(dict(response.headers))
+
     close(repo)
 
