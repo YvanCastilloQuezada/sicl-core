@@ -393,6 +393,16 @@ class SQLiteRepository:
         );
         CREATE INDEX IF NOT EXISTS idx_d2_snapshots_project_version
         ON d2_snapshots(project_id, version DESC);
+        CREATE TABLE IF NOT EXISTS developer_promotion_idempotency (
+          project_id TEXT NOT NULL,
+          proposal_id TEXT NOT NULL,
+          proposal_fingerprint TEXT NOT NULL,
+          human_review_id TEXT NOT NULL,
+          snapshot_id TEXT NOT NULL REFERENCES d2_snapshots(snapshot_id),
+          d2_version INTEGER NOT NULL,
+          committed_at TEXT NOT NULL,
+          PRIMARY KEY (project_id, proposal_id, proposal_fingerprint, human_review_id)
+        );
         CREATE TRIGGER IF NOT EXISTS d2_snapshots_no_update
         BEFORE UPDATE ON d2_snapshots
         BEGIN SELECT RAISE(ABORT, 'D-2 snapshots are append-only'); END;
@@ -414,6 +424,12 @@ class SQLiteRepository:
         objective_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(objectives)")}
         if "source_parent_objective_id" not in objective_columns:
             self.conn.execute("ALTER TABLE objectives ADD COLUMN source_parent_objective_id TEXT NULL")
+        # D-2 causal base semantics:
+        # NULL = legacy snapshot whose causal base was not recorded.
+        # 0 = known empty D-2 base; N > 0 = known D-2 base version N.
+        d2_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(d2_snapshots)")}
+        if "based_on_version" not in d2_columns:
+            self.conn.execute("ALTER TABLE d2_snapshots ADD COLUMN based_on_version INTEGER NULL")
         review_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(human_reviews)")}
         if "referenced_entity_type" not in review_columns:
             self.conn.execute("ALTER TABLE human_reviews ADD COLUMN referenced_entity_type TEXT NULL")
