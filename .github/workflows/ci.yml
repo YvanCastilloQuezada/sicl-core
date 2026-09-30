@@ -2,9 +2,7 @@ name: SICL Core CI
 
 on:
   push:
-    branches:
-      - main
-      - feat/core-promotion-concurrency-guarantee
+    branches: [main]
   pull_request:
     branches: [main]
 
