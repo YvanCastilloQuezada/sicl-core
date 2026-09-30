@@ -271,22 +271,28 @@ def promote_developer_proposal(
         reference=review.review_id,
     )
     candidate = tuple(existing_canonical) + candidate_elements
+    current = repo.get_d2_current_snapshot(project_id)
+    base_version = current.version if current is not None else 0
     try:
-        snapshot = repo.insert_d2_snapshot_and_event(
-            project_id,
-            candidate,
-            review.actor,
-            "ARKI_DEVELOPER_PROMOTION",
-            event_type="DEVELOPER_PROMOTION_COMMITTED",
-            event_payload={
-                "proposal_id": proposal_id,
-                "proposal_fingerprint": proposal_fingerprint,
-                "human_review_id": human_review_id,
-            },
+        commit_status, snapshot = repo.commit_developer_promotion(
+            project_id, candidate, review.actor, proposal_id,
+            proposal_fingerprint, human_review_id, base_version,
         )
-    except Exception:
+    except RuntimeError as exc:
+        if str(exc) == "STALE_BASE_VERSION":
+            raise
         return _reject(repo, project_id, proposal_id, proposal_fingerprint, human_review_id,
                        "PROMOTION_PERSIST_FAILED", review.actor)
+    except Exception:
+        raise
+
+    if commit_status == "ALREADY_COMMITTED":
+        return _already_committed(
+            repo, project_id, proposal_id, proposal_fingerprint, human_review_id
+        ) or PromotionOutcome(
+            True, proposal_id, snapshot.snapshot_id, snapshot.version,
+            snapshot.elements, "NOT_ATTEMPTED", "ALREADY_COMMITTED",
+        )
 
     transaction = ArchiTransaction(existing_canonical)
     try:
