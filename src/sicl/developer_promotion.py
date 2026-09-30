@@ -74,37 +74,23 @@ def _reasoning_execution(repo: SQLiteRepository, project_id: str, proposal_id: s
 
 def _already_committed(repo: SQLiteRepository, project_id: str, proposal_id: str,
                        fingerprint: str, review_id: str) -> PromotionOutcome | None:
-    for event in repo.events(project_id):
-        if event.type != "DEVELOPER_PROMOTION_COMMITTED":
-            continue
-        p = event.payload or {}
-        if (
-            p.get("proposal_id") == proposal_id
-            and p.get("proposal_fingerprint") == fingerprint
-            and p.get("human_review_id") == review_id
-        ):
-            snapshot_id = p.get("snapshot_id")
-            version = p.get("version")
-            if not isinstance(snapshot_id, str) or not isinstance(version, int):
-                return PromotionOutcome(True, proposal_id, effects_status="FAILED",
-                                        reason="COMMITTED_EVENT_INVALID")
-            snapshot = repo.get_d2_snapshot(project_id, version)
-            if snapshot is None or snapshot.snapshot_id != snapshot_id:
-                return PromotionOutcome(True, proposal_id, snapshot_id, version,
-                                        effects_status="FAILED",
-                                        reason="COMMITTED_SNAPSHOT_NOT_FOUND")
-            failed = any(
-                e.type in {"D2_EFFECTS_FAILED", "D2_INTERNAL_INCONSISTENCY"}
-                and (e.payload or {}).get("snapshot_id") == snapshot_id
-                for e in repo.events(project_id)
-            )
-            return PromotionOutcome(
-                True, proposal_id, snapshot_id, version, snapshot.elements,
-                "FAILED" if failed else "NOT_ATTEMPTED",
-                "ALREADY_COMMITTED",
-            )
-    return None
-
+    try:
+        snapshot = repo.get_developer_promotion_commit(
+            project_id, proposal_id, fingerprint, review_id
+        )
+    except RuntimeError as exc:
+        return PromotionOutcome(True, proposal_id, effects_status="FAILED", reason=str(exc))
+    if snapshot is None:
+        return None
+    failed = any(
+        event.type in {"D2_EFFECTS_FAILED", "D2_INTERNAL_INCONSISTENCY"}
+        and (event.payload or {}).get("snapshot_id") == snapshot.snapshot_id
+        for event in repo.events(project_id)
+    )
+    return PromotionOutcome(
+        True, proposal_id, snapshot.snapshot_id, snapshot.version, snapshot.elements,
+        "FAILED" if failed else "NOT_ATTEMPTED", "ALREADY_COMMITTED",
+    )
 
 def _int_field(value: Any, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
