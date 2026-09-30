@@ -244,7 +244,9 @@ def _promote_developer_proposal_once(
         return _reject(repo, project_id, proposal_id, proposal_fingerprint, human_review_id,
                        str(exc), review.actor)
 
-    existing_canonical = repo.get_d2(project_id) or ()
+    current_base = repo.get_d2_current_snapshot(project_id)
+    existing_canonical = current_base.elements if current_base is not None else ()
+    base_version = current_base.version if current_base is not None else 0
     structural = validate_creation(
         project_id=project_id,
         candidate_elements=candidate_elements,
@@ -273,8 +275,6 @@ def _promote_developer_proposal_once(
         reference=review.review_id,
     )
     candidate = tuple(existing_canonical) + candidate_elements
-    current = repo.get_d2_current_snapshot(project_id)
-    base_version = current.version if current is not None else 0
     try:
         commit_status, snapshot = repo.commit_developer_promotion(
             project_id, candidate, review.actor, proposal_id,
