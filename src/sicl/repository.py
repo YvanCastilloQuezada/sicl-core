@@ -89,12 +89,36 @@ class SQLiteRepository:
         if not cls._column_exists(conn, "d2_snapshots", "based_on_version"):
             conn.execute("ALTER TABLE d2_snapshots ADD COLUMN based_on_version INTEGER NULL")
 
+    @classmethod
+    def _assert_migrated_v1(cls, conn: sqlite3.Connection) -> None:
+        state = cls._detect_schema_state(conn)
+        if state != "MIGRATED":
+            raise RuntimeError(f"core migration validation failed: {state}")
+
+    @classmethod
+    def _migrate_legacy_to_v1(cls, conn: sqlite3.Connection) -> None:
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            if cls._detect_schema_state(conn) != "LEGACY":
+                raise RuntimeError("core migration requires LEGACY schema state")
+            cls._ddl_add_based_on_version(conn)
+            cls._ddl_create_developer_promotion_idempotency(conn)
+            conn.execute("PRAGMA user_version = 1")
+            cls._assert_migrated_v1(conn)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
     def _create_schema(self) -> None:
         self.conn.execute("PRAGMA foreign_keys = ON")
         schema_state = self._detect_schema_state(self.conn)
         if schema_state in ("PARTIAL", "UNSUPPORTED"):
             raise RuntimeError(f"core schema state not supported: {schema_state}")
-        if schema_state in ("LEGACY", "MIGRATED"):
+        if schema_state == "LEGACY":
+            self._migrate_legacy_to_v1(self.conn)
+            return
+        if schema_state == "MIGRATED":
             return
 
         self.conn.executescript("""
