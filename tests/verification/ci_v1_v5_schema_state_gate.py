@@ -139,11 +139,11 @@ def v1_legacy() -> bool:
 
         ok = (
             initial["user_version"] == 0
-            and final["user_version"] == 0
+            and final["user_version"] == 1
             and not initial["has_ledger"]
-            and not final["has_ledger"]
+            and final["has_ledger"]
             and not initial["has_based_on_version"]
-            and not final["has_based_on_version"]
+            and final["has_based_on_version"]
             and initial["has_events"]
             and final["has_events"]
             and initial["has_d2_snapshots"]
