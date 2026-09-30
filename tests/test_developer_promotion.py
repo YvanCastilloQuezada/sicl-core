@@ -212,11 +212,15 @@ def test_unsupported_property_values(key, value):
 def test_conversion_is_deterministic_and_preserves_provenance(monkeypatch):
     repo = setup_repo()
     captured = {}
-    real = repo.insert_d2_snapshot_and_event
-    def capture(project_id, elements, actor, source, **kwargs):
+    real = repo.commit_developer_promotion
+    def capture(project_id, elements, actor, proposal_id, proposal_fingerprint,
+                human_review_id, based_on_version):
         captured["elements"] = elements
-        return real(project_id, elements, actor, source, **kwargs)
-    monkeypatch.setattr(repo, "insert_d2_snapshot_and_event", capture)
+        return real(
+            project_id, elements, actor, proposal_id, proposal_fingerprint,
+            human_review_id, based_on_version,
+        )
+    monkeypatch.setattr(repo, "commit_developer_promotion", capture)
     out = run(repo)
     element = captured["elements"][0]
     assert element.element_id == ArchiElementId.compute(PROJECT, "SPACE", "space-1")
@@ -262,7 +266,7 @@ def test_persist_failure_does_not_run_effects(monkeypatch):
         raise RuntimeError("db")
     def effects(*args, **kwargs):
         called["effects"] = True
-    monkeypatch.setattr(repo, "insert_d2_snapshot_and_event", fail)
+    monkeypatch.setattr(repo, "commit_developer_promotion", fail)
     monkeypatch.setattr(dp.ArchiTransaction, "promote_initial_elements", effects)
     out = run(repo)
     assert (out.committed, out.effects_status, out.reason) == (False, "NOT_ATTEMPTED", "PROMOTION_PERSIST_FAILED")
