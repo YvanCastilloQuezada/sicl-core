@@ -703,6 +703,14 @@ class SQLiteRepository:
                 snapshot_id, project_id, version, deserialize_elements(raw),
                 content_hash, actor.strip(), event.id, created_at,
             )
+        except sqlite3.IntegrityError:
+            self.conn.rollback()
+            prior = self.get_developer_promotion_commit(
+                project_id, proposal_id, proposal_fingerprint, human_review_id
+            )
+            if prior is not None:
+                return "ALREADY_COMMITTED", prior
+            raise
         except Exception:
             self.conn.rollback()
             raise
