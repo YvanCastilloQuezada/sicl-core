@@ -41,6 +41,7 @@ def main() -> int:
             "INSERT INTO projects(project_id,name,stage,version,temporal_scope) "
             "VALUES ('bench-project','Benchmark','test',1,'proyecto')"
         )
+        repo.conn.commit()
 
         insert_ns: list[int] = []
         repo.conn.execute("BEGIN")
