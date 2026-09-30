@@ -626,6 +626,87 @@ class SQLiteRepository:
         with self.transaction():
             return [self._insert_event(event) for event in events]
 
+    def get_developer_promotion_commit(
+        self, project_id: str, proposal_id: str, proposal_fingerprint: str, human_review_id: str,
+    ) -> D2Snapshot | None:
+        row = self.conn.execute(
+            """SELECT snapshot_id, d2_version FROM developer_promotion_idempotency
+               WHERE project_id=? AND proposal_id=? AND proposal_fingerprint=? AND human_review_id=?""",
+            (project_id, proposal_id, proposal_fingerprint, human_review_id),
+        ).fetchone()
+        if row is None:
+            return None
+        self.ledger_binding_guard(project_id, row["snapshot_id"], int(row["d2_version"]))
+        snapshot = self.get_d2_snapshot(project_id, int(row["d2_version"]))
+        if snapshot is None or snapshot.snapshot_id != row["snapshot_id"]:
+            raise RuntimeError("LEDGER_BINDING_SNAPSHOT_NOT_FOUND")
+        return snapshot
+
+    def commit_developer_promotion(
+        self, project_id: str, elements: tuple[ArchiElement, ...], actor: str,
+        proposal_id: str, proposal_fingerprint: str, human_review_id: str,
+        based_on_version: int,
+    ) -> tuple[str, D2Snapshot]:
+        """Atomically commit event + D-2 snapshot + idempotency ledger with CAS."""
+        raw = serialize_elements(elements)
+        if any(element.project_id != project_id for element in elements):
+            raise ValueError("all D-2 elements must belong to project_id")
+        content_hash = elements_content_hash(raw)
+        created_at = now_iso()
+        try:
+            self.conn.execute("BEGIN IMMEDIATE")
+            prior = self.get_developer_promotion_commit(
+                project_id, proposal_id, proposal_fingerprint, human_review_id
+            )
+            if prior is not None:
+                self.conn.commit()
+                return "ALREADY_COMMITTED", prior
+            row = self.conn.execute(
+                "SELECT COALESCE(MAX(version), 0) AS version FROM d2_snapshots WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            current_version = int(row["version"])
+            if current_version != based_on_version:
+                raise RuntimeError("STALE_BASE_VERSION")
+            version = current_version + 1
+            snapshot_id = deterministic_snapshot_id(project_id, version, content_hash)
+            payload = {
+                "snapshot_id": snapshot_id, "project_id": project_id, "version": version,
+                "content_hash": content_hash, "element_count": len(elements),
+                "actor": actor.strip(), "source": "ARKI_DEVELOPER_PROMOTION",
+                "proposal_id": proposal_id, "proposal_fingerprint": proposal_fingerprint,
+                "human_review_id": human_review_id,
+            }
+            event = self._insert_event(Event(
+                None, created_at, project_id, "DEVELOPER_PROMOTION_COMMITTED",
+                payload, actor.strip(), "ARKI_D2_STORE",
+            ))
+            self.conn.execute(
+                """INSERT INTO d2_snapshots(
+                    snapshot_id, project_id, version, elements_json, content_hash,
+                    actor, source_event_id, created_at, based_on_version
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (snapshot_id, project_id, version, raw, content_hash, actor.strip(),
+                 event.id, created_at, based_on_version),
+            )
+            self.conn.execute(
+                """INSERT INTO developer_promotion_idempotency(
+                    project_id, proposal_id, proposal_fingerprint, human_review_id,
+                    snapshot_id, d2_version, committed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (project_id, proposal_id, proposal_fingerprint, human_review_id,
+                 snapshot_id, version, created_at),
+            )
+            self.ledger_binding_guard(project_id, snapshot_id, version)
+            self.conn.commit()
+            return "COMMITTED", D2Snapshot(
+                snapshot_id, project_id, version, deserialize_elements(raw),
+                content_hash, actor.strip(), event.id, created_at,
+            )
+        except Exception:
+            self.conn.rollback()
+            raise
+
     def insert_d2_snapshot_and_event(
         self,
         project_id: str,
