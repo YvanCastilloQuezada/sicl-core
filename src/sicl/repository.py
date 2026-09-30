@@ -713,6 +713,29 @@ class SQLiteRepository:
             expected, row["actor"], row["source_event_id"], row["created_at"],
         )
 
+    def ledger_binding_guard(
+        self,
+        project_id: str,
+        snapshot_id: str,
+        d2_version: int,
+    ) -> None:
+        """Fail closed unless a ledger binding names the exact canonical D-2 row.
+
+        The lookup is anchored on d2_snapshots.snapshot_id (PRIMARY KEY), so
+        validation cost is independent of project history length and never
+        requires a history scan.
+        """
+        row = self.conn.execute(
+            "SELECT project_id, version FROM d2_snapshots WHERE snapshot_id=?",
+            (snapshot_id,),
+        ).fetchone()
+        if row is None:
+            raise RuntimeError("LEDGER_BINDING_SNAPSHOT_NOT_FOUND")
+        if row["project_id"] != project_id:
+            raise RuntimeError("LEDGER_BINDING_PROJECT_MISMATCH")
+        if int(row["version"]) != d2_version:
+            raise RuntimeError("LEDGER_BINDING_VERSION_MISMATCH")
+
     def get_d2_snapshot(self, project_id: str, version: int) -> D2Snapshot | None:
         row = self.conn.execute(
             "SELECT * FROM d2_snapshots WHERE project_id=? AND version=?",
