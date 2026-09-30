@@ -7,6 +7,7 @@ from api.deps import get_repository
 from api.main import app
 import api.routes.v1 as v1_routes
 from api.routes.v1 import _status_for
+import sicl.developer_promotion as developer_promotion_module
 from sicl.developer_promotion import PromotionOutcome
 from sicl.repository import SQLiteRepository
 from sicl.archi import ArchiElement, ArchiElementId, ArchiGeometry, ElementKind, GeometryKind, ProfileSpec
@@ -585,5 +586,44 @@ def test_v1_developer_promotion_request_is_strict(tmp_path: Path):
     )
     assert response.status_code == 422
     assert repo.get_d2("V1-PROMOTE-STRICT") is None
+    close(repo)
+
+def test_v1_developer_promotion_stale_is_retried_and_never_reaches_wire(tmp_path: Path, monkeypatch):
+    client, repo = client_for(tmp_path)
+    project_id = "V1-PROMOTE-STALE-WIRE"
+    client.post("/v1/projects", json={"project_id": project_id, "name": "Promotion"})
+    _record_promotable_developer_proposal(client, project_id)
+    review_id = _approve_promotable_developer_proposal(client, project_id)
+
+    real_commit = repo.commit_developer_promotion
+    calls = 0
+
+    def stale_once(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("STALE_BASE_VERSION")
+        return real_commit(*args, **kwargs)
+
+    monkeypatch.setattr(repo, "commit_developer_promotion", stale_once)
+    monkeypatch.setattr(developer_promotion_module, "BACKOFF_BASE_MS", 0)
+    monkeypatch.setattr(developer_promotion_module, "BACKOFF_CAP_MS", 0)
+
+    response = client.post(
+        f"/v1/projects/{project_id}/developer-promotions",
+        json=_promotion_body(review_id),
+    )
+
+    assert calls == 2
+    assert response.status_code == 200
+
+    data = response.json()["data"]
+    assert data["status"] == "COMMITTED"
+    assert data["snapshot_id"] is not None
+    assert data["d2_version"] == 1
+
+    assert "STALE_BASE_VERSION" not in response.text
+    assert "STALE_BASE_VERSION" not in str(dict(response.headers))
+
     close(repo)
 
