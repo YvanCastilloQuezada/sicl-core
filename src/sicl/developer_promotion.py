@@ -6,6 +6,8 @@ IFC/ledger publication is a convergent effect after the D-2 snapshot commit.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import sqlite3
+import time
 from typing import Any, Literal
 
 from pydantic import ValidationError
@@ -184,7 +186,7 @@ def _element(project_id: str, proposal: DeveloperProposalSchema,
     )
 
 
-def promote_developer_proposal(
+def _promote_developer_proposal_once(
     *,
     repo: SQLiteRepository,
     project_id: str,
