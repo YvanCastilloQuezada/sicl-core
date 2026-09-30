@@ -259,6 +259,104 @@ def test_sufficiency_not_permitted_is_rejected_without_snapshot(monkeypatch):
     assert "SUFFICIENCY_NOT_PERMITTED" in reasons(repo)
 
 
+@pytest.mark.parametrize(
+    "error",
+    [
+        "LEDGER_BINDING_SNAPSHOT_NOT_FOUND",
+        "LEDGER_BINDING_PROJECT_MISMATCH",
+        "LEDGER_BINDING_VERSION_MISMATCH",
+    ],
+)
+def test_ledger_binding_integrity_failure_before_commit_is_not_reported_as_committed(
+    monkeypatch, error
+):
+    repo = setup_repo()
+
+    def fail(*args, **kwargs):
+        raise RuntimeError(error)
+
+    monkeypatch.setattr(repo, "get_developer_promotion_commit", fail)
+
+    out = run(repo)
+
+    assert (out.committed, out.effects_status, out.reason) == (
+        False,
+        "NOT_ATTEMPTED",
+        "INTEGRITY_FAILURE",
+    )
+    assert repo.get_d2(PROJECT) is None
+
+
+def test_unknown_ledger_binding_error_before_commit_is_not_silently_classified(monkeypatch):
+    repo = setup_repo()
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("LEDGER_BINDING_FUTURE")
+
+    monkeypatch.setattr(repo, "get_developer_promotion_commit", fail)
+
+    with pytest.raises(RuntimeError, match="^LEDGER_BINDING_FUTURE$"):
+        run(repo)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        "LEDGER_BINDING_SNAPSHOT_NOT_FOUND",
+        "LEDGER_BINDING_PROJECT_MISMATCH",
+        "LEDGER_BINDING_VERSION_MISMATCH",
+    ],
+)
+def test_ledger_binding_integrity_failure_during_commit_does_not_run_effects(
+    monkeypatch, error
+):
+    repo = setup_repo()
+    called = {"effects": False}
+
+    def fail(*args, **kwargs):
+        raise RuntimeError(error)
+
+    def effects(*args, **kwargs):
+        called["effects"] = True
+
+    monkeypatch.setattr(repo, "commit_developer_promotion", fail)
+    monkeypatch.setattr(dp.ArchiTransaction, "promote_initial_elements", effects)
+
+    out = run(repo)
+
+    assert (out.committed, out.effects_status, out.reason) == (
+        False,
+        "NOT_ATTEMPTED",
+        "INTEGRITY_FAILURE",
+    )
+    assert called["effects"] is False
+    assert repo.get_d2(PROJECT) is None
+
+
+def test_unknown_ledger_binding_error_during_commit_remains_persist_failure(monkeypatch):
+    repo = setup_repo()
+    called = {"effects": False}
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("LEDGER_BINDING_FUTURE")
+
+    def effects(*args, **kwargs):
+        called["effects"] = True
+
+    monkeypatch.setattr(repo, "commit_developer_promotion", fail)
+    monkeypatch.setattr(dp.ArchiTransaction, "promote_initial_elements", effects)
+
+    out = run(repo)
+
+    assert (out.committed, out.effects_status, out.reason) == (
+        False,
+        "NOT_ATTEMPTED",
+        "PROMOTION_PERSIST_FAILED",
+    )
+    assert called["effects"] is False
+    assert repo.get_d2(PROJECT) is None
+
+
 def test_persist_failure_does_not_run_effects(monkeypatch):
     repo = setup_repo()
     called = {"effects": False}

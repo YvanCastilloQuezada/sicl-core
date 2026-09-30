@@ -17,6 +17,14 @@ Status: IMPLEMENTATION AUTHORIZED — CONTROLLED GATES
 - 503/500 envelope V1 amendment.
 - Frozen Web contract is not reopened by this Core implementation.
 
+## 3.1 Error wire materialization
+- RETRIABLE_BUSY_EXHAUSTED -> HTTP 503.
+- HTTP 503 RETRIABLE_BUSY_EXHAUSTED MUST emit Retry-After: 1.
+- INTEGRITY_FAILURE -> HTTP 500.
+- Successful first commit -> data.status COMMITTED.
+- Successful idempotent replay -> data.status ALREADY_COMMITTED.
+- Ordinary promotion rejection semantics remain unchanged.
+
 ## 4. Approved implementation sequence
 - [6.11.1] Preflight — PASS WITH CORRECTION.
 - [6.11.2] Branch and documentation baseline — this step.

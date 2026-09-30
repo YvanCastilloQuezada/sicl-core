@@ -26,6 +26,12 @@ from .repository import SQLiteRepository
 
 EffectsStatus = Literal["COMPLETE", "PARTIAL", "FAILED", "NOT_ATTEMPTED"]
 
+_LEDGER_BINDING_INTEGRITY_ERRORS = {
+    "LEDGER_BINDING_SNAPSHOT_NOT_FOUND",
+    "LEDGER_BINDING_PROJECT_MISMATCH",
+    "LEDGER_BINDING_VERSION_MISMATCH",
+}
+
 
 @dataclass(frozen=True)
 class PromotionOutcome:
@@ -81,7 +87,14 @@ def _already_committed(repo: SQLiteRepository, project_id: str, proposal_id: str
             project_id, proposal_id, fingerprint, review_id
         )
     except RuntimeError as exc:
-        return PromotionOutcome(True, proposal_id, effects_status="FAILED", reason=str(exc))
+        if str(exc) in _LEDGER_BINDING_INTEGRITY_ERRORS:
+            return PromotionOutcome(
+                False,
+                proposal_id,
+                effects_status="NOT_ATTEMPTED",
+                reason="INTEGRITY_FAILURE",
+            )
+        raise
     if snapshot is None:
         return None
     failed = any(
@@ -283,6 +296,13 @@ def _promote_developer_proposal_once(
     except RuntimeError as exc:
         if str(exc) == "STALE_BASE_VERSION":
             raise
+        if str(exc) in _LEDGER_BINDING_INTEGRITY_ERRORS:
+            return PromotionOutcome(
+                False,
+                proposal_id,
+                effects_status="NOT_ATTEMPTED",
+                reason="INTEGRITY_FAILURE",
+            )
         return _reject(repo, project_id, proposal_id, proposal_fingerprint, human_review_id,
                        "PROMOTION_PERSIST_FAILED", review.actor)
     except Exception:
