@@ -135,6 +135,8 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
 
 
 def _status_for(code: str) -> int:
+    if code == 'D2_SNAPSHOT_INTEGRITY_FAILURE':
+        return 409
     if code in {"METHOD_NOT_FOUND", "SIMULATION_NOT_FOUND", "MULTIOBJECTIVE_NOT_FOUND", "GENERATION_NOT_FOUND", "CANDIDATE_NOT_FOUND", "MEMORY_NOT_FOUND", "OBJECTIVE_NOT_FOUND", "PLANNING_INSTRUMENT_NOT_FOUND", "REGULATION_NOT_FOUND", "INTERPRETATION_NOT_FOUND", "SNAPSHOT_NOT_FOUND", "SOURCE_NOT_FOUND", "BIM_SNAPSHOT_NOT_FOUND", "SCALE_RELATION_REQUIRED", "EXAMPLE_NOT_FOUND", "D2_NOT_COMMITTED", "D2_SNAPSHOT_NOT_FOUND", "REVIEW_TARGET_NOT_FOUND", "PROPOSAL_NOT_FOUND", "HUMAN_REVIEW_NOT_FOUND"}:
         return 404
     if code in {"METHOD_TYPE_MISMATCH", "REVIEW_TARGET_FINGERPRINT_MISMATCH", "PROPOSAL_FINGERPRINT_MISMATCH", "PROPOSAL_FINGERPRINT_INCONSISTENT", "HUMAN_REVIEW_BINDING_MISMATCH", "SUFFICIENCY_NOT_PERMITTED"}:
@@ -1075,7 +1077,18 @@ def get_d2_snapshot(project_id: str, version: int, repo: SQLiteRepository = Depe
     project = repo.get_project(project_id)
     if project is None:
         _error({"code": "PROJECT_NOT_FOUND", "message": project_id}, project_id)
-    snapshot = repo.get_d2_snapshot(project_id, version)
+    try:
+        snapshot = repo.get_d2_snapshot(project_id, version)
+    except ValueError as exc:
+        if str(exc).split(':', 1)[0] != 'D2_SNAPSHOT_ID_MISMATCH':
+            raise
+        _error(
+            {
+                'code': 'D2_SNAPSHOT_INTEGRITY_FAILURE',
+                'message': 'D-2 snapshot integrity verification failed',
+            },
+            project_id,
+        )
     if snapshot is None:
         _error({"code": "D2_SNAPSHOT_NOT_FOUND", "message": f"D-2 snapshot version {version} not found"}, project_id)
     return _ok({"snapshot": _d2_snapshot_payload(snapshot)}, project_id, project.version)

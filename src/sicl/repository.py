@@ -617,6 +617,17 @@ class SQLiteRepository:
         elements = deserialize_elements(raw)
         if any(element.project_id != row["project_id"] for element in elements):
             raise ValueError(f"D2_SNAPSHOT_PROJECT_MISMATCH:{row['snapshot_id']}")
+        expected_id = deterministic_snapshot_id(
+            row["project_id"],
+            row["version"],
+            row["content_hash"],
+        )
+        if row["snapshot_id"] != expected_id:
+            raise ValueError(
+                "D2_SNAPSHOT_ID_MISMATCH:"
+                + str(row["snapshot_id"])
+            )
+
         return D2Snapshot(
             row["snapshot_id"], row["project_id"], row["version"], elements,
             expected, row["actor"], row["source_event_id"], row["created_at"],
