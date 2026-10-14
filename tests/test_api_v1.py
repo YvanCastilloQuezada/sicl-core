@@ -377,6 +377,33 @@ def _promotion_body(review_id: str, proposal_id: str = "dev-promote-1") -> dict:
     }
 
 
+def _ace88_signed_promotion_body(repo, project_id: str, review_id: str, proposal_id: str = "dev-promote-1") -> dict:
+    """Generate ephemeral project-scoped approval for isolated HTTP test SQLite."""
+    import base64
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+    from sicl.human_authority_crypto import ACTION, CONTRACT, canonical_bytes
+
+    private = Ed25519PrivateKey.generate()
+    key_id = "ace88-http-" + secrets.token_hex(12)
+    public = base64.b64encode(private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()
+    repo.register_authority_key_offline(project_id=project_id, key_id=key_id,
+                                        actor_id="architect", public_key_b64=public)
+    now = datetime.now(timezone.utc)
+    payload = dict(contract=CONTRACT, action=ACTION, projectId=project_id,
+                   proposalId=proposal_id, fingerprint=PROMOTION_FP,
+                   actorId="architect", reviewId=review_id, keyId=key_id,
+                   decision="APPROVED", issuedAt=(now-timedelta(seconds=5)).isoformat(),
+                   expiresAt=(now+timedelta(seconds=120)).isoformat(),
+                   nonce=secrets.token_hex(20))
+    body = _promotion_body(review_id, proposal_id)
+    body.update(approval_payload=payload,
+                approval_signature_b64=base64.b64encode(private.sign(canonical_bytes(payload))).decode())
+    return body
+
+
 @pytest.mark.parametrize(
     "code,status",
     [
@@ -414,7 +441,7 @@ def test_v1_developer_promotion_commits_d2_without_advancing_project_version(tmp
 
     response = client.post(
         f"/v1/projects/{project_id}/developer-promotions",
-        json=_promotion_body(review_id),
+        json=_ace88_signed_promotion_body(repo, project_id, review_id),
     )
 
     assert response.status_code == 200
@@ -435,7 +462,7 @@ def test_v1_developer_promotion_is_idempotent_over_http(tmp_path: Path):
     client.post("/v1/projects", json={"project_id": project_id, "name": "Promotion"})
     _record_promotable_developer_proposal(client, project_id)
     review_id = _approve_promotable_developer_proposal(client, project_id)
-    body = _promotion_body(review_id)
+    body = _ace88_signed_promotion_body(repo, project_id, review_id)
 
     first = client.post(f"/v1/projects/{project_id}/developer-promotions", json=body)
     second = client.post(f"/v1/projects/{project_id}/developer-promotions", json=body)
@@ -458,7 +485,7 @@ def test_v1_developer_promotion_restart_durability(tmp_path: Path):
     client.post("/v1/projects", json={"project_id": project_id, "name": "Promotion"})
     _record_promotable_developer_proposal(client, project_id)
     review_id = _approve_promotable_developer_proposal(client, project_id)
-    request = _promotion_body(review_id)
+    request = _ace88_signed_promotion_body(repo, project_id, review_id)
     first = client.post(f"/v1/projects/{project_id}/developer-promotions", json=request)
     assert first.status_code == 200
     snapshot_id = first.json()["data"]["snapshot_id"]

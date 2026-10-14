@@ -6,6 +6,8 @@ IFC/ledger publication is a convergent effect after the D-2 snapshot commit.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+from .human_authority_crypto import verify_approval, canonical_bytes, HumanAuthorityError
 from typing import Any, Literal
 
 from pydantic import ValidationError
@@ -207,6 +209,8 @@ def promote_developer_proposal(
     human_review_id: str,
     ledger: DerivationLedger,
     ifc_path: str | None = None,
+    approval_payload: dict[str, Any] | None = None,
+    approval_signature_b64: str | None = None,
 ) -> PromotionOutcome:
     if not isinstance(project_id, str) or not project_id.strip():
         return PromotionOutcome(False, proposal_id, reason="PROJECT_NOT_FOUND")
@@ -242,6 +246,38 @@ def promote_developer_proposal(
     ):
         return _reject(repo, project_id, proposal_id, proposal_fingerprint, human_review_id,
                        "HUMAN_REVIEW_BINDING_MISMATCH", review.actor)
+
+    # Trust anchor is the offline-provisioned, project-scoped key registry.
+    if not isinstance(approval_payload, dict) or not isinstance(approval_signature_b64, str):
+        return _reject(repo, project_id, proposal_id, proposal_fingerprint,
+                       human_review_id, "HUMAN_AUTHORITY_PROOF_REQUIRED", review.actor)
+    key_id = approval_payload.get("keyId")
+    if not isinstance(key_id, str):
+        return _reject(repo, project_id, proposal_id, proposal_fingerprint,
+                       human_review_id, "INVALID_AUTHORITY_KEY", review.actor)
+    trusted = repo.trusted_authority_key(project_id, key_id)
+    if trusted is None or trusted["actor_id"] != review.actor or review.authority != "PRODUCT_OWNER":
+        return _reject(repo, project_id, proposal_id, proposal_fingerprint,
+                       human_review_id, "HUMAN_AUTHORITY_NOT_TRUSTED", review.actor)
+    try:
+        verified = verify_approval(
+            payload=approval_payload, signature_b64=approval_signature_b64,
+            public_key_b64=trusted["public_key_b64"], project_id=project_id,
+            proposal_id=proposal_id, fingerprint=proposal_fingerprint,
+            review_id=human_review_id, key_id=key_id,
+        )
+        if verified["actorId"] != review.actor:
+            raise HumanAuthorityError("AUTHORITY_ACTOR_MISMATCH")
+    except (HumanAuthorityError, TypeError, ValueError):
+        return _reject(repo, project_id, proposal_id, proposal_fingerprint,
+                       human_review_id, "HUMAN_AUTHORITY_INVALID", review.actor)
+    authority_proof = {
+        "nonce": verified["nonce"], "review_id": human_review_id,
+        "proposal_id": proposal_id, "fingerprint": proposal_fingerprint,
+        "actor_id": review.actor, "key_id": key_id,
+        "payload_json": canonical_bytes(verified).decode("utf-8"),
+        "signature_b64": approval_signature_b64,
+    }
 
     if proposal.proposed_relations:
         return _reject(repo, project_id, proposal_id, proposal_fingerprint, human_review_id,
@@ -297,6 +333,7 @@ def promote_developer_proposal(
                 "proposal_fingerprint": proposal_fingerprint,
                 "human_review_id": human_review_id,
             },
+            authority_proof=authority_proof,
         )
     except Exception:
         return _reject(repo, project_id, proposal_id, proposal_fingerprint, human_review_id,

@@ -1111,6 +1111,8 @@ def developer_promotion(
         proposal_id=body.proposal_id,
         proposal_fingerprint=body.proposal_fingerprint,
         human_review_id=body.human_review_id,
+        approval_payload=body.approval_payload,
+        approval_signature_b64=body.approval_signature_b64,
         ledger=DerivationLedger(repo),
     )
     project = repo.get_project(project_id)

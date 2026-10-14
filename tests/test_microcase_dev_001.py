@@ -114,6 +114,33 @@ def _promotion_body(review_id: str, fingerprint: str = FINGERPRINT) -> dict:
     }
 
 
+
+
+def _ace88_signed_microcase(repo, review_id: str) -> dict:
+    import base64
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+    from sicl.human_authority_crypto import ACTION, CONTRACT, canonical_bytes
+
+    private = Ed25519PrivateKey.generate()
+    key_id = "ace88-microcase-" + secrets.token_hex(12)
+    public = base64.b64encode(private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()
+    repo.register_authority_key_offline(project_id=PROJECT_ID, key_id=key_id,
+                                        actor_id="architect", public_key_b64=public)
+    now = datetime.now(timezone.utc)
+    payload = dict(contract=CONTRACT, action=ACTION, projectId=PROJECT_ID,
+                   proposalId=PROPOSAL_ID, fingerprint=FINGERPRINT,
+                   actorId="architect", reviewId=review_id, keyId=key_id,
+                   decision="APPROVED", issuedAt=(now-timedelta(seconds=5)).isoformat(),
+                   expiresAt=(now+timedelta(seconds=120)).isoformat(),
+                   nonce=secrets.token_hex(20))
+    body = _promotion_body(review_id)
+    body.update(approval_payload=payload,
+                approval_signature_b64=base64.b64encode(private.sign(canonical_bytes(payload))).decode())
+    return body
+
 def test_microcase_dev_001_full_promotion_chain_and_restart(tmp_path: Path):
     db_path = tmp_path / "microcase-dev-001.sqlite"
     repo = SQLiteRepository(db_path, check_same_thread=False)
@@ -130,7 +157,7 @@ def test_microcase_dev_001_full_promotion_chain_and_restart(tmp_path: Path):
 
     first = client.post(
         f"/v1/projects/{PROJECT_ID}/developer-promotions",
-        json=_promotion_body(review_id),
+        json=_ace88_signed_microcase(repo, review_id),
     )
     assert first.status_code == 200
     first_data = first.json()["data"]

@@ -87,10 +87,39 @@ def setup_repo(*, payload=None, execution_fp=FP, review_status="APPROVED", bind_
     return repo
 
 
+
+
+def _ace88_proof(repo):
+    import base64
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+    from sicl.human_authority_crypto import ACTION, CONTRACT, canonical_bytes
+
+    private = Ed25519PrivateKey.generate()
+    key_id = "ace88-test-" + secrets.token_hex(12)
+    public = base64.b64encode(private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()
+    repo.register_authority_key_offline(project_id=PROJECT, key_id=key_id,
+                                        actor_id="architect", public_key_b64=public)
+    now = datetime.now(timezone.utc)
+    payload = dict(contract=CONTRACT, action=ACTION, projectId=PROJECT,
+                   proposalId=PROPOSAL, fingerprint=FP, actorId="architect",
+                   reviewId=REVIEW, keyId=key_id, decision="APPROVED",
+                   issuedAt=(now-timedelta(seconds=5)).isoformat(),
+                   expiresAt=(now+timedelta(seconds=120)).isoformat(),
+                   nonce=secrets.token_hex(20))
+    return dict(approval_payload=payload,
+                approval_signature_b64=base64.b64encode(private.sign(canonical_bytes(payload))).decode())
+
 def run(repo, **overrides):
     args = dict(repo=repo, project_id=PROJECT, proposal_id=PROPOSAL,
                 proposal_fingerprint=FP, human_review_id=REVIEW,
                 ledger=DerivationLedger(repo))
+    # Supply a valid ephemeral authority proof to exercise downstream validations.
+    # Earlier validation failures retain their original precedence.
+    if repo.get_project(PROJECT) is not None:
+        args.update(_ace88_proof(repo))
     args.update(overrides)
     return dp.promote_developer_proposal(**args)
 

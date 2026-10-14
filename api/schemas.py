@@ -384,6 +384,8 @@ class DeveloperPromotionRequest(BaseModel):
     proposal_id: str = Field(min_length=1)
     proposal_fingerprint: str = Field(min_length=64, max_length=64)
     human_review_id: str = Field(min_length=1)
+    approval_payload: dict[str, Any] | None = None
+    approval_signature_b64: str | None = None
 
     @model_validator(mode="after")
     def _validate_fingerprint(self):

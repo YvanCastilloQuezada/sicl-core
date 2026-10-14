@@ -414,6 +414,39 @@ class SQLiteRepository:
         objective_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(objectives)")}
         if "source_parent_objective_id" not in objective_columns:
             self.conn.execute("ALTER TABLE objectives ADD COLUMN source_parent_objective_id TEXT NULL")
+        # ACE88: persistent provenance for verified human approvals.
+        # Historical reviews remain unchanged and untrusted for promotion.
+        self.conn.executescript("""
+        CREATE TABLE IF NOT EXISTS human_authority_keys (
+            key_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(project_id),
+            actor_id TEXT NOT NULL,
+            public_key_b64 TEXT NOT NULL,
+            registered_at TEXT NOT NULL,
+            revoked_at TEXT
+        );
+        CREATE TRIGGER IF NOT EXISTS human_authority_keys_no_delete
+        BEFORE DELETE ON human_authority_keys
+        BEGIN SELECT RAISE(ABORT, 'authority keys cannot be deleted'); END;
+        CREATE TABLE IF NOT EXISTS human_authority_proofs (
+            nonce TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(project_id),
+            review_id TEXT NOT NULL UNIQUE REFERENCES human_reviews(review_id),
+            proposal_id TEXT NOT NULL,
+            proposal_fingerprint TEXT NOT NULL,
+            actor_id TEXT NOT NULL,
+            key_id TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            signature_b64 TEXT NOT NULL,
+            verified_at TEXT NOT NULL
+        );
+        CREATE TRIGGER IF NOT EXISTS human_authority_proofs_no_update
+        BEFORE UPDATE ON human_authority_proofs
+        BEGIN SELECT RAISE(ABORT, 'authority proofs are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS human_authority_proofs_no_delete
+        BEFORE DELETE ON human_authority_proofs
+        BEGIN SELECT RAISE(ABORT, 'authority proofs are append-only'); END;
+        """)
         review_columns = {row["name"] for row in self.conn.execute("PRAGMA table_info(human_reviews)")}
         if "referenced_entity_type" not in review_columns:
             self.conn.execute("ALTER TABLE human_reviews ADD COLUMN referenced_entity_type TEXT NULL")
@@ -535,6 +568,40 @@ class SQLiteRepository:
         with self.transaction():
             return [self._insert_event(event) for event in events]
 
+    def trusted_authority_key(self, project_id: str, key_id: str):
+        return self.conn.execute(
+            "SELECT * FROM human_authority_keys WHERE project_id=? AND key_id=? AND revoked_at IS NULL",
+            (project_id, key_id),
+        ).fetchone()
+
+    def register_authority_key_offline(self, *, project_id: str, key_id: str,
+                                       actor_id: str, public_key_b64: str) -> None:
+        """Administrative offline-only operation. Never expose through service-token HTTP."""
+        import base64
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        if not all(isinstance(x, str) and x.strip()
+                   for x in (project_id, key_id, actor_id, public_key_b64)):
+            raise ValueError("INVALID_AUTHORITY_KEY")
+        Ed25519PublicKey.from_public_bytes(base64.b64decode(public_key_b64, validate=True))
+        if self.get_project(project_id) is None:
+            raise ValueError("PROJECT_NOT_FOUND")
+        self.conn.execute(
+            "INSERT INTO human_authority_keys VALUES (?,?,?,?,?,NULL)",
+            (key_id, project_id, actor_id, public_key_b64, now_iso()),
+        )
+        self.conn.commit()
+
+    def revoke_authority_key_offline(self, project_id: str, key_id: str) -> None:
+        """Administrative offline-only revocation."""
+        cursor = self.conn.execute(
+            "UPDATE human_authority_keys SET revoked_at=? WHERE project_id=? AND key_id=? AND revoked_at IS NULL",
+            (now_iso(), project_id, key_id),
+        )
+        if cursor.rowcount != 1:
+            self.conn.rollback()
+            raise ValueError("AUTHORITY_KEY_NOT_ACTIVE")
+        self.conn.commit()
+
     def insert_d2_snapshot_and_event(
         self,
         project_id: str,
@@ -544,6 +611,7 @@ class SQLiteRepository:
         *,
         event_type: str = "D2_SNAPSHOT_COMMITTED",
         event_payload: Mapping[str, Any] | None = None,
+        authority_proof: Mapping[str, Any] | None = None,
     ) -> D2Snapshot:
         """Atomically append one canonical D-2 snapshot and its audit event.
 
@@ -573,6 +641,19 @@ class SQLiteRepository:
         content_hash = elements_content_hash(raw)
         created_at = now_iso()
         with self.transaction():
+            if event_type == "DEVELOPER_PROMOTION_COMMITTED":
+                if authority_proof is None:
+                    raise ValueError("HUMAN_AUTHORITY_PROOF_REQUIRED")
+                self.conn.execute(
+                    """INSERT INTO human_authority_proofs
+                    (nonce, project_id, review_id, proposal_id, proposal_fingerprint,
+                     actor_id, key_id, payload_json, signature_b64, verified_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    (authority_proof["nonce"], project_id, authority_proof["review_id"],
+                     authority_proof["proposal_id"], authority_proof["fingerprint"],
+                     authority_proof["actor_id"], authority_proof["key_id"],
+                     authority_proof["payload_json"], authority_proof["signature_b64"], now_iso()),
+                )
             row = self.conn.execute(
                 "SELECT COALESCE(MAX(version), 0) AS version FROM d2_snapshots WHERE project_id=?",
                 (project_id,),

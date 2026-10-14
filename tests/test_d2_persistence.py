@@ -214,15 +214,55 @@ def test_deserialize_valid_references_still_round_trip():
 
 
 
+
+
+def _ace88_persistence_proof(repo, actor="architect"):
+    import base64
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+    from sicl.human_authority_crypto import ACTION, CONTRACT, canonical_bytes
+
+    review_id = "ace88-review-" + secrets.token_hex(12)
+    key_id = "ace88-key-" + secrets.token_hex(12)
+    private = Ed25519PrivateKey.generate()
+    public = base64.b64encode(private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)).decode()
+    repo.register_authority_key_offline(project_id="P", key_id=key_id,
+                                        actor_id=actor, public_key_b64=public)
+    repo.conn.execute(
+        """INSERT INTO human_reviews
+        (review_id, project_id, actor, timestamp, review, reason, authority, status,
+         version, referenced_entity_type, referenced_entity_id, referenced_fingerprint)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (review_id, "P", actor, now_iso(), "Test approval", "Test-only signed proof",
+         "PRODUCT_OWNER", "APPROVED", 1, "DEVELOPER_PROPOSAL", "dev-prop-1", "a"*64),
+    )
+    repo.conn.commit()
+    now = datetime.now(timezone.utc)
+    payload = dict(contract=CONTRACT, action=ACTION, projectId="P",
+                   proposalId="dev-prop-1", fingerprint="a"*64,
+                   actorId=actor, reviewId=review_id, keyId=key_id,
+                   decision="APPROVED", issuedAt=(now-timedelta(seconds=5)).isoformat(),
+                   expiresAt=(now+timedelta(seconds=120)).isoformat(),
+                   nonce=secrets.token_hex(20))
+    return dict(nonce=payload["nonce"], review_id=review_id,
+                proposal_id="dev-prop-1", fingerprint="a"*64,
+                actor_id=actor, key_id=key_id,
+                payload_json=canonical_bytes(payload).decode(),
+                signature_b64=base64.b64encode(private.sign(canonical_bytes(payload))).decode())
+
 def test_custom_d2_event_type_is_persisted_and_bound_to_snapshot():
     repo = SQLiteRepository()
     project(repo)
+    proof = _ace88_persistence_proof(repo, actor="architect")
     committed = repo.insert_d2_snapshot_and_event(
         "P",
         elements(),
         "architect",
         "ARKI_DEVELOPER_PROMOTION",
         event_type="DEVELOPER_PROMOTION_COMMITTED",
+        authority_proof=proof,
     )
     event = next(item for item in repo.events("P") if item.type == "DEVELOPER_PROMOTION_COMMITTED")
     assert event.id == committed.source_event_id
@@ -233,12 +273,14 @@ def test_custom_d2_event_type_is_persisted_and_bound_to_snapshot():
 def test_custom_d2_event_payload_preserves_additional_metadata():
     repo = SQLiteRepository()
     project(repo)
+    proof = _ace88_persistence_proof(repo, actor="review.actor")
     repo.insert_d2_snapshot_and_event(
         "P",
         elements(),
         "review.actor",
         "ARKI_DEVELOPER_PROMOTION",
         event_type="DEVELOPER_PROMOTION_COMMITTED",
+        authority_proof=proof,
         event_payload={
             "proposal_id": "dev-prop-1",
             "proposal_fingerprint": "a" * 64,
@@ -283,6 +325,7 @@ def test_custom_d2_event_payload_cannot_override_canonical_fields(reserved_field
 def test_custom_d2_event_is_atomic_when_snapshot_insert_fails():
     repo = SQLiteRepository()
     project(repo)
+    proof = _ace88_persistence_proof(repo, actor="architect")
     repo.conn.executescript("""
     CREATE TRIGGER force_custom_d2_insert_failure
     BEFORE INSERT ON d2_snapshots
@@ -296,6 +339,7 @@ def test_custom_d2_event_is_atomic_when_snapshot_insert_fails():
             "architect",
             "ARKI_DEVELOPER_PROMOTION",
             event_type="DEVELOPER_PROMOTION_COMMITTED",
+        authority_proof=proof,
             event_payload={"proposal_id": "dev-prop-1"},
         )
     assert repo.get_d2("P") is None
@@ -306,19 +350,23 @@ def test_custom_d2_event_keeps_project_version_and_advances_only_d2_version():
     repo = SQLiteRepository()
     project(repo)
     project_version = repo.get_project("P").version
+    proof1 = _ace88_persistence_proof(repo, actor="architect")
     first = repo.insert_d2_snapshot_and_event(
         "P",
         elements(),
         "architect",
         "ARKI_DEVELOPER_PROMOTION",
         event_type="DEVELOPER_PROMOTION_COMMITTED",
+        authority_proof=proof1,
     )
+    proof2 = _ace88_persistence_proof(repo, actor="architect")
     second = repo.insert_d2_snapshot_and_event(
         "P",
         elements(),
         "architect",
         "ARKI_DEVELOPER_PROMOTION",
         event_type="DEVELOPER_PROMOTION_COMMITTED",
+        authority_proof=proof2,
     )
     assert repo.get_project("P").version == project_version
     assert first.version == 1
