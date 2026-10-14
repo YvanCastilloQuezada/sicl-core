@@ -77,3 +77,11 @@ El ciclo debe aplicarse tanto a carencias internas del software como a carencias
 > «Avanza con esto: llenar el 00-start para tu próximo chat, y eso hazlo automáticamente.»
 
 Este archivo es el handoff inicial persistente. **La actualización futura automática no está programada ni implementada por este commit**: debe incorporarse como parte del flujo de entrega/CI, con validación y sin inventar evidencia.
+
+## 8. Avance Mapa Vivo V1 (2026-10-14)
+
+- Generador de grafo observacional añadido: `tools/arki_mapa_vivo.py`.
+- Contrato de validación: `docs/arki-automejora/ARKI_MAPA_VIVO_V1.md`.
+- Commit de documentación: `8f842f33d235cc12baa94164f975246d28584562`.
+- Estado: código publicado en rama; ejecución local, cobertura real F1–F10 y mapa interactivo pendientes de validar.
+- Próxima acción: `git pull --ff-only` en ARKI-02, ejecutar generador fuera del repositorio, comprobar salida y aportar evidencia; después implementar detector de ciclos y propagación.
