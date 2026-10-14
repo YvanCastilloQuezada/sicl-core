@@ -86,11 +86,11 @@ def test_evolution_table_is_append_only(tmp_path):
 
 
 def test_evolution_http_endpoints(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     repo = SQLiteRepository(tmp_path / "http.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
     try:
-        client = TestClient(app)
+        client = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
         assert client.post('/v1/projects', json={"project_id": "HTTP-EVO", "name": "HTTP evolution"}).status_code == 200
         assert client.post('/v1/projects/HTTP-EVO/cycles', json={"cycle_id": "C-2030", "horizon": "2030", "start_date": "2026-01-01"}).status_code == 200
         assert client.post('/v1/projects/HTTP-EVO/cycles', json={"cycle_id": "C-2040", "horizon": "2040", "start_date": "2026-01-01"}).status_code == 200

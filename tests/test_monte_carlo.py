@@ -62,11 +62,11 @@ def test_monte_carlo_rejects_unknown_parameter_and_invalid_distribution(tmp_path
 
 
 def test_monte_carlo_http_endpoint(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     repo = SQLiteRepository(tmp_path / "mc-http.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}) as client:
             client.post("/v1/projects", json={"project_id": "P-MC-HTTP", "name": "Monte Carlo"})
             objective = client.post("/v1/projects/P-MC-HTTP/commands", json={"command": "/OBJECTIVE SET ENERGY_SAVINGS MAXIMIZE 80"}).json()["data"]["objective_id"]
             alternative = client.post("/v1/projects/P-MC-HTTP/commands", json={"command": "/ALTERNATIVE CREATE Alpha"}).json()["data"]["alternative_id"]

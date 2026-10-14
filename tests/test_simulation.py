@@ -20,10 +20,10 @@ def setup_project(client: TestClient) -> tuple[str, str, str]:
 
 
 def configured_client(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     repo = SQLiteRepository(tmp_path / "simulation.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    return repo, TestClient(app)
+    return repo, TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
 
 
 def test_methods_catalog_has_all_implemented_methods(tmp_path):
@@ -159,18 +159,18 @@ def test_simulation_does_not_create_recommendation_or_decision(tmp_path, monkeyp
 
 
 def test_simulation_persists_after_restart(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     db = tmp_path / "restart.sqlite"
     repo = SQLiteRepository(db, check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    with TestClient(app) as client:
+    with TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}) as client:
         objective_id, alternative_id, project_id = setup_project(client)
         client.post(f"/v1/projects/{project_id}/simulations", json={"simulation_type": "DETERMINISTIC", "method": "deterministic_basic_v1", "inputs": {"alternative_id": alternative_id, "objective_id": objective_id, "parameter_value": 82}})
     repo.close()
     restarted = SQLiteRepository(db, check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: restarted
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}) as client:
             assert len(client.get(f"/v1/projects/{project_id}/simulations").json()["data"]["simulations"]) == 1
     finally:
         app.dependency_overrides.clear()

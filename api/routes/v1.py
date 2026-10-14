@@ -129,7 +129,10 @@ def _find_existing_reasoning_event(repo: SQLiteRepository, project_id: str, exec
 def _auth(authorization: str | None = Header(default=None)) -> None:
     expected = os.getenv("SICL_CORE_SERVICE_TOKEN", "").strip()
     if not expected:
-        return
+        raise HTTPException(
+            status_code=401,
+            detail="Core service authentication is not configured",
+        )
     if authorization != f"Bearer {expected}":
         raise HTTPException(status_code=401, detail="Invalid or missing service token")
 

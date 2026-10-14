@@ -83,11 +83,11 @@ def test_actor_tables_are_append_only(tmp_path):
 
 
 def test_multi_actor_http_endpoints(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     repo = SQLiteRepository(tmp_path / "http.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
     try:
-        client = TestClient(app)
+        client = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
         created = client.post('/v1/projects', json={"project_id": "HTTP-ACT", "name": "HTTP actors"})
         assert created.status_code == 200
         actor = client.post('/v1/projects/HTTP-ACT/actors', json={"actor_id": "A-1", "role": "CLIENT", "name": "Client", "authority_level": "ADVISORY", "interests": ["cost"]})

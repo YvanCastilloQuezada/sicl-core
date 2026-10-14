@@ -117,22 +117,22 @@ def test_multiobjective_survives_restart_and_is_append_only(tmp_path):
 
 
 def test_http_multiobjective_endpoints(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     repo = SQLiteRepository(tmp_path / "http.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
     try:
         cli, _, _, _ = setup_project(repo)
-        created = TestClient(app).post('/v1/projects/P-MOBJ/multiobjective/pareto', json={"objectives": ["ENERGY_SAVINGS", "CONSTRUCTION_COST"]})
+        created = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}).post('/v1/projects/P-MOBJ/multiobjective/pareto', json={"objectives": ["ENERGY_SAVINGS", "CONSTRUCTION_COST"]})
         assert created.status_code == 200
         body = created.json()
         result_id = body["data"]["multiobjective"]["multiobjective_id"]
         assert body["contract_version"] == "1.0"
-        tradeoffs = TestClient(app).post('/v1/projects/P-MOBJ/multiobjective/tradeoffs', json={"objectives": ["ENERGY_SAVINGS", "CONSTRUCTION_COST"]})
+        tradeoffs = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}).post('/v1/projects/P-MOBJ/multiobjective/tradeoffs', json={"objectives": ["ENERGY_SAVINGS", "CONSTRUCTION_COST"]})
         assert tradeoffs.status_code == 200
-        listed = TestClient(app).get('/v1/projects/P-MOBJ/multiobjective')
+        listed = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}).get('/v1/projects/P-MOBJ/multiobjective')
         assert listed.status_code == 200
         assert len(listed.json()["data"]["multiobjectives"]) == 2
-        individual = TestClient(app).get(f'/v1/projects/P-MOBJ/multiobjective/{result_id}')
+        individual = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}).get(f'/v1/projects/P-MOBJ/multiobjective/{result_id}')
         assert individual.status_code == 200
         assert individual.json()["project_id"] == "P-MOBJ"
     finally:

@@ -10,10 +10,10 @@ from sicl.design_principles import PRINCIPLES
 
 
 def configured_client(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     repo = SQLiteRepository(tmp_path / "design.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    return repo, TestClient(app)
+    return repo, TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
 
 
 def test_http_catalog_returns_fifteen_sourced_principles(tmp_path, monkeypatch):

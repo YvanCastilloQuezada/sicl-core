@@ -127,10 +127,10 @@ def test_append_only_triggers_for_regulatory_tables(tmp_path):
 
 
 def test_regulatory_http_endpoints_and_envelope(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     repo = SQLiteRepository(tmp_path / "api.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    client = TestClient(app)
+    client = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
     try:
         project = client.post('/v1/projects', json={"project_id": "P-API", "name": "API project"})
         assert project.status_code in (200, 201)

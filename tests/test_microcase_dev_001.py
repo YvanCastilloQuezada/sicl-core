@@ -11,7 +11,7 @@ from sicl.repository import SQLiteRepository
 
 @pytest.fixture(autouse=True)
 def clear_service_token(monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
 
 
 PROJECT_ID = "ARK-DEV-001-001"
@@ -21,7 +21,7 @@ FINGERPRINT = "d" * 64
 
 def _client(repo: SQLiteRepository) -> TestClient:
     app.dependency_overrides[get_repository] = lambda: repo
-    return TestClient(app)
+    return TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
 
 
 def _proposal() -> dict:

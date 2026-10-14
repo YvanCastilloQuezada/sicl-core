@@ -10,14 +10,14 @@ from sicl.repository import SQLiteRepository
 
 @pytest.fixture(autouse=True)
 def clear_service_token(monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
 
 
 @pytest.fixture
 def ctx(tmp_path: Path):
     repo = SQLiteRepository(tmp_path / "reasoning.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    client = TestClient(app)
+    client = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
     client.post("/v1/projects", json={"project_id": "R-P", "name": "Reasoning"})
     yield client, repo
     repo.close()

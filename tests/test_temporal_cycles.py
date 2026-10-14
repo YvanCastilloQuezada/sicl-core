@@ -79,11 +79,11 @@ def test_selection_is_versioned_append_only_and_past_cycle_unchanged(tmp_path):
 
 
 def test_http_temporal_endpoints(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     repo = SQLiteRepository(tmp_path / "http.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
     try:
-        client = TestClient(app)
+        client = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
         assert client.post('/v1/projects', json={"project_id": "HTTP-T", "name": "Temporal HTTP"}).status_code == 200
         cycle = client.post('/v1/projects/HTTP-T/cycles', json={"cycle_id": "C-2040", "horizon": "2040", "start_date": "2026-01-01", "assumptions": ["stable demand"]})
         assert cycle.status_code == 200

@@ -14,7 +14,7 @@ from sicl.repository import SQLiteRepository
 
 @pytest.fixture(autouse=True)
 def clear_service_token(monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
 
 
 def prepare_closed(repo: SQLiteRepository, project_id: str = "MEM-SOURCE") -> CLI:
@@ -130,7 +130,7 @@ def test_memory_is_persistent_and_append_only(tmp_path: Path):
 def test_http_memory_endpoints(tmp_path: Path):
     repo = SQLiteRepository(tmp_path / "memory-api.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    client = TestClient(app)
+    client = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
     assert client.post('/v1/projects', json={"project_id": "HTTP-MEM", "name": "Source"}).status_code == 200
     client.post('/v1/projects/HTTP-MEM/commands', json={"command": "/PREFERENCE SET \"Prefer low energy\" OWNER"})
     client.post('/v1/projects/HTTP-MEM/commands', json={"command": "/STAGE SET CLOSED"})

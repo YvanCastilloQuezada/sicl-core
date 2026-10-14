@@ -11,14 +11,14 @@ from sicl.archi import ArchiElement, ArchiElementId, ArchiGeometry, ElementKind,
 
 
 @pytest.fixture(autouse=True)
-def clear_service_token(monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+def configure_service_token(monkeypatch):
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
 
 
 def client_for(tmp_path: Path):
     repo = SQLiteRepository(tmp_path / "v1.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    return TestClient(app), repo
+    return TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}), repo
 
 
 def close(repo: SQLiteRepository) -> None:
@@ -453,7 +453,7 @@ def test_v1_developer_promotion_restart_durability(tmp_path: Path):
     db_path = tmp_path / "promotion-restart.sqlite"
     repo = SQLiteRepository(db_path, check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    client = TestClient(app)
+    client = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
     project_id = "V1-PROMOTE-RESTART"
     client.post("/v1/projects", json={"project_id": project_id, "name": "Promotion"})
     _record_promotable_developer_proposal(client, project_id)
@@ -467,7 +467,7 @@ def test_v1_developer_promotion_restart_durability(tmp_path: Path):
 
     reopened = SQLiteRepository(db_path, check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: reopened
-    restarted_client = TestClient(app)
+    restarted_client = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
     replay = restarted_client.post(
         f"/v1/projects/{project_id}/developer-promotions",
         json=request,

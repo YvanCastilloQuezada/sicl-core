@@ -107,10 +107,10 @@ def test_source_table_has_canonical_shape():
 
 def test_http_evidence_create_list_get_and_hash(tmp_path, monkeypatch):
     repo = SQLiteRepository(tmp_path / "api-evidence.sqlite", check_same_thread=False)
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     app.dependency_overrides[get_repository] = lambda: repo
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}) as client:
             created_project = client.post("/v1/projects", json={"project_id": "P-API-E", "name": "API Evidence"})
             assert created_project.status_code == 200
             created = client.post("/v1/projects/P-API-E/evidence", json={"evidence_id": "E-API", "statement": "API observation", "evidence_type": "OBSERVATION"})
@@ -132,10 +132,10 @@ def test_http_evidence_create_list_get_and_hash(tmp_path, monkeypatch):
 
 def test_http_evidence_invalid_type_and_duplicate_are_rejected(tmp_path, monkeypatch):
     repo = SQLiteRepository(tmp_path / "api-evidence-errors.sqlite", check_same_thread=False)
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     app.dependency_overrides[get_repository] = lambda: repo
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}) as client:
             client.post("/v1/projects", json={"project_id": "P-API-ERR", "name": "API Evidence"})
             invalid = client.post("/v1/projects/P-API-ERR/evidence", json={"evidence_id": "E-ERR", "statement": "Bad", "evidence_type": "BAD"})
             assert invalid.status_code == 400

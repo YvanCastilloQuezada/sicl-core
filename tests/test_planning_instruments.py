@@ -96,10 +96,10 @@ def test_planning_append_only(tmp_path):
 
 
 def test_planning_http_catalog_filters_and_link(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     repo = SQLiteRepository(tmp_path / "planning-http.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    client = TestClient(app)
+    client = TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
     try:
         cli = CLI(repo)
         cli.execute('/PROJECT CREATE P-HTTP "HTTP"')

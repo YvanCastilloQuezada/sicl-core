@@ -15,10 +15,10 @@ def setup_project(client: TestClient) -> None:
 
 
 def client_for(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     repo = SQLiteRepository(tmp_path / "rfc5.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    return repo, TestClient(app)
+    return repo, TestClient(app, headers={"Authorization": "Bearer ace88-test-token"})
 
 
 def test_post_evaluation_valid_and_get_list_and_filter(tmp_path, monkeypatch):
@@ -123,11 +123,11 @@ def test_evaluation_and_comparison_do_not_create_recommendation_or_decision(tmp_
 
 
 def test_evaluation_and_comparison_persist_after_restart(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     db = tmp_path / "restart.sqlite"
     repo = SQLiteRepository(db, check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    with TestClient(app) as client:
+    with TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}) as client:
         setup_project(client)
         client.post("/v1/projects/P-RFC5/evaluations", json={"alternative": "Alpha", "objective": "ENERGY_SAVINGS", "value": 82})
         client.post("/v1/projects/P-RFC5/comparisons", json={"alternatives": ["Alpha", "Beta"]})
@@ -135,7 +135,7 @@ def test_evaluation_and_comparison_persist_after_restart(tmp_path, monkeypatch):
     restarted = SQLiteRepository(db, check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: restarted
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}) as client:
             assert len(client.get("/v1/projects/P-RFC5/evaluations").json()["data"]["evaluations"]) == 1
             assert len(client.get("/v1/projects/P-RFC5/comparisons").json()["data"]["comparisons"]) == 1
     finally:

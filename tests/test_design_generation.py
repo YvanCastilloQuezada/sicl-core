@@ -16,7 +16,7 @@ from sicl.repository import SQLiteRepository
 
 @pytest.fixture(autouse=True)
 def clear_service_token(monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
 
 
 def cli_for(tmp_path: Path, project_id: str = "GEN-P"):
@@ -30,7 +30,7 @@ def cli_for(tmp_path: Path, project_id: str = "GEN-P"):
 def client_for(tmp_path: Path):
     repo = SQLiteRepository(tmp_path / "api-generation.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    return TestClient(app), repo
+    return TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}), repo
 
 
 def close(repo: SQLiteRepository):

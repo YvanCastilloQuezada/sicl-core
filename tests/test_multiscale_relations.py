@@ -71,11 +71,11 @@ def test_relation_survives_reload(tmp_path):
 
 
 def test_http_scales_and_relation_and_import(tmp_path, monkeypatch):
-    monkeypatch.delenv('SICL_CORE_SERVICE_TOKEN', raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     repo = SQLiteRepository(tmp_path / 'api.sqlite', check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}) as client:
             assert client.get('/v1/scales').status_code == 200
             assert client.post('/projects', json={'project_id': 'REGION', 'name': 'Region', 'spatial_scope': 'region'}).status_code == 201
             assert client.post('/projects', json={'project_id': 'CITY', 'name': 'City', 'spatial_scope': 'distrito_ciudad'}).status_code == 201

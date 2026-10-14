@@ -91,7 +91,7 @@ def test_api_create_and_get_expose_scopes(tmp_path):
     repo = SQLiteRepository(tmp_path / "api.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}) as client:
             response = client.post("/projects", json={"project_id": "API-001", "name": "API", "spatial_scope": "region", "temporal_scope": "escenario_2040"})
             assert response.status_code == 201
             assert response.json()["data"]["spatial_scope"] == "region"
@@ -108,7 +108,7 @@ def test_api_invalid_scope_returns_bad_request(tmp_path):
     repo = SQLiteRepository(tmp_path / "api-invalid.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}) as client:
             response = client.post("/projects", json={"project_id": "API-002", "name": "API", "spatial_scope": "unknown"})
             assert response.status_code == 400
             assert response.json()["detail"]["code"] == "INVALID_SCOPE"
@@ -149,11 +149,11 @@ def test_rfc019_new_scopes_support_ancestor_relations():
 
 
 def test_rfc019_http_scales_and_project_scope_validation(tmp_path, monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "ace88-test-token")
     repo = SQLiteRepository(tmp_path / "rfc019-api.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
     try:
-        with TestClient(app) as client:
+        with TestClient(app, headers={"Authorization": "Bearer ace88-test-token"}) as client:
             scales = client.get("/v1/scales")
             assert scales.status_code == 200
             values = scales.json()["data"]["scales"]
