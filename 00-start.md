@@ -85,3 +85,16 @@ Este archivo es el handoff inicial persistente. **La actualización futura autom
 - Commit de documentación: `8f842f33d235cc12baa94164f975246d28584562`.
 - Estado: código publicado en rama; ejecución local, cobertura real F1–F10 y mapa interactivo pendientes de validar.
 - Próxima acción: `git pull --ff-only` en ARKI-02, ejecutar generador fuera del repositorio, comprobar salida y aportar evidencia; después implementar detector de ciclos y propagación.
+
+## 9. Corrección de precedencia: Mapa/Árbol/Gemelo existentes (2026-10-14)
+
+**Fuente canónica recuperada:** repositorio `YvanCastilloQuezada/sicl-web`, rama `feat/arbol-vivo-autoensamblaje-20261011` (revisar HEAD y ramas más recientes antes de cambiar). Allí **YA EXISTEN**:
+- `docs/arki-master-map/ARKI_MASTER_MAP_LIVE.md` y `ARKI_MASTER_MAP_STATE.json` — mapa maestro canónico y estado.
+- `tools/maqueta-viva/arki-arbol-vivo-auto.cjs` — ordenamiento y reconciliación de piezas, con detección de ciclos y dependencias desconocidas.
+- `tools/maqueta-viva/arki-map-adn-bridge.cjs` — puente read-only del mapa al observador de mejora continua.
+- `tools/maqueta-viva/ARBOL-GEMELO-DIGITAL.md` — Árbol Vivo, cerebro relacional y vista conceptual 3D, con límites explícitos.
+- `tools/maqueta-viva/README.md` — interfaz y pruebas locales existentes.
+
+**Corrección:** el generador `tools/arki_mapa_vivo.py` añadido recientemente a `sicl-core` es un prototipo observacional potencialmente redundante; **NO ES un mapa canónico nuevo**. No ampliarlo ni conectarlo a producción hasta una auditoría de solapamiento. No duplicar Árbol Vivo, Mapa Vivo, Gemelo o ADN. No trasladar estados documentales a PASS automáticamente.
+
+**Próximo paso:** comparar contratos, modelos de datos, fuentes y pruebas de ambas bases; identificar integración Core↔Web mínima, preservando una única fuente de verdad y el motor AGK único. Documentar qué se reutiliza, qué se depreca y qué falta; solicitar evidencia de ejecución antes de declarar nuevas capacidades.
