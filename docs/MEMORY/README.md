@@ -117,3 +117,5 @@ La auditoría 01 se amplió con el paquete de preservación de conocimiento de W
 - Los informes 02 y 05 registran el riesgo de escritura en el workflow de continuidad de Web main y el estado abierto de PR #68.
 
 - [09 — Conciliación del inventario de 209 ramas](09-conciliacion-inventario-ramas-20261021.md)
+
+- [10 — Reconciliación estática del contrato MEMORY en Core](10-reconciliacion-contrato-core-memory-20261021.md)
