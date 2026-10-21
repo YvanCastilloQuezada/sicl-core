@@ -5,13 +5,13 @@
 **Ramas descubiertas en GitHub:** 3  
 **Objetivo:** registrar cada rama por su nombre exacto y SHA, compararla contra `main`, resumir sus cambios únicos, evidencia y destino posible. Esta lista no afirma que las ramas estén integradas ni que sus pruebas hayan pasado.
 
-> Este registro es acumulativo. “Pendiente de análisis detallado” significa que solo se ha confirmado la existencia de la referencia y su SHA. La comparación contra main, commits y contenido debe incorporarse por lotes. No se eliminarán ramas ni se harán merges durante la auditoría.
+> Este registro es acumulativo. “Comparación inicial documentada; ver auditoría arki-acs-branch-audit.md” significa que solo se ha confirmado la existencia de la referencia y su SHA. La comparación contra main, commits y contenido debe incorporarse por lotes. No se eliminarán ramas ni se harán merges durante la auditoría.
 
 | Rama | SHA actual observado | Estado de auditoría |
 |---|---|---|
 | `experiment/arki-ideas-acs-20261015` | `507e0b18862e6cf13e1e72f559cca8f343411fc2` | [Auditoría](arki-acs-branch-audit.md) |
-| `feat/oece-arki-integration-v1` | `3fa4e4a799606e3595a29688223b0f50c1672ef8` | Pendiente de análisis detallado |
-| `main` | `1a48ed4426b958cb45be2599efc1e8d624baab80` | Pendiente de análisis detallado |
+| `feat/oece-arki-integration-v1` | `3fa4e4a799606e3595a29688223b0f50c1672ef8` | Comparación inicial documentada; ver auditoría arki-acs-branch-audit.md |
+| `main` | `1a48ed4426b958cb45be2599efc1e8d624baab80` | Comparación inicial documentada; ver auditoría arki-acs-branch-audit.md |
 
 ## Criterios para cerrar cada rama
 
