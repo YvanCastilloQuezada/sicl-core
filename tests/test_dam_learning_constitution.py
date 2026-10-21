@@ -56,7 +56,10 @@ def test_graduated_dna_requires_exam_and_human_review():
 
 def test_only_level_10_is_production_eligible():
     for level in GraduationLevel:
-        record = GraduationRecord("DRAWING", level)
         if level is GraduationLevel.GRADUATED_DNA:
+            # Level 10 is invalid without the evidence mandated by the model;
+            # the valid case below proves its production eligibility.
             record = GraduationRecord("DRAWING", level, ("EXAM-10",), (), "HUMAN-REVIEW-1")
+        else:
+            record = GraduationRecord("DRAWING", level)
         assert record.production_eligible is (level is GraduationLevel.GRADUATED_DNA)
