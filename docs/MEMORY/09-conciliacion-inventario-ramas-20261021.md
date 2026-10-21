@@ -33,3 +33,29 @@ Los conteos coinciden con el inventario documental actual. El registro de Core i
 La auditoría no se considerará completa hasta que: (a) cada rama tenga una clasificación de avance y relación con main; (b) las ramas críticas divergentes tengan sus archivos y dependencias contrastados; (c) los resultados de CI/test se verifiquen por SHA y logs; (d) se localicen los cómics/fuentes visuales pendientes; y (e) se escriba el contrato de integración MEMORY sin duplicar la autoridad de Core.
 
 **No se ejecutaron tests ni se hicieron merges en esta actualización.**
+
+## Revalidación de referencias remotas y PR — 2026-10-21
+
+Se volvió a consultar la API de ramas de GitHub, incluyendo todas las páginas devueltas:
+
+| Repositorio | Ramas remotas actuales observadas | SHA de `main` |
+|---|---:|---|
+| `YvanCastilloQuezada/sicl-web` | 97 | `9ae8fe504bbb964d8b89d87709ee773e64cbbacb` |
+| `YvanCastilloQuezada/sicl-core` | 109 | `de43b6b833731c87fb6277834484545bd953d76a` |
+| `YvanCastilloQuezada/arki-acs` | 3 | `1a48ed4426b958cb45be2599efc1e8d624baab80` |
+
+Los 209 nombres de ramas de los registros coinciden con las referencias remotas observadas. No se encontraron ramas faltantes ni nombres obsoletos. En el registro de Core, el SHA consignado para la propia rama MEMORY es una fotografía de su punta antes del commit que actualizó ese registro; una referencia a la punta de la misma rama dentro de un archivo versionado queda necesariamente una revisión atrás cuando ese archivo se confirma.
+
+### PR de Web reconsultados
+
+- PR #68 — `fix(arki): make continuity workflow read-only`: **OPEN, no fusionado**, head `33f3cd5b7aa1fcdac9d967a264a7618d7eb9ed0a`, base `main@9ae8fe504bbb964d8b89d87709ee773e64cbbacb`. Sigue pendiente; no se ejecutó merge ni se verificaron independientemente los logs de CI.
+- PR #58 — `ARKI: isolated autonomy memory and integrity tests (main integration 1)`: **OPEN, DRAFT, no fusionado**, head `e7237c6f8c671a7a1325fdf87d18b70b6dfda4a8`. No se debe tratar como integrado en Web main.
+
+### Comparaciones críticas reconsultadas
+
+- `sicl-core:rfc-011-institutional-memory` frente a Core main: `ahead=0, behind=249`; no presenta commits exclusivos respecto de main. La rama es histórica respecto de la base actual, pero el código y contrato de RFC-011 deben evaluarse en main, no atribuirse a una integración pendiente de esa rama.
+- `sicl-web:feat/arki-autonomy-memory-main-20261013`: `ahead=8, behind=59`; cuatro rutas exclusivas reportadas, incluido el journal `arki-autonomy-memory.cjs` y su test. Continúa sin estar integrado en main.
+- `sicl-web:fix/arki-continuity-workflow-readonly-20261021`: `ahead=7, behind=0`; modifica únicamente `.github/workflows/arki-continuity-map.yml` según la comparación. El cambio está propuesto en PR #68, aún abierto.
+
+**Límite:** esta revalidación comprueba referencias, comparaciones y metadatos de PR; no ejecuta tests ni demuestra comportamiento desplegado. La revisión profunda de ramas divergentes y la evidencia de CI siguen abiertas.
+
