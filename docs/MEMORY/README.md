@@ -100,3 +100,12 @@ Definir MEMORY como **arquitectura de continuidad con una única autoridad por c
 ## Próxima actualización
 
 Completar el inventario de fundamentos, catálogos de conceptos congelados/históricos, artefactos visuales/cómics y referencias cruzadas; después comparar contra la implementación de `main` y los branches de RFC/REVIVIR sin asumir que una rama experimental ya está integrada.
+
+
+## Actualización de fundamentos y fuentes visuales — 2026-10-21
+
+La auditoría 01 se amplió con el paquete de preservación de conocimiento de Web main: 13 libros Excel versionados, con manifest y hashes SHA-256; ingesta automática de runtime deshabilitada. También se revisaron el inventario FROZEN/histórico y el inventario de ideas/decisiones (este último corresponde a una base histórica de septiembre, no al HEAD actual).
+
+**Cómics/historietas:** se consultó la búsqueda de código de GitHub en las ramas por defecto de los tres repositorios para `comic`, `cómic`, `historieta`, `viñeta` y `storyboard`; no hubo resultados. El inventario de cómics permanece `UNKNOWN / PENDIENTE DE LOCALIZACIÓN`: la búsqueda no cubre necesariamente binarios, adjuntos, otras ramas ni archivos externos. No declarar completa esa parte de la auditoría hasta localizar las fuentes.
+
+**Siguiente trabajo:** seguir la segunda pasada por ramas divergentes y registrar diferencias verificables por SHA/PR/CI; después completar el inventario de conceptos congelados, antecedentes y cómics que no estén en el código de las ramas por defecto.
