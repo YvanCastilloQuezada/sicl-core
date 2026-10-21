@@ -1,0 +1,69 @@
+# Auditoría 1 — Fundamentos, doctrina y conocimiento preservado
+
+**Perspectiva:** identidad de ARKI, autoridad, conocimiento, precedentes y estado epistemológico.
+
+## 1. Qué declara el fundamento de Web
+
+El documento `docs/ARKI_AND_SICL_FOUNDATIONS.md` define ARKI como **Sistema de Inteligencia de Diseño Espacial Multiescala** y SICL como **Spatial Intelligence Command Language**. ARKI organiza información espacial, compara alternativas y documenta decisiones; SICL formaliza operaciones verificables sobre el modelo. El frontend es una superficie de interacción y Core es la superficie de dominio y persistencia.
+
+El documento separa explícitamente:
+- `Recommendation` de `Decision`.
+- `Fact`, `Assumption` y `Preference`.
+- Preview de mutación persistida.
+- Ayuda de interfaz de sintaxis canónica.
+- Autoridad analítica de autoridad humana.
+
+El flujo mínimo declarado es `Project → Preference → Recommendation → HumanReview → Decision → Audit`. Una decisión requiere `HumanReview`, actor y authority. Los eventos de auditoría son append-only.
+
+Fuente: [ARKI_AND_SICL_FOUNDATIONS.md](https://github.com/YvanCastilloQuezada/sicl-web/blob/main/docs/ARKI_AND_SICL_FOUNDATIONS.md), contenido consultado en `main` (SHA de archivo observado: `43f67d53ccd4c8aa0b0ec9d48fa65c1cbe112844`).
+
+## 2. Consecuencia para MEMORY
+
+MEMORY no puede ser un bloc de notas con autoridad implícita. Debe mantener tipos separados para:
+- hechos observados y su evidencia;
+- declaraciones o recuerdos procedentes de conversación;
+- decisiones y aprobaciones humanas;
+- supuestos, hipótesis y propuestas;
+- ejecuciones de pruebas y recibos;
+- estados inferidos o resúmenes generados;
+- asuntos desconocidos o no verificados.
+
+No se debe transformar un resumen en hecho, una propuesta en decisión ni una declaración de un registro en evidencia de ejecución. El contenido de continuidad debe indicar fuente, fecha, versión/commit, estado epistemológico y autoridad cuando corresponda.
+
+## 3. Conocimiento fundamental preservado
+
+La búsqueda encontró el conjunto `docs/arki-knowledge/fundamental-research/FKCG-02/` y su manifiesto. El README declara FKCG-02 como **PRESERVED / REVIEWED / NOT CANONIZED / NOT IMPLEMENTED**. Su propósito es conservar investigación fundamental como conocimiento documental; no crea por sí solo un sistema, motor, primitiva, esquema ni capacidad de runtime. El README menciona mapa de responsabilidades A–F, genealogía de fuentes, principios conservados, correcciones, UNKNOWN y brechas de demostración DG-01–DG-05.
+
+Esto significa que MEMORY debe indexar y enlazar el conocimiento preservado sin elevarlo automáticamente a norma ejecutable. El estado de cada concepto debe mantenerse visible.
+
+Fuentes:
+- [Knowledge README](https://github.com/YvanCastilloQuezada/sicl-web/blob/main/docs/arki-knowledge/README.md)
+- [FKCG-02 manifest](https://github.com/YvanCastilloQuezada/sicl-web/blob/main/docs/arki-knowledge/fundamental-research/FKCG-02/manifest.json)
+- [FKCG-02 preservation](https://github.com/YvanCastilloQuezada/sicl-web/blob/main/docs/arki-knowledge/fundamental-research/FKCG-02/FKCG-02_FUNDAMENTAL_KNOWLEDGE_PRESERVATION.md)
+
+## 4. Invariantes que MEMORY debe preservar
+
+1. Una fuente canónica por dominio; los mapas/documentos son proyecciones, no otro Event Store.
+2. Ninguna evidencia implica más de lo que realmente demuestra.
+3. El estado UNKNOWN no se elimina para producir una apariencia de completitud.
+4. Lo congelado o histórico se conserva con su condición; no se reactiva por indexarlo.
+5. Una decisión requiere actor y autoridad humanos conforme al contrato de Core.
+6. Una memoria puede ayudar a recuperar contexto, pero no decide ni ejecuta cambios canónicos por sí sola.
+7. La procedencia debe ser navegable hasta el artefacto/commit/registro de origen.
+8. Un conocimiento recuperado puede ser candidato, pero su promoción a conocimiento canónico requiere la compuerta humana pertinente.
+
+El inventario de activos congelados e ideas/decisiones debe revisarse como fuente primaria adicional antes de declarar cerrado este dictamen:
+- `docs/arki-inventory/ARKI_FROZEN_AND_HISTORICAL_ASSETS.md`
+- `docs/arki-inventory/ARKI_IDEA_AND_DECISION_INVENTORY.md`
+
+## 5. Cómics, viñetas y fundamentos visuales: estado de búsqueda
+
+Las búsquedas iniciales en el código de `sicl-web` por `comic`, `cómic`, `historieta`, `storyboard` y `viñeta` no devolvieron resultados. Tampoco se localizaron cómics con la búsqueda inicial de la biblioteca de archivos consultada anteriormente. Eso solo permite afirmar **NO LOCALIZADOS EN LAS FUENTES EXAMINADAS**, no que hayan sido eliminados ni que no existan.
+
+Para completar el requisito hace falta identificar dónde se guardaron: otro repositorio, carpeta de Drive/Library, conversación, imágenes adjuntas u otro sistema. No se debe inventar su contenido.
+
+## 6. Conclusión y pendientes
+
+La doctrina de ARKI exige que MEMORY sea una capa de continuidad trazable y no una autoridad nueva. El fundamento de Web y la memoria institucional de Core tienen fronteras compatibles en principio, pero la auditoría no demuestra aún una integración funcional extremo a extremo.
+
+**Pendiente:** inventariar todos los documentos de fundamentos, los conceptos congelados/históricos, los manifests y los cómics originales; extraer el estado de cada elemento y sus relaciones sin cambiar sus estados.
