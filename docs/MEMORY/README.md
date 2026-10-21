@@ -60,6 +60,11 @@ Se descubrieron 209 referencias: 97 en Web, 109 en Core (incluida esta rama docu
 
 **Precisión del alcance:** se han comparado las referencias de las 209 ramas contra `main` y documentado sus metadatos, estados de divergencia y lectura inicial por propósito. “Informe por rama” significa que cada rama tiene una sección identificada; no significa que se haya leído línea por línea cada commit histórico. Las ramas con commits exclusivos, diferencias de seguridad o potencial relación con MEMORY necesitan una segunda pasada de archivos/PR/CI antes de cerrar su dictamen.
 
+### Segunda pasada — código de MEMORY y continuidad
+- [06 — Hallazgos directos en ramas críticas](06-segunda-pasada-ramas-memory-criticas.md)
+
+Esta segunda pasada ya lee directamente el módulo de journal de REVIVIR, el adaptador persistente, el Living Memory experimental, el generador de Mapas Vivos y el código/tests de RFC-011 en Core. Detectó también que el catálogo histórico de ramas de Web tiene una cabeza de rama MEMORY desfasada frente a la lista actual de refs de GitHub.
+
 ## Dictamen preliminar
 
 Los repositorios ya contienen **tres capacidades relacionadas pero distintas**:
