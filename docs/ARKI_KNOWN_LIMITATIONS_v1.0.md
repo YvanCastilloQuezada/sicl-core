@@ -1,3 +1,9 @@
+> **RECONCILIATION NOTICE — 2026-10-07**
+>
+> This file is a historical v1.0 snapshot, not the current ARKI debt ledger. Several RT identifiers below were subsequently re-audited or reclassified in the cross-repository ARKI workstream. Preserve this document for lineage, but do **not** infer that every item remains open or that a deferred item is a current production defect. Current status must be reconciled against executable evidence and the ARKI Live Master Map in `sicl-web/docs/arki-master-map/` under the law `NO EVIDENCE = NO GREEN`.
+>
+> **Epistemic state:** `HISTORICAL / RECONCILIATION_REQUIRED`.
+
 # ARKI Known Limitations & Deferred Debt — v1.0
 
 Este documento formaliza las limitaciones conocidas y la deuda técnica diferida del Ciclo Cognitivo Core (H-001 a H-004).
