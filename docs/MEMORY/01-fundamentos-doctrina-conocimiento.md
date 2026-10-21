@@ -67,3 +67,38 @@ Para completar el requisito hace falta identificar dónde se guardaron: otro rep
 La doctrina de ARKI exige que MEMORY sea una capa de continuidad trazable y no una autoridad nueva. El fundamento de Web y la memoria institucional de Core tienen fronteras compatibles en principio, pero la auditoría no demuestra aún una integración funcional extremo a extremo.
 
 **Pendiente:** inventariar todos los documentos de fundamentos, los conceptos congelados/históricos, los manifests y los cómics originales; extraer el estado de cada elemento y sus relaciones sin cambiar sus estados.
+
+
+## 6. Paquete preservado de conocimiento — verificación concreta
+
+En sicl-web/main, docs/arki-knowledge/README.md y package-manifest-v1.0.json declaran un paquete documental v1.0 de 13 libros Excel preservados, con SHA-256 por archivo. La ingesta automática en runtime está deshabilitada; no se publica ni activa FFO automáticamente. El paquete conserva estas familias:
+
+1. Constitución/decisiones.
+2. Investigación/hallazgos y procedencia.
+3. Historia/evolución.
+4. Experimentos/evidencia A–AV.
+5. Capacidades/madurez.
+6. UNKNOWN, brechas y preguntas abiertas.
+7. Arquitectura FROZEN/FUTURE (FFO/V1–V24).
+8. Casos/precedentes arquitectónicos.
+9. Fuentes/biblioteca arquitectónica.
+10. Tipologías.
+11. Ideas no implementadas.
+12. Libro maestro de conocimiento arquitectónico.
+13. Formato de investigación de IA externa.
+
+Reglas expresas del paquete: RESEARCH ≠ CANONICAL KNOWLEDGE ≠ IMPLEMENTATION; HISTORICAL ≠ CURRENT; DOCUMENTED ≠ AUTHORIZED ≠ IMPLEMENTED ≠ INTEGRATED ≠ DEPLOYED; UNKNOWN BEFORE INVENTING. Los originales no deben reescribirse y el índice/corpus derivado no sustituye a los libros fuente.
+
+Fuentes consultadas en Web main:
+- [Índice del paquete](https://github.com/YvanCastilloQuezada/sicl-web/blob/main/docs/arki-knowledge/README.md) — blob SHA 449ccbc9eba7a329453a589030c10263b57de5a6.
+- [Manifest v1.0](https://github.com/YvanCastilloQuezada/sicl-web/blob/main/docs/arki-knowledge/package-manifest-v1.0.json) — blob SHA 8a33b3cbde6b9d7d9da6476d523f2c2b12b6aeb8.
+- [Inventario FROZEN/histórico, Delta 513](https://github.com/YvanCastilloQuezada/sicl-web/blob/main/docs/arki-inventory/ARKI_FROZEN_AND_HISTORICAL_ASSETS.md) — blob SHA 75efe4f6d2748336c932c6a6b204d6c5ec57b6bd.
+- [Inventario de ideas/decisiones, Delta 515](https://github.com/YvanCastilloQuezada/sicl-web/blob/main/docs/arki-inventory/ARKI_IDEA_AND_DECISION_INVENTORY.md) — blob SHA 9e629f634a4912b2de98598b0c062b6b0ff70552. Atención: ese documento declara una base histórica main@a565a909... de septiembre, no el HEAD actual; usarlo como genealogía/inventario fechado, no como fotografía actual del sistema.
+
+El inventario FROZEN insiste en que FROZEN significa preservado como evidencia/baseline, no motor activo. Entre otros ejemplos, clasifica UPAO-001 como fixture sintético y limita las afirmaciones sobre D6.2-M/D6.3-G a sus alcances conceptuales. Esto coincide con la regla de no convertir una etiqueta histórica en capacidad actual.
+
+## 7. Cómics, historietas y storyboards — resultado de búsqueda
+
+Se consultó el buscador de código de GitHub en las ramas por defecto de sicl-web, sicl-core y arki-acs para los términos comic, cómic, historieta, viñeta y storyboard. No se devolvieron resultados para esas consultas.
+
+Esto no prueba que los cómics no existan. La búsqueda de código no cubre necesariamente archivos binarios, adjuntos, otras ramas ni archivos de conversaciones externas. Su ubicación y el inventario completo de cómics siguen como UNKNOWN / PENDIENTE DE LOCALIZACIÓN. No se fabricará un catálogo ni se marcará la revisión como completa hasta localizar las fuentes.
