@@ -78,3 +78,10 @@ El nombre **MEMORY** puede representar la experiencia unificada y el contrato tr
 ## 5. Regla de avance
 
 Esta rama contiene documentación de auditoría. No se debe fusionar automáticamente. La implementación futura requiere contrato, pruebas y autorización explícita. Ningún test se marca como ejecutado sin logs del SHA exacto.
+
+
+## 6. Gate de seguridad detectado en SICL Web
+
+El workflow de continuidad en sicl-web/main tiene `contents: write`, checkout con credenciales persistentes y pasos que regeneran el mapa y hacen commit/push automático. PR #68 propone convertirlo en solo lectura; en la consulta, el PR seguía abierto y sin fusionar. El cuerpo del PR declara CI exitoso para un SHA concreto, pero ese resultado no se ha corroborado aquí con logs independientes.
+
+Este hallazgo debe entrar en el gate de MEMORY: **no considerar segura la continuidad automatizada hasta que la política de escritura esté resuelta y validada por SHA/CI**. No se hizo merge ni se modificó el workflow.
