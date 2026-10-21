@@ -109,3 +109,9 @@ La auditoría 01 se amplió con el paquete de preservación de conocimiento de W
 **Cómics/historietas:** se consultó la búsqueda de código de GitHub en las ramas por defecto de los tres repositorios para `comic`, `cómic`, `historieta`, `viñeta` y `storyboard`; no hubo resultados. El inventario de cómics permanece `UNKNOWN / PENDIENTE DE LOCALIZACIÓN`: la búsqueda no cubre necesariamente binarios, adjuntos, otras ramas ni archivos externos. No declarar completa esa parte de la auditoría hasta localizar las fuentes.
 
 **Siguiente trabajo:** seguir la segunda pasada por ramas divergentes y registrar diferencias verificables por SHA/PR/CI; después completar el inventario de conceptos congelados, antecedentes y cómics que no estén en el código de las ramas por defecto.
+
+
+### Seguimiento crítico actualizado
+- [08 — Estado de ramas críticas y riesgo de escritura del workflow](08-seguimiento-ramas-criticas-20261021.md)
+- El informe 01 ahora incluye el paquete de 13 libros preservados y el resultado de la búsqueda de cómics/historietas en los tres repositorios.
+- Los informes 02 y 05 registran el riesgo de escritura en el workflow de continuidad de Web main y el estado abierto de PR #68.
