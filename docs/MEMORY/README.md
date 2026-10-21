@@ -115,3 +115,5 @@ La auditoría 01 se amplió con el paquete de preservación de conocimiento de W
 - [08 — Estado de ramas críticas y riesgo de escritura del workflow](08-seguimiento-ramas-criticas-20261021.md)
 - El informe 01 ahora incluye el paquete de 13 libros preservados y el resultado de la búsqueda de cómics/historietas en los tres repositorios.
 - Los informes 02 y 05 registran el riesgo de escritura en el workflow de continuidad de Web main y el estado abierto de PR #68.
+
+- [09 — Conciliación del inventario de 209 ramas](09-conciliacion-inventario-ramas-20261021.md)
