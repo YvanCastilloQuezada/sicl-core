@@ -18,7 +18,7 @@ Ramas registradas: **109**. Base: `main@de43b6b833731c87fb6277834484545bd953d76a
 | `docs/master-architecture-v2` | `14e31987cff90f4cc93a7167e2d28c5f5cb8be9f` | DOCUMENTACIÓN |
 | `docs/master-architecture-v2.2` | `c83d6ed3028092603b681fc1ad0ed1105fe67d8a` | DOCUMENTACIÓN |
 | `docs/master-frozen-future-orders` | `de949f5cc3773d18cdedfb4b9cf19d0749d3315a` | DOCUMENTACIÓN |
-| `docs/memory-auditoria-integracion-20261021` | `4667be6d96137ec95a98717218792e6a98df3768` | MEMORY/MAPA VIVO |
+| `docs/memory-auditoria-integracion-20261021` | `656b2194790f747e8527bad1830955e0a4400b45` | MEMORY/MAPA VIVO (HEAD revalidado 2026-10-21) |
 | `docs/mv-p0-1-common-variable-schema` | `c7d9cdee2aaa6a8ee7ccabc304515bc8a444336d` | DOCUMENTACIÓN |
 | `docs/mv-p0-2-object-variable-matrix` | `2c3d8e20a39eede18399d955d7437e60fc6e7b80` | DOCUMENTACIÓN |
 | `docs/mv-p0-3-space-variable-matrix` | `3789fdd6464556637dc54f6602e3550a354b6483` | DOCUMENTACIÓN |
