@@ -102,3 +102,10 @@ El inventario FROZEN insiste en que FROZEN significa preservado como evidencia/b
 Se consultó el buscador de código de GitHub en las ramas por defecto de sicl-web, sicl-core y arki-acs para los términos comic, cómic, historieta, viñeta y storyboard. No se devolvieron resultados para esas consultas.
 
 Esto no prueba que los cómics no existan. La búsqueda de código no cubre necesariamente archivos binarios, adjuntos, otras ramas ni archivos de conversaciones externas. Su ubicación y el inventario completo de cómics siguen como UNKNOWN / PENDIENTE DE LOCALIZACIÓN. No se fabricará un catálogo ni se marcará la revisión como completa hasta localizar las fuentes.
+
+
+### Comprobación adicional por árbol Git (ramas por defecto)
+
+Se inspeccionó el árbol recursivo de Git de main en los tres repositorios: sicl-web (1,602 rutas), sicl-core (419) y arki-acs (298); las respuestas no estaban truncadas. No hubo nombres de ruta que coincidieran con comic/cómic/historieta/viñeta/storyboard/cartoon/graphic novel. Sí existen archivos visuales y PDFs generales (Web: 180 rutas con extensiones visuales/documentales; Core: 14; ACS: 1), pero sus extensiones/nombres no bastan para clasificar su contenido como cómics. El contenido binario no se ha inspeccionado página por página y esta comprobación solo cubre main, no todas las ramas.
+
+**Estado preciso:** búsqueda de nombres en main sin coincidencias; inventario de cómics completo todavía no demostrado. Próximo paso necesario: localizar carpeta, ZIP, PDF o adjunto fuente fuera de esas rutas, o inspeccionar visualmente los documentos potencialmente relevantes que el usuario identifique.
