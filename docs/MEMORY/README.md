@@ -17,6 +17,31 @@ Investigar cómo reunir **REVIVIR ARKI** (adaptador de auto-mejora operativa), *
 4. [ACS: laboratorio, experimentación y evidencia](04-acs-laboratorio-evidencia.md)
 5. [Integración, seguridad, recuperación y plan de pruebas](05-integracion-seguridad-plan.md)
 
+## Auditoría de ramas — inventario acumulativo
+
+Se descubrieron 209 referencias: 97 en Web, 109 en Core (incluida esta rama documental) y 3 en ACS. Las comparaciones se hacen contra `main` del repositorio respectivo. “Behind” no significa necesariamente pérdida; puede significar que la historia de la rama está contenida en main. “Ahead/diverged” no autoriza merge.
+
+### SICL Web
+- [Registro de las 97 ramas y SHAs](branches/sicl-web-branch-register.md)
+- [Lote 1 — memoria, continuidad y Árbol Vivo](branches/sicl-web-branch-audit-01.md)
+- [Lote 2 — histórico, sincronización y auditorías](branches/sicl-web-branch-audit-02.md)
+- [Lote 3 — CI y documentación](branches/sicl-web-branch-audit-03.md)
+- [Lote 4 — RFC, ideas, ACS y AGK](branches/sicl-web-branch-audit-04.md)
+- [Lote 5 — AGK, ensamblaje y vitalidad](branches/sicl-web-branch-audit-05.md)
+- [Lote 6 — UI, puentes espaciales y F7–F8](branches/sicl-web-branch-audit-06.md)
+- [Lote 7 — rendimiento, idioma y Mapas Vivos](branches/sicl-web-branch-audit-07.md)
+- [Lote 8 — interfaz y pilotos espaciales](branches/sicl-web-branch-audit-08.md)
+- [Lote 9 — visualización, promoción, correcciones y rendimiento](branches/sicl-web-branch-audit-09.md)
+- [Lote 10 — red team, RFC y pruebas](branches/sicl-web-branch-audit-10.md)
+
+**Estado:** 97 nombres/SHAs registrados; análisis por lotes documentado. Algunas ramas requieren inspección de archivos/PR y verificación de CI antes de un dictamen final. Las ramas divergentes grandes tienen una lectura de alcance inicial, no una revisión exhaustiva de cada commit.
+
+### SICL Core
+- [Registro de las 109 ramas y SHAs](branches/sicl-core-branch-register.md) — pendiente de crear en el siguiente lote.
+
+### ARKI-ACS
+- [Registro de las 3 ramas y SHAs](branches/arki-acs-branch-register.md) — pendiente de crear en el siguiente lote.
+
 ## Dictamen preliminar
 
 Los repositorios ya contienen **tres capacidades relacionadas pero distintas**:
