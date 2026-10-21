@@ -5,7 +5,7 @@
 **Ramas descubiertas en GitHub:** 109  
 **Objetivo:** registrar cada rama por su nombre exacto y SHA, compararla contra `main`, resumir sus cambios únicos, evidencia y destino posible. Esta lista no afirma que las ramas estén integradas ni que sus pruebas hayan pasado.
 
-> Este registro es acumulativo. “Comparación inicial documentada; ver informe por lote” significa que solo se ha confirmado la existencia de la referencia y su SHA. La comparación contra main, commits y contenido debe incorporarse por lotes. No se eliminarán ramas ni se harán merges durante la auditoría.
+Este registro enlaza cada rama con su informe de lote cuando se ha incluido allí. La profundidad es desigual: comparación de SHAs/deltas y lectura por propósito para todas las ramas; lectura de código/PR/CI más profunda solo para las ramas críticas. No se eliminarán ramas ni se harán merges durante la auditoría.
 
 | Rama | SHA actual observado | Estado de auditoría |
 |---|---|---|
@@ -89,7 +89,7 @@
 | `fix/site-semantics-001` | `bd1069ad1804c62dc436b71144fcd05a4d187a01` | Comparación inicial documentada; ver informe por lote |
 | `integrate/spatial-s6p01-core` | `3f52d87bf0696470a39c13504dbd57a2c1e6c450` | Comparación inicial documentada; ver informe por lote |
 | `integration-v2` | `b377aa65380ea2cc1a7fc77a9cd63830197f5371` | Comparación inicial documentada; ver informe por lote |
-| `main` | `de43b6b833731c87fb6277834484545bd953d76a` | Comparación inicial documentada; ver informe por lote |
+| `main` | `de43b6b833731c87fb6277834484545bd953d76a` | Baseline de referencia; ver README |
 | `railway/fix-deploy-ba7603` | `d0de2079b274cbc36512cd9ce9ee76f6e16d5dc6` | Comparación inicial documentada; ver informe por lote |
 | `reconcile/arki-live-map-2026-10-07` | `bad480272140109e9529c3e269d525515624fc0c` | Comparación inicial documentada; ver informe por lote |
 | `rfc-001-multiscale-model` | `e4ff7423ae4d236bda956a5b0a4fd884961b99cf` | Comparación inicial documentada; ver informe por lote |
