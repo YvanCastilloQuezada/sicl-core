@@ -121,3 +121,34 @@ La auditoría 01 se amplió con el paquete de preservación de conocimiento de W
 - [10 — Reconciliación estática del contrato MEMORY en Core](10-reconciliacion-contrato-core-memory-20261021.md)
 
 - [11 — Compatibilidad de esquemas y recuperación E2E](11-compatibilidad-esquemas-y-recuperacion.md)
+
+
+## 12. Estado de Pull Requests — consulta directa de GitHub (2026-10-21)
+
+**Última consulta:** API de PR de `sicl-core` y checks asociados al SHA de main. El estado de PR es una fotografía de esta consulta y debe refrescarse antes de actuar.
+
+### PR abiertos en SICL Core
+
+| PR | Título | Estado | Base | Lectura para MEMORY |
+|---|---|---|---|---|
+| [#42](https://github.com/YvanCastilloQuezada/sicl-core/pull/42) | Core promotion concurrency guarantee | OPEN / DRAFT | main | No fusionar: el propio PR ordena no hacerlo hasta cerrar todos los gates. Cambia el contrato de promoción: errores 503/500, idempotencia y binding; requiere revisión detallada de gates y pruebas. |
+| [#43](https://github.com/YvanCastilloQuezada/sicl-core/pull/43) | DAM foundation: DNA, advisor and examiner roles | MERGED a una rama de trabajo, no a main | `feat/core-promotion-concurrency-guarantee` | Es un PR apilado encima de #42. Aunque GitHub lo marca merged, su base es la rama de #42, no main. No afirmar que DAM está en main mientras #42 no se integre y se compruebe la nueva línea base. |
+| [#22](https://github.com/YvanCastilloQuezada/sicl-core/pull/22) | Feat/rfc 030 ifc regeneration | OPEN | main | Contiene artefactos IFC generados y cambios declarativos de RFC-030. Revisar formato, trazabilidad y pruebas; no asumir regeneración profesional completa por la tabla de comparación del cuerpo. |
+| [#21](https://github.com/YvanCastilloQuezada/sicl-core/pull/21) | RFC-034.1 sheet composition and layout engine | OPEN | main | El PR declara 16 tests, suite, compileall y diff-check PASS, y ausencia de mutaciones Core/Decision. Esta auditoría no reprodujo los comandos. `mergeable=false` en la consulta, así que requiere investigar conflicto/estado del PR. |
+| [#1](https://github.com/YvanCastilloQuezada/sicl-core/pull/1) | revert: remove editable install from Railway build | OPEN | main | Antiguo PR de empaquetado/despliegue. Antes de actuar, revisar main actual y PR #2 ya fusionado; no ejecutar una reversión antigua sin reconciliar su objetivo con la configuración presente. |
+
+### PR recientes ya cerrados
+
+- [#47 — MEMORY audit](https://github.com/YvanCastilloQuezada/sicl-core/pull/47): **MERGED a main** el 21 de octubre de 2026; merge commit `bfd5449813e17481883641bd22aa2497e0fa4aac`. Incluye los cinco informes y el inventario documental.
+- [#45 — Core authority / ARKI Live Map](https://github.com/YvanCastilloQuezada/sicl-core/pull/45): **MERGED a main**; añade contrato de autoridad entre repositorios y clasifica el ledger anterior como histórico/reconciliación pendiente.
+- [#46 — 0-Historical](https://github.com/YvanCastilloQuezada/sicl-core/pull/46): cerrado sin merge; no asumir que la rama histórica fue absorbida.
+
+### Check de CI para MEMORY en main
+
+Para el merge commit `bfd5449813e17481883641bd22aa2497e0fa4aac`, GitHub Actions reporta dos checks completados con conclusión `success`: `test (3.11)` y `test (3.12)`. Esto verifica el resultado CI del commit documental de MEMORY; no equivale a ejecutar pruebas de REVIVIR/Mapas Vivos entre repositorios ni a validar el comportamiento de despliegue.
+
+### Estado de seguridad relacionado
+
+El PR #68 de SICL Web no pertenece a Core, pero es relevante para continuidad de MEMORY: la consulta de contexto anterior encontró la rama read-only propuesta, todavía sin merge en el snapshot de referencia. Antes de cualquier automatización de escritura en Web, consultar nuevamente [PR #68](https://github.com/YvanCastilloQuezada/sicl-web/pull/68) y verificar su base, cabeza y checks.
+
+**Conclusión de este apartado:** los PR aportan historial técnico y evidencia declarada, pero la relación base/head determina qué llega realmente a main. MEMORY debe registrar el repositorio base y el SHA de merge, no sólo la etiqueta `merged`. No se fusionó, cerró ni cambió ningún PR en esta auditoría.
