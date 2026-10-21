@@ -6,6 +6,9 @@ IFC/ledger publication is a convergent effect after the D-2 snapshot commit.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
+import sqlite3
+import time
 from typing import Any, Literal
 
 from pydantic import ValidationError
@@ -23,6 +26,15 @@ from .repository import SQLiteRepository
 
 
 EffectsStatus = Literal["COMPLETE", "PARTIAL", "FAILED", "NOT_ATTEMPTED"]
+
+_LEDGER_BINDING_INTEGRITY_ERRORS = {
+    "LEDGER_BINDING_SNAPSHOT_NOT_FOUND",
+    "LEDGER_BINDING_PROJECT_MISMATCH",
+    "LEDGER_BINDING_VERSION_MISMATCH",
+    "PROMOTION_SNAPSHOT_UNIQUE_INTEGRITY_FAILURE",
+}
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -74,37 +86,30 @@ def _reasoning_execution(repo: SQLiteRepository, project_id: str, proposal_id: s
 
 def _already_committed(repo: SQLiteRepository, project_id: str, proposal_id: str,
                        fingerprint: str, review_id: str) -> PromotionOutcome | None:
-    for event in repo.events(project_id):
-        if event.type != "DEVELOPER_PROMOTION_COMMITTED":
-            continue
-        p = event.payload or {}
-        if (
-            p.get("proposal_id") == proposal_id
-            and p.get("proposal_fingerprint") == fingerprint
-            and p.get("human_review_id") == review_id
-        ):
-            snapshot_id = p.get("snapshot_id")
-            version = p.get("version")
-            if not isinstance(snapshot_id, str) or not isinstance(version, int):
-                return PromotionOutcome(True, proposal_id, effects_status="FAILED",
-                                        reason="COMMITTED_EVENT_INVALID")
-            snapshot = repo.get_d2_snapshot(project_id, version)
-            if snapshot is None or snapshot.snapshot_id != snapshot_id:
-                return PromotionOutcome(True, proposal_id, snapshot_id, version,
-                                        effects_status="FAILED",
-                                        reason="COMMITTED_SNAPSHOT_NOT_FOUND")
-            failed = any(
-                e.type in {"D2_EFFECTS_FAILED", "D2_INTERNAL_INCONSISTENCY"}
-                and (e.payload or {}).get("snapshot_id") == snapshot_id
-                for e in repo.events(project_id)
-            )
+    try:
+        snapshot = repo.get_developer_promotion_commit(
+            project_id, proposal_id, fingerprint, review_id
+        )
+    except RuntimeError as exc:
+        if str(exc) in _LEDGER_BINDING_INTEGRITY_ERRORS:
             return PromotionOutcome(
-                True, proposal_id, snapshot_id, version, snapshot.elements,
-                "FAILED" if failed else "NOT_ATTEMPTED",
-                "ALREADY_COMMITTED",
+                False,
+                proposal_id,
+                effects_status="NOT_ATTEMPTED",
+                reason="INTEGRITY_FAILURE",
             )
-    return None
-
+        raise
+    if snapshot is None:
+        return None
+    failed = any(
+        event.type in {"D2_EFFECTS_FAILED", "D2_INTERNAL_INCONSISTENCY"}
+        and (event.payload or {}).get("snapshot_id") == snapshot.snapshot_id
+        for event in repo.events(project_id)
+    )
+    return PromotionOutcome(
+        True, proposal_id, snapshot.snapshot_id, snapshot.version, snapshot.elements,
+        "FAILED" if failed else "NOT_ATTEMPTED", "ALREADY_COMMITTED",
+    )
 
 def _int_field(value: Any, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
@@ -198,7 +203,7 @@ def _element(project_id: str, proposal: DeveloperProposalSchema,
     )
 
 
-def promote_developer_proposal(
+def _promote_developer_proposal_once(
     *,
     repo: SQLiteRepository,
     project_id: str,
@@ -256,7 +261,9 @@ def promote_developer_proposal(
         return _reject(repo, project_id, proposal_id, proposal_fingerprint, human_review_id,
                        str(exc), review.actor)
 
-    existing_canonical = repo.get_d2(project_id) or ()
+    current_base = repo.get_d2_current_snapshot(project_id)
+    existing_canonical = current_base.elements if current_base is not None else ()
+    base_version = current_base.version if current_base is not None else 0
     structural = validate_creation(
         project_id=project_id,
         candidate_elements=candidate_elements,
@@ -286,21 +293,32 @@ def promote_developer_proposal(
     )
     candidate = tuple(existing_canonical) + candidate_elements
     try:
-        snapshot = repo.insert_d2_snapshot_and_event(
-            project_id,
-            candidate,
-            review.actor,
-            "ARKI_DEVELOPER_PROMOTION",
-            event_type="DEVELOPER_PROMOTION_COMMITTED",
-            event_payload={
-                "proposal_id": proposal_id,
-                "proposal_fingerprint": proposal_fingerprint,
-                "human_review_id": human_review_id,
-            },
+        commit_status, snapshot = repo.commit_developer_promotion(
+            project_id, candidate, review.actor, proposal_id,
+            proposal_fingerprint, human_review_id, base_version,
         )
-    except Exception:
+    except RuntimeError as exc:
+        if str(exc) == "STALE_BASE_VERSION":
+            raise
+        if str(exc) in _LEDGER_BINDING_INTEGRITY_ERRORS:
+            return PromotionOutcome(
+                False,
+                proposal_id,
+                effects_status="NOT_ATTEMPTED",
+                reason="INTEGRITY_FAILURE",
+            )
         return _reject(repo, project_id, proposal_id, proposal_fingerprint, human_review_id,
                        "PROMOTION_PERSIST_FAILED", review.actor)
+    except Exception:
+        raise
+
+    if commit_status == "ALREADY_COMMITTED":
+        return _already_committed(
+            repo, project_id, proposal_id, proposal_fingerprint, human_review_id
+        ) or PromotionOutcome(
+            True, proposal_id, snapshot.snapshot_id, snapshot.version,
+            snapshot.elements, "NOT_ATTEMPTED", "ALREADY_COMMITTED",
+        )
 
     transaction = ArchiTransaction(existing_canonical)
     try:
@@ -339,6 +357,80 @@ def promote_developer_proposal(
     effects: EffectsStatus = "PARTIAL" if result.reason == "PROMOTED_CLEANUP_DEFERRED" else "COMPLETE"
     return PromotionOutcome(True, proposal_id, snapshot.snapshot_id, snapshot.version,
                             snapshot.elements, effects, result.reason or "PROMOTED")
+
+
+PROMOTION_DEADLINE_MS = 5000
+BUSY_TIMEOUT_CAP_MS = 1000
+SAFETY_MAX_ATTEMPTS = 100
+BACKOFF_BASE_MS = 50
+BACKOFF_FACTOR = 2
+BACKOFF_CAP_MS = 500
+
+
+def _promotion_backoff_seconds(attempt: int) -> float:
+    backoff_ms = min(
+        BACKOFF_CAP_MS,
+        BACKOFF_BASE_MS * (BACKOFF_FACTOR ** max(0, attempt - 1)),
+    )
+    return backoff_ms / 1000.0
+
+
+def promote_developer_proposal(
+    *,
+    repo: SQLiteRepository,
+    project_id: str,
+    proposal_id: str,
+    proposal_fingerprint: str,
+    human_review_id: str,
+    ledger: DerivationLedger,
+    ifc_path: str | None = None,
+) -> PromotionOutcome:
+    deadline = time.monotonic() + (PROMOTION_DEADLINE_MS / 1000.0)
+    attempts = 0
+    original_busy_timeout = int(repo.conn.execute("PRAGMA busy_timeout").fetchone()[0])
+    try:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return PromotionOutcome(False, proposal_id, reason="RETRIABLE_BUSY_EXHAUSTED")
+
+            if attempts >= SAFETY_MAX_ATTEMPTS:
+                _logger.error(
+                    "SAFETY_MAX_ATTEMPTS triggered: attempts=%d "
+                    "remaining=%.6fs project_id=%s proposal_id=%s "
+                    "fingerprint=%s review_id=%s",
+                    attempts, remaining, project_id, proposal_id,
+                    proposal_fingerprint, human_review_id,
+                )
+                return PromotionOutcome(False, proposal_id, reason="RETRIABLE_BUSY_EXHAUSTED")
+
+            attempts += 1
+            attempt_timeout_ms = max(
+                1,
+                min(BUSY_TIMEOUT_CAP_MS, int(remaining * 1000)),
+            )
+            repo.conn.execute(f"PRAGMA busy_timeout = {attempt_timeout_ms}")
+            try:
+                return _promote_developer_proposal_once(
+                    repo=repo, project_id=project_id, proposal_id=proposal_id,
+                    proposal_fingerprint=proposal_fingerprint,
+                    human_review_id=human_review_id, ledger=ledger, ifc_path=ifc_path,
+                )
+            except RuntimeError as exc:
+                if str(exc) != "STALE_BASE_VERSION":
+                    raise
+            except sqlite3.OperationalError as exc:
+                code = getattr(exc, "sqlite_errorcode", None)
+                if code not in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED}:
+                    raise
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return PromotionOutcome(False, proposal_id, reason="RETRIABLE_BUSY_EXHAUSTED")
+
+            time.sleep(min(_promotion_backoff_seconds(attempts), remaining))
+    finally:
+        repo.conn.execute(f"PRAGMA busy_timeout = {original_busy_timeout}")
 
 
 __all__ = ["PromotionOutcome", "promote_developer_proposal"]

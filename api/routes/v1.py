@@ -139,7 +139,9 @@ def _status_for(code: str) -> int:
         return 404
     if code in {"METHOD_TYPE_MISMATCH", "REVIEW_TARGET_FINGERPRINT_MISMATCH", "PROPOSAL_FINGERPRINT_MISMATCH", "PROPOSAL_FINGERPRINT_INCONSISTENT", "HUMAN_REVIEW_BINDING_MISMATCH", "SUFFICIENCY_NOT_PERMITTED"}:
         return 409
-    if code in {"PROMOTION_PERSIST_FAILED", "PROMOTION_FAILED"}:
+    if code == "RETRIABLE_BUSY_EXHAUSTED":
+        return 503
+    if code in {"PROMOTION_PERSIST_FAILED", "PROMOTION_FAILED", "INTEGRITY_FAILURE"}:
         return 500
     if code in {"INVALID_DEVELOPER_PROPOSAL", "STRUCTURAL_VALIDATION_FAILED", "RELATIONS_NOT_YET_SUPPORTED", "DERIVATIONS_NOT_YET_SUPPORTED", "UNKNOWN_ELEMENT_KIND", "MISSING_GEOMETRY", "GEOMETRY_CONTRACT_NOT_MAPPED"} or code.startswith("GEOMETRY_CONTRACT_NOT_MAPPED:") or code.startswith("UNSUPPORTED_PROPERTY_VALUE:"):
         return 400
@@ -154,7 +156,11 @@ def _status_for(code: str) -> int:
     return 400
 
 
-def _error(result: dict[str, Any], project_id: str | None = None) -> None:
+def _error(
+    result: dict[str, Any],
+    project_id: str | None = None,
+    headers: dict[str, str] | None = None,
+) -> None:
     if result.get("code") == "OK":
         return
     raise HTTPException(
@@ -168,6 +174,7 @@ def _error(result: dict[str, Any], project_id: str | None = None) -> None:
             "observed_version": None,
             "data": result.get("data", {}),
         },
+        headers=headers,
     )
 
 
@@ -1100,12 +1107,17 @@ def developer_promotion(
     project = repo.get_project(project_id)
     observed_version = project.version if project is not None else None
     if not outcome.committed:
+        failure_status = (
+            outcome.reason
+            if outcome.reason in {"RETRIABLE_BUSY_EXHAUSTED", "INTEGRITY_FAILURE"}
+            else "REJECTED"
+        )
         _error(
             {
                 "code": outcome.reason or "PROMOTION_FAILED",
                 "message": outcome.reason or "Developer promotion failed",
                 "data": {
-                    "status": "REJECTED",
+                    "status": failure_status,
                     "proposal_id": outcome.proposal_id,
                     "snapshot_id": outcome.snapshot_id,
                     "d2_version": outcome.d2_version,
@@ -1114,10 +1126,15 @@ def developer_promotion(
                 },
             },
             project_id,
+            headers={"Retry-After": "1"}
+            if outcome.reason == "RETRIABLE_BUSY_EXHAUSTED"
+            else None,
         )
     return _ok(
         {
-            "status": "COMMITTED",
+            "status": "ALREADY_COMMITTED"
+            if outcome.reason == "ALREADY_COMMITTED"
+            else "COMMITTED",
             "proposal_id": outcome.proposal_id,
             "snapshot_id": outcome.snapshot_id,
             "d2_version": outcome.d2_version,

@@ -30,12 +30,152 @@ class SQLiteRepository:
         self.path = str(path)
         self.conn = sqlite3.connect(self.path, check_same_thread=check_same_thread)
         self.conn.row_factory = sqlite3.Row
-        self._create_schema()
+        try:
+            self._create_schema()
+        except Exception:
+            self.conn.close()
+            raise
 
     def close(self) -> None:
         self.conn.close()
 
+    @staticmethod
+    def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+        row = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (table_name,),
+        ).fetchone()
+        return row is not None
+
+    @staticmethod
+    def _column_exists(conn: sqlite3.Connection, table_name: str, column_name: str) -> bool:
+        return any(row["name"] == column_name for row in conn.execute(f"PRAGMA table_info({table_name})"))
+
+    @classmethod
+    def _detect_schema_state(cls, conn: sqlite3.Connection) -> str:
+        user_version = int(conn.execute("PRAGMA user_version").fetchone()[0])
+        if user_version not in (0, 1):
+            return "UNSUPPORTED"
+
+        has_d2 = cls._table_exists(conn, "d2_snapshots")
+        has_ledger = cls._table_exists(conn, "developer_promotion_idempotency")
+        has_based_on = has_d2 and cls._column_exists(conn, "d2_snapshots", "based_on_version")
+
+        if not has_d2:
+            return "NEW" if user_version == 0 and not has_ledger else "PARTIAL"
+        if user_version == 0 and not has_ledger and not has_based_on:
+            return "LEGACY"
+        if user_version == 1 and has_ledger and has_based_on:
+            return "MIGRATED"
+        return "PARTIAL"
+
+    @staticmethod
+    def _ddl_create_developer_promotion_idempotency(conn: sqlite3.Connection) -> None:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS developer_promotion_idempotency (
+              project_id TEXT NOT NULL,
+              proposal_id TEXT NOT NULL,
+              proposal_fingerprint TEXT NOT NULL,
+              human_review_id TEXT NOT NULL,
+              snapshot_id TEXT NOT NULL REFERENCES d2_snapshots(snapshot_id),
+              d2_version INTEGER NOT NULL,
+              committed_at TEXT NOT NULL,
+              PRIMARY KEY (project_id, proposal_id, proposal_fingerprint, human_review_id)
+            )
+        """)
+
+    @classmethod
+    def _ddl_add_based_on_version(cls, conn: sqlite3.Connection) -> None:
+        if not cls._column_exists(conn, "d2_snapshots", "based_on_version"):
+            conn.execute("ALTER TABLE d2_snapshots ADD COLUMN based_on_version INTEGER NULL")
+
+    @classmethod
+    def _assert_migrated_v1(cls, conn: sqlite3.Connection) -> None:
+        state = cls._detect_schema_state(conn)
+        if state != "MIGRATED":
+            raise RuntimeError(f"core migration validation failed: {state}")
+
+        invalid_order = conn.execute(
+            """
+            SELECT snapshot_id
+            FROM d2_snapshots
+            WHERE based_on_version IS NOT NULL
+              AND based_on_version >= version
+            LIMIT 1
+            """
+        ).fetchone()
+        if invalid_order is not None:
+            raise RuntimeError("D2_BASED_ON_VERSION_NOT_PREDECESSOR")
+
+        invalid_zero = conn.execute(
+            """
+            SELECT snapshot_id
+            FROM d2_snapshots
+            WHERE version > 1
+              AND based_on_version = 0
+            LIMIT 1
+            """
+        ).fetchone()
+        if invalid_zero is not None:
+            raise RuntimeError("D2_BASED_ON_ZERO_INVALID_FOR_VERSION")
+
+        missing_base = conn.execute(
+            """
+            SELECT child.snapshot_id
+            FROM d2_snapshots AS child
+            LEFT JOIN d2_snapshots AS base
+              ON base.project_id = child.project_id
+             AND base.version = child.based_on_version
+            WHERE child.based_on_version > 0
+              AND base.snapshot_id IS NULL
+            LIMIT 1
+            """
+        ).fetchone()
+        if missing_base is not None:
+            raise RuntimeError("D2_BASED_ON_SNAPSHOT_NOT_FOUND")
+
+        invalid_ledger_binding = conn.execute(
+            """
+            SELECT ledger.snapshot_id
+            FROM developer_promotion_idempotency AS ledger
+            LEFT JOIN d2_snapshots AS snapshot
+              ON snapshot.snapshot_id = ledger.snapshot_id
+            WHERE snapshot.snapshot_id IS NULL
+               OR snapshot.project_id != ledger.project_id
+               OR snapshot.version != ledger.d2_version
+            LIMIT 1
+            """
+        ).fetchone()
+        if invalid_ledger_binding is not None:
+            raise RuntimeError("PROMOTION_LEDGER_BINDING_INTEGRITY_FAILURE")
+
+    @classmethod
+    def _migrate_legacy_to_v1(cls, conn: sqlite3.Connection) -> None:
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+            if cls._detect_schema_state(conn) != "LEGACY":
+                raise RuntimeError("core migration requires LEGACY schema state")
+            cls._ddl_add_based_on_version(conn)
+            cls._ddl_create_developer_promotion_idempotency(conn)
+            conn.execute("PRAGMA user_version = 1")
+            cls._assert_migrated_v1(conn)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
     def _create_schema(self) -> None:
+        self.conn.execute("PRAGMA foreign_keys = ON")
+        schema_state = self._detect_schema_state(self.conn)
+        if schema_state in ("PARTIAL", "UNSUPPORTED"):
+            raise RuntimeError(f"core schema state not supported: {schema_state}")
+        if schema_state == "LEGACY":
+            self._migrate_legacy_to_v1(self.conn)
+            return
+        if schema_state == "MIGRATED":
+            self._assert_migrated_v1(self.conn)
+            return
+
         self.conn.executescript("""
         PRAGMA foreign_keys = ON;
         CREATE TABLE IF NOT EXISTS projects (
@@ -421,6 +561,12 @@ class SQLiteRepository:
             self.conn.execute("ALTER TABLE human_reviews ADD COLUMN referenced_entity_id TEXT NULL")
         if "referenced_fingerprint" not in review_columns:
             self.conn.execute("ALTER TABLE human_reviews ADD COLUMN referenced_fingerprint TEXT NULL")
+
+        # Fresh databases are born at schema V1. Legacy databases returned above
+        # untouched and are upgraded only by the atomic migration in [6.11.5].
+        self._ddl_add_based_on_version(self.conn)
+        self._ddl_create_developer_promotion_idempotency(self.conn)
+        self.conn.execute("PRAGMA user_version = 1")
         self.conn.commit()
 
     @contextmanager
@@ -535,6 +681,115 @@ class SQLiteRepository:
         with self.transaction():
             return [self._insert_event(event) for event in events]
 
+    def get_developer_promotion_commit(
+        self, project_id: str, proposal_id: str, proposal_fingerprint: str, human_review_id: str,
+    ) -> D2Snapshot | None:
+        row = self.conn.execute(
+            """SELECT snapshot_id, d2_version FROM developer_promotion_idempotency
+               WHERE project_id=? AND proposal_id=? AND proposal_fingerprint=? AND human_review_id=?""",
+            (project_id, proposal_id, proposal_fingerprint, human_review_id),
+        ).fetchone()
+        if row is None:
+            return None
+        self.ledger_binding_guard(project_id, row["snapshot_id"], int(row["d2_version"]))
+        snapshot = self.get_d2_snapshot(project_id, int(row["d2_version"]))
+        if snapshot is None or snapshot.snapshot_id != row["snapshot_id"]:
+            raise RuntimeError("LEDGER_BINDING_SNAPSHOT_NOT_FOUND")
+        return snapshot
+
+    def commit_developer_promotion(
+        self, project_id: str, elements: tuple[ArchiElement, ...], actor: str,
+        proposal_id: str, proposal_fingerprint: str, human_review_id: str,
+        based_on_version: int,
+    ) -> tuple[str, D2Snapshot]:
+        """Atomically commit event + D-2 snapshot + idempotency ledger with CAS."""
+        raw = serialize_elements(elements)
+        if any(element.project_id != project_id for element in elements):
+            raise ValueError("all D-2 elements must belong to project_id")
+        content_hash = elements_content_hash(raw)
+        created_at = now_iso()
+        try:
+            self.conn.execute("BEGIN IMMEDIATE")
+            prior = self.get_developer_promotion_commit(
+                project_id, proposal_id, proposal_fingerprint, human_review_id
+            )
+            if prior is not None:
+                self.conn.commit()
+                return "ALREADY_COMMITTED", prior
+            row = self.conn.execute(
+                "SELECT COALESCE(MAX(version), 0) AS version FROM d2_snapshots WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            current_version = int(row["version"])
+            if current_version != based_on_version:
+                raise RuntimeError("STALE_BASE_VERSION")
+            version = current_version + 1
+            snapshot_id = deterministic_snapshot_id(project_id, version, content_hash)
+            payload = {
+                "snapshot_id": snapshot_id, "project_id": project_id, "version": version,
+                "content_hash": content_hash, "element_count": len(elements),
+                "actor": actor.strip(), "source": "ARKI_DEVELOPER_PROMOTION",
+                "proposal_id": proposal_id, "proposal_fingerprint": proposal_fingerprint,
+                "human_review_id": human_review_id,
+            }
+            event = self._insert_event(Event(
+                None, created_at, project_id, "DEVELOPER_PROMOTION_COMMITTED",
+                payload, actor.strip(), "ARKI_D2_STORE",
+            ))
+            self.conn.execute(
+                """INSERT INTO d2_snapshots(
+                    snapshot_id, project_id, version, elements_json, content_hash,
+                    actor, source_event_id, created_at, based_on_version
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (snapshot_id, project_id, version, raw, content_hash, actor.strip(),
+                 event.id, created_at, based_on_version),
+            )
+            self.conn.execute(
+                """INSERT INTO developer_promotion_idempotency(
+                    project_id, proposal_id, proposal_fingerprint, human_review_id,
+                    snapshot_id, d2_version, committed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (project_id, proposal_id, proposal_fingerprint, human_review_id,
+                 snapshot_id, version, created_at),
+            )
+            self.ledger_binding_guard(project_id, snapshot_id, version)
+            self.conn.commit()
+            return "COMMITTED", D2Snapshot(
+                snapshot_id, project_id, version, deserialize_elements(raw),
+                content_hash, actor.strip(), event.id, created_at,
+            )
+        except sqlite3.IntegrityError as exc:
+            self.conn.rollback()
+            prior = self.get_developer_promotion_commit(
+                project_id, proposal_id, proposal_fingerprint, human_review_id
+            )
+            if prior is not None:
+                return "ALREADY_COMMITTED", prior
+
+            message = str(exc)
+            snapshot_version_unique = (
+                message
+                == "UNIQUE constraint failed: "
+                   "d2_snapshots.project_id, d2_snapshots.version"
+            )
+            if snapshot_version_unique:
+                row = self.conn.execute(
+                    "SELECT COALESCE(MAX(version), 0) AS version "
+                    "FROM d2_snapshots WHERE project_id=?",
+                    (project_id,),
+                ).fetchone()
+                authoritative_version = int(row["version"])
+                if authoritative_version > based_on_version:
+                    raise RuntimeError("STALE_BASE_VERSION") from exc
+                raise RuntimeError(
+                    "PROMOTION_SNAPSHOT_UNIQUE_INTEGRITY_FAILURE"
+                ) from exc
+
+            raise
+        except Exception:
+            self.conn.rollback()
+            raise
+
     def insert_d2_snapshot_and_event(
         self,
         project_id: str,
@@ -621,6 +876,29 @@ class SQLiteRepository:
             row["snapshot_id"], row["project_id"], row["version"], elements,
             expected, row["actor"], row["source_event_id"], row["created_at"],
         )
+
+    def ledger_binding_guard(
+        self,
+        project_id: str,
+        snapshot_id: str,
+        d2_version: int,
+    ) -> None:
+        """Fail closed unless a ledger binding names the exact canonical D-2 row.
+
+        The lookup is anchored on d2_snapshots.snapshot_id (PRIMARY KEY), so
+        validation cost is independent of project history length and never
+        requires a history scan.
+        """
+        row = self.conn.execute(
+            "SELECT project_id, version FROM d2_snapshots WHERE snapshot_id=?",
+            (snapshot_id,),
+        ).fetchone()
+        if row is None:
+            raise RuntimeError("LEDGER_BINDING_SNAPSHOT_NOT_FOUND")
+        if row["project_id"] != project_id:
+            raise RuntimeError("LEDGER_BINDING_PROJECT_MISMATCH")
+        if int(row["version"]) != d2_version:
+            raise RuntimeError("LEDGER_BINDING_VERSION_MISMATCH")
 
     def get_d2_snapshot(self, project_id: str, version: int) -> D2Snapshot | None:
         row = self.conn.execute(
