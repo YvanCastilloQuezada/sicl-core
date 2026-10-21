@@ -37,10 +37,27 @@ Se descubrieron 209 referencias: 97 en Web, 109 en Core (incluida esta rama docu
 **Estado:** 97 nombres/SHAs registrados; análisis por lotes documentado. Algunas ramas requieren inspección de archivos/PR y verificación de CI antes de un dictamen final. Las ramas divergentes grandes tienen una lectura de alcance inicial, no una revisión exhaustiva de cada commit.
 
 ### SICL Core
-- [Registro de las 109 ramas y SHAs](branches/sicl-core-branch-register.md) — pendiente de crear en el siguiente lote.
+- [Registro de las 109 ramas y SHAs](branches/sicl-core-branch-register.md)
+- [Lote 1 — historia y documentación](branches/sicl-core-branch-audit-01.md)
+- [Lote 2 — arquitectura y Mapas Vivos P0](branches/sicl-core-branch-audit-02.md)
+- [Lote 3 — Mapas Vivos, operación y copilot](branches/sicl-core-branch-audit-03.md)
+- [Lote 4 — proceso, manuales y A-002](branches/sicl-core-branch-audit-04.md)
+- [Lote 5 — representación 3D y ARE](branches/sicl-core-branch-audit-05.md)
+- [Lote 6 — persistencia, validación y promoción](branches/sicl-core-branch-audit-06.md)
+- [Lote 7 — contrato de eventos y promoción](branches/sicl-core-branch-audit-07.md)
+- [Lote 8 — recomputación, Mapas Vivos y RFC](branches/sicl-core-branch-audit-08.md)
+- [Lote 9 — VSM, DAM y UPAO-001](branches/sicl-core-branch-audit-09.md)
+- [Lote 10 — integración, despliegue y contexto ambiental](branches/sicl-core-branch-audit-10.md)
+- [Lote 11 — mapa vivo y RFC 001–006](branches/sicl-core-branch-audit-11.md)
+- [Lote 12 — RFC 006–013](branches/sicl-core-branch-audit-12.md)
+- [Lote 13 — RFC 013–029](branches/sicl-core-branch-audit-13.md)
+- [Lote 14 — GIS, pruebas y baseline](branches/sicl-core-branch-audit-14.md)
 
 ### ARKI-ACS
-- [Registro de las 3 ramas y SHAs](branches/arki-acs-branch-register.md) — pendiente de crear en el siguiente lote.
+- [Registro de las 3 ramas y SHAs](branches/arki-acs-branch-register.md)
+- [Auditoría de las tres ramas](branches/arki-acs-branch-audit.md)
+
+**Precisión del alcance:** se han comparado las referencias de las 209 ramas contra `main` y documentado sus metadatos, estados de divergencia y lectura inicial por propósito. “Informe por rama” significa que cada rama tiene una sección identificada; no significa que se haya leído línea por línea cada commit histórico. Las ramas con commits exclusivos, diferencias de seguridad o potencial relación con MEMORY necesitan una segunda pasada de archivos/PR/CI antes de cerrar su dictamen.
 
 ## Dictamen preliminar
 
