@@ -9,7 +9,7 @@
 
 | Rama | SHA actual observado | Estado de auditoría |
 |---|---|---|
-| `experiment/arki-ideas-acs-20261015` | `507e0b18862e6cf13e1e72f559cca8f343411fc2` | Pendiente de análisis detallado |
+| `experiment/arki-ideas-acs-20261015` | `507e0b18862e6cf13e1e72f559cca8f343411fc2` | [Auditoría](arki-acs-branch-audit.md) |
 | `feat/oece-arki-integration-v1` | `3fa4e4a799606e3595a29688223b0f50c1672ef8` | Pendiente de análisis detallado |
 | `main` | `1a48ed4426b958cb45be2599efc1e8d624baab80` | Pendiente de análisis detallado |
 
