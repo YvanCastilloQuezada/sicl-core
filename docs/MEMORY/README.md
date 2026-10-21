@@ -33,6 +33,7 @@ Se descubrieron 209 referencias: 97 en Web, 109 en Core (incluida esta rama docu
 - [Lote 8 — interfaz y pilotos espaciales](branches/sicl-web-branch-audit-08.md)
 - [Lote 9 — visualización, promoción, correcciones y rendimiento](branches/sicl-web-branch-audit-09.md)
 - [Lote 10 — red team, RFC y pruebas](branches/sicl-web-branch-audit-10.md)
+- [Lote 11 — baseline y experimento Mapas Vivos](branches/sicl-web-branch-audit-11.md)
 
 **Estado:** 97 nombres/SHAs registrados; análisis por lotes documentado. Algunas ramas requieren inspección de archivos/PR y verificación de CI antes de un dictamen final. Las ramas divergentes grandes tienen una lectura de alcance inicial, no una revisión exhaustiva de cada commit.
 
