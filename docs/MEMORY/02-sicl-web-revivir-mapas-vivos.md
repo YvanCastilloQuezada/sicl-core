@@ -61,3 +61,12 @@ Estas son comprobaciones pendientes, no fallos confirmados.
 Mantener Mapas Vivos como **proyección de lectura/regenerable**; mantener REVIVIR como **productor de observaciones, déficits, propuestas y recibos**; trasladar al modelo canónico de Core solo eventos de dominio que cumplan su contrato. MEMORY debe ser la experiencia/arquitectura de recuperación común, no un cuarto almacén paralelo.
 
 **No se ejecutaron pruebas durante esta auditoría documental.** Los estados de prueba citados en el mapa son históricos hasta que se comprueben contra un SHA exacto y sus logs.
+
+
+## 7. Verificación adicional del workflow de continuidad — PR #68
+
+La inspección de sicl-web/main encontró que .github/workflows/arki-continuity-map.yml declara `permissions: contents: write`, usa checkout con `persist-credentials: true`, regenera el snapshot y ejecuta un `git commit`/`git push` automático si cambia el mapa. Esto concede al workflow capacidad de escritura sobre la rama en la que corre.
+
+PR #68, `fix(arki): make continuity workflow read-only`, está **OPEN / NOT MERGED** en la consulta realizada. Su diff reduce permisos a `contents: read`, desactiva persist-credentials, mantiene los tests y la carga del log como artefacto, y elimina la regeneración/publicación automática. El cuerpo del PR declara CI verde en SHA `33f3cd5b7aa1fcdac9d967a264a7618d7eb9ed0a`, pero no se verificaron aquí los logs de esas ejecuciones de manera independiente.
+
+**Hallazgo confirmado por el contenido del workflow main:** existe una ruta de escritura automática en CI. **Recomendación:** evaluar PR #68 como control de seguridad prioritario; no afirmar que el riesgo está corregido mientras siga abierto y sin merge. No lo fusioné.
