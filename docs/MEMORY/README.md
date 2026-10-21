@@ -121,6 +121,7 @@ La auditoría 01 se amplió con el paquete de preservación de conocimiento de W
 - [10 — Reconciliación estática del contrato MEMORY en Core](10-reconciliacion-contrato-core-memory-20261021.md)
 
 - [11 — Compatibilidad de esquemas y recuperación E2E](11-compatibilidad-esquemas-y-recuperacion.md)
+- [12 — Auditoría de Pull Requests de Core](12-auditoria-pull-requests-20261021.md)
 
 
 ## 12. Estado de Pull Requests — consulta directa de GitHub (2026-10-21)
