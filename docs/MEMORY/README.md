@@ -119,3 +119,5 @@ La auditoría 01 se amplió con el paquete de preservación de conocimiento de W
 - [09 — Conciliación del inventario de 209 ramas](09-conciliacion-inventario-ramas-20261021.md)
 
 - [10 — Reconciliación estática del contrato MEMORY en Core](10-reconciliacion-contrato-core-memory-20261021.md)
+
+- [11 — Compatibilidad de esquemas y recuperación E2E](11-compatibilidad-esquemas-y-recuperacion.md)
