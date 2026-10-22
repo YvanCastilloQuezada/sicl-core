@@ -32,5 +32,14 @@ jobs:
       - name: Run tests
         run: python -m pytest -ra
 
+      - name: Run schema-state verification gate
+        run: python tests/verification/ci_v1_v5_schema_state_gate.py
+
+      - name: Run atomic-migration verification gate
+        run: python tests/verification/ci_atomic_migration_gate.py
+
+      - name: Run ledger-binding benchmark gate
+        run: python tests/verification/ci_ledger_binding_guard_benchmark.py
+
       - name: Compile source
         run: python -m compileall -q src api tests
