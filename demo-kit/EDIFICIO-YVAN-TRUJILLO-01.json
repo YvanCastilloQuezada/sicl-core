@@ -1,0 +1,418 @@
+{
+  "alternatives": {
+    "ALT-49f32160d2": {
+      "alternative_id": "ALT-49f32160d2",
+      "description": "",
+      "name": "ALT-A",
+      "parameters": {},
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "status": "GENERATED",
+      "version": 1
+    },
+    "ALT-e5b77a64ca": {
+      "alternative_id": "ALT-e5b77a64ca",
+      "description": "",
+      "name": "ALT-B",
+      "parameters": {},
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "status": "GENERATED",
+      "version": 1
+    }
+  },
+  "assumptions": {
+    "ASM-2c9d941958": {
+      "assumption_id": "ASM-2c9d941958",
+      "basis": "estimada: 80% ESTIMACION",
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "statement": "Ocupacion",
+      "version": 1
+    }
+  },
+  "comparisons": {
+    "CMP-d9c264d334": {
+      "alternative_ids": [
+        "ALT-49f32160d2",
+        "ALT-e5b77a64ca"
+      ],
+      "comparison_id": "CMP-d9c264d334",
+      "evaluations": [
+        {
+          "alternative_id": "ALT-49f32160d2",
+          "confidence": 0.9,
+          "evaluation_id": "EVAL-e745280e4d",
+          "objective_id": "OBJ-28fc951aba",
+          "source": "USER_INPUT",
+          "unit": "score",
+          "value": 80.0,
+          "version": 1
+        },
+        {
+          "alternative_id": "ALT-e5b77a64ca",
+          "confidence": 0.8,
+          "evaluation_id": "EVAL-c45d0f86d2",
+          "objective_id": "OBJ-28fc951aba",
+          "source": "USER_INPUT",
+          "unit": "score",
+          "value": 70.0,
+          "version": 1
+        }
+      ],
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "tradeoffs": {},
+      "version": 1
+    }
+  },
+  "constraints": {
+    "CON-32d64d7952": {
+      "constraint_id": "CON-32d64d7952",
+      "hard": true,
+      "key": "HEIGHT",
+      "operator": "<=",
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "unit": "FLOORS",
+      "value": "6",
+      "version": 1
+    },
+    "CON-635d7d7cfc": {
+      "constraint_id": "CON-635d7d7cfc",
+      "hard": true,
+      "key": "ZONIFICACION",
+      "operator": "=",
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "unit": "Municipalidad",
+      "value": "C-2 (Comercial)",
+      "version": 1
+    }
+  },
+  "decisions": {},
+  "evaluations": {
+    "EVAL-c45d0f86d2": {
+      "alternative_id": "ALT-e5b77a64ca",
+      "confidence": 0.8,
+      "evaluation_id": "EVAL-c45d0f86d2",
+      "objective_id": "OBJ-28fc951aba",
+      "source": "USER_INPUT",
+      "unit": "score",
+      "value": 70.0,
+      "version": 1
+    },
+    "EVAL-e745280e4d": {
+      "alternative_id": "ALT-49f32160d2",
+      "confidence": 0.9,
+      "evaluation_id": "EVAL-e745280e4d",
+      "objective_id": "OBJ-28fc951aba",
+      "source": "USER_INPUT",
+      "unit": "score",
+      "value": 80.0,
+      "version": 1
+    }
+  },
+  "events": [
+    {
+      "actor": "demo-human",
+      "id": 1,
+      "payload": {
+        "actor": "demo-human",
+        "name": "Edificio Yvan Trujillo"
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "USER_COMMAND",
+      "timestamp": "2026-09-15T08:11:15.324643+00:00",
+      "type": "PROJECT_CREATED"
+    },
+    {
+      "actor": "demo-human",
+      "id": 2,
+      "payload": {
+        "actor": "demo-human",
+        "fact_id": "FACT-b378988583",
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "source": "SENAMHI",
+        "statement": "Clima: Semiárido cálido (BSk Köppen), T° promedio 21°C",
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "SITE_INTELLIGENCE_API",
+      "timestamp": "2026-09-15T08:11:15.326760+00:00",
+      "type": "FACT_SET"
+    },
+    {
+      "actor": "demo-human",
+      "id": 3,
+      "payload": {
+        "actor": "demo-human",
+        "fact_id": "FACT-d51c71af0a",
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "source": "NASA_POWER",
+        "statement": "Radiación solar: 5.5 kWh/m²/día anual",
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "SITE_INTELLIGENCE_API",
+      "timestamp": "2026-09-15T08:11:15.327012+00:00",
+      "type": "FACT_SET"
+    },
+    {
+      "actor": "demo-human",
+      "id": 4,
+      "payload": {
+        "actor": "demo-human",
+        "fact_id": "FACT-90b250aa20",
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "source": "SENAMHI",
+        "statement": "Vientos predominantes: Sur-Suroeste",
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "SITE_INTELLIGENCE_API",
+      "timestamp": "2026-09-15T08:11:15.327181+00:00",
+      "type": "FACT_SET"
+    },
+    {
+      "actor": "demo-human",
+      "id": 5,
+      "payload": {
+        "actor": "demo-human",
+        "constraint_id": "CON-635d7d7cfc",
+        "hard": true,
+        "key": "ZONIFICACION",
+        "operator": "=",
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "unit": "Municipalidad",
+        "value": "C-2 (Comercial)",
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "SITE_INTELLIGENCE_API",
+      "timestamp": "2026-09-15T08:11:15.327364+00:00",
+      "type": "CONSTRAINT_SET"
+    },
+    {
+      "actor": "demo-human",
+      "id": 6,
+      "payload": {
+        "actor": "demo-human",
+        "fact_id": "FACT-bcf9ddb06d",
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "source": "del sitio: 2000 m2 CATASTRO",
+        "statement": "Area",
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "USER_COMMAND",
+      "timestamp": "2026-09-15T08:11:15.327584+00:00",
+      "type": "FACT_SET"
+    },
+    {
+      "actor": "demo-human",
+      "id": 7,
+      "payload": {
+        "actor": "demo-human",
+        "assumption_id": "ASM-2c9d941958",
+        "basis": "estimada: 80% ESTIMACION",
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "statement": "Ocupacion",
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "USER_COMMAND",
+      "timestamp": "2026-09-15T08:11:15.327761+00:00",
+      "type": "ASSUMPTION_SET"
+    },
+    {
+      "actor": "demo-human",
+      "id": 8,
+      "payload": {
+        "actor": "demo-human",
+        "direction": "MAXIMIZE",
+        "key": "CLIMATE",
+        "objective_id": "OBJ-28fc951aba",
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "value": "80",
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "USER_COMMAND",
+      "timestamp": "2026-09-15T08:11:15.327948+00:00",
+      "type": "OBJECTIVE_SET"
+    },
+    {
+      "actor": "demo-human",
+      "id": 9,
+      "payload": {
+        "actor": "demo-human",
+        "constraint_id": "CON-32d64d7952",
+        "hard": true,
+        "key": "HEIGHT",
+        "operator": "<=",
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "unit": "FLOORS",
+        "value": "6",
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "USER_COMMAND",
+      "timestamp": "2026-09-15T08:11:15.328194+00:00",
+      "type": "CONSTRAINT_SET"
+    },
+    {
+      "actor": "demo-human",
+      "id": 10,
+      "payload": {
+        "actor": "demo-human",
+        "name": "ARCHITECT",
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "role_id": "ROLE-ea07d12ace",
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "USER_COMMAND",
+      "timestamp": "2026-09-15T08:11:15.328414+00:00",
+      "type": "ROLE_ADDED"
+    },
+    {
+      "actor": "demo-human",
+      "id": 11,
+      "payload": {
+        "actor": "demo-human",
+        "alternative_id": "ALT-49f32160d2",
+        "description": "",
+        "name": "ALT-A",
+        "parameters": {},
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "status": "GENERATED",
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "USER_COMMAND",
+      "timestamp": "2026-09-15T08:11:15.328638+00:00",
+      "type": "ALTERNATIVE_CREATED"
+    },
+    {
+      "actor": "demo-human",
+      "id": 12,
+      "payload": {
+        "actor": "demo-human",
+        "alternative_id": "ALT-e5b77a64ca",
+        "description": "",
+        "name": "ALT-B",
+        "parameters": {},
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "status": "GENERATED",
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "USER_COMMAND",
+      "timestamp": "2026-09-15T08:11:15.328875+00:00",
+      "type": "ALTERNATIVE_CREATED"
+    },
+    {
+      "actor": "demo-human",
+      "id": 13,
+      "payload": {
+        "actor": "demo-human",
+        "alternative_id": "ALT-49f32160d2",
+        "confidence": 0.9,
+        "evaluation_id": "EVAL-e745280e4d",
+        "objective_id": "OBJ-28fc951aba",
+        "source": "USER_INPUT",
+        "unit": "score",
+        "value": 80.0,
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "USER_COMMAND",
+      "timestamp": "2026-09-15T08:11:15.329116+00:00",
+      "type": "EVALUATION_RECORDED"
+    },
+    {
+      "actor": "demo-human",
+      "id": 14,
+      "payload": {
+        "actor": "demo-human",
+        "alternative_id": "ALT-e5b77a64ca",
+        "confidence": 0.8,
+        "evaluation_id": "EVAL-c45d0f86d2",
+        "objective_id": "OBJ-28fc951aba",
+        "source": "USER_INPUT",
+        "unit": "score",
+        "value": 70.0,
+        "version": 1
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "USER_COMMAND",
+      "timestamp": "2026-09-15T08:11:15.329390+00:00",
+      "type": "EVALUATION_RECORDED"
+    },
+    {
+      "actor": "demo-human",
+      "id": 15,
+      "payload": {
+        "actor": "demo-human",
+        "alternative_ids": [
+          "ALT-49f32160d2",
+          "ALT-e5b77a64ca"
+        ],
+        "comparison_id": "CMP-d9c264d334"
+      },
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "USER_COMMAND",
+      "timestamp": "2026-09-15T08:11:15.329674+00:00",
+      "type": "COMPARISON_CREATED"
+    }
+  ],
+  "facts": {
+    "FACT-90b250aa20": {
+      "fact_id": "FACT-90b250aa20",
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "SENAMHI",
+      "statement": "Vientos predominantes: Sur-Suroeste",
+      "version": 1
+    },
+    "FACT-b378988583": {
+      "fact_id": "FACT-b378988583",
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "SENAMHI",
+      "statement": "Clima: Semiárido cálido (BSk Köppen), T° promedio 21°C",
+      "version": 1
+    },
+    "FACT-bcf9ddb06d": {
+      "fact_id": "FACT-bcf9ddb06d",
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "del sitio: 2000 m2 CATASTRO",
+      "statement": "Area",
+      "version": 1
+    },
+    "FACT-d51c71af0a": {
+      "fact_id": "FACT-d51c71af0a",
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "source": "NASA_POWER",
+      "statement": "Radiación solar: 5.5 kWh/m²/día anual",
+      "version": 1
+    }
+  },
+  "name": "Edificio Yvan Trujillo",
+  "objectives": {
+    "OBJ-28fc951aba": {
+      "direction": "MAXIMIZE",
+      "key": "CLIMATE",
+      "objective_id": "OBJ-28fc951aba",
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "value": "80",
+      "version": 1
+    }
+  },
+  "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+  "recommendations": {},
+  "roles": {
+    "ROLE-ea07d12ace": {
+      "actor": "Yvan",
+      "name": "ARCHITECT",
+      "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+      "role_id": "ROLE-ea07d12ace",
+      "version": 1
+    }
+  },
+  "stage": "DRAFT",
+  "version": 15
+}

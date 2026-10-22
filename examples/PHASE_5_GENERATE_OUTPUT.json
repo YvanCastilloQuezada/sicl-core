@@ -1,0 +1,36 @@
+{
+  "status": "OK",
+  "code": "OK",
+  "message": "ok",
+  "data": {
+    "generated": [
+      {
+        "alternative_id": "ALT-92a0629715",
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "name": "CONVENCIONAL_A_OPT_1",
+        "description": "Budget-reduced proposal",
+        "parameters": {
+          "FLOORS": "7"
+        },
+        "status": "PROPOSED",
+        "version": 1,
+        "source": "GENERATIVE_OPTIMIZER"
+      },
+      {
+        "alternative_id": "ALT-b42a05237d",
+        "project_id": "EDIFICIO-YVAN-TRUJILLO-01",
+        "name": "CONVENCIONAL_A_OPT_2",
+        "description": "Energy-improved proposal",
+        "parameters": {
+          "FLOORS": "8",
+          "facade": "doble piel"
+        },
+        "status": "PROPOSED",
+        "version": 1,
+        "source": "GENERATIVE_OPTIMIZER"
+      }
+    ],
+    "decision_created": false,
+    "recommendation_created": false
+  }
+}

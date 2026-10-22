@@ -53,6 +53,7 @@ def test_fact_and_assumption_are_distinct_and_decision_is_human(tmp_path: Path):
     cli.execute('/PROJECT CREATE P-1 "Test"')
     cli.execute('/FACT SET "Observed datum" "Survey"')
     cli.execute('/ASSUMPTION SET "Demand remains stable" "Scenario premise"')
+    cli.execute('/HUMAN REVIEW Architect 2026-09-15T00:00:00Z "Proceed with option A" "Reviewed recommendation" PRODUCT_OWNER')
     cli.execute('/DECISION RECORD "Proceed with option A" "Architect" "PRODUCT_OWNER"')
 
     state = cli.execute('/STATUS')["data"]
@@ -62,7 +63,7 @@ def test_fact_and_assumption_are_distinct_and_decision_is_human(tmp_path: Path):
     assert decision["actor"] == "Architect"
     assert decision["authority"] == "PRODUCT_OWNER"
     assert [e["type"] for e in cli.execute('/HISTORY')["data"]["events"]] == [
-        "PROJECT_CREATED", "FACT_SET", "ASSUMPTION_SET", "DECISION_RECORDED"
+        "PROJECT_CREATED", "FACT_SET", "ASSUMPTION_SET", "HUMAN_REVIEW_RECORDED", "DECISION_RECORDED"
     ]
     repo.close()
 
@@ -136,8 +137,10 @@ def test_decision_requires_actor_and_authority(tmp_path: Path):
     repo = SQLiteRepository(tmp_path / "decision.sqlite")
     cli = CLI(repo)
     cli.execute('/PROJECT CREATE P-DECISION "Decision"')
-    assert cli.execute('/DECISION RECORD "Proceed"')["code"] == "INVALID_ARGUMENT"
-    assert cli.execute('/DECISION RECORD "Proceed" Architect')["code"] == "INVALID_ARGUMENT"
+    assert cli.execute('/DECISION RECORD "Proceed"') ["code"] == "INVALID_ARGUMENT"
+    assert cli.execute('/DECISION RECORD "Proceed" Architect') ["code"] == "INVALID_ARGUMENT"
+    assert cli.execute('/DECISION RECORD "Proceed" Architect PRODUCT_OWNER')["code"] == "HUMAN_REVIEW_REQUIRED"
+    assert cli.execute('/HUMAN REVIEW Architect 2026-09-15T00:00:00Z "Proceed" "Reviewed recommendation" PRODUCT_OWNER')["code"] == "OK"
     assert cli.execute('/DECISION RECORD "Proceed" Architect PRODUCT_OWNER')["code"] == "OK"
     decision = next(iter(cli.execute('/STATUS')["data"]["decisions"].values()))
     assert decision["actor"] == "Architect" and decision["authority"] == "PRODUCT_OWNER"

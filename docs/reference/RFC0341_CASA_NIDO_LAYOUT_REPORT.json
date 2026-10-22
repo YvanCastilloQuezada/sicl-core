@@ -1,0 +1,188 @@
+{
+  "project": "CASA NIDO DE CAMPO",
+  "engine": "RFC-034.1 Sheet Composition & Layout Engine",
+  "renders_pdf": false,
+  "core_changed": false,
+  "decision_created": false,
+  "sheet_count": 5,
+  "valid_sheet_count": 5,
+  "total_collisions": 0,
+  "total_margin_violations": 0,
+  "sheets": [
+    {
+      "layout_id": "CN-01",
+      "title": "Planta Baja · Nivel 01",
+      "format": "A3",
+      "orientation": "H",
+      "margins": {
+        "top": 20,
+        "bottom": 20,
+        "left": 25,
+        "right": 25
+      },
+      "zones": [
+        "title",
+        "cajetin",
+        "drawing",
+        "norte",
+        "scale",
+        "notes"
+      ],
+      "elements": [
+        "CN-01-title",
+        "CN-01-drawing",
+        "CN-01-cajetin",
+        "CN-01-north",
+        "CN-01-scale"
+      ],
+      "status": "VALID",
+      "collisions": 0,
+      "margin_violations": 0,
+      "truncations": 0,
+      "title_present": true,
+      "north_present": true,
+      "scale_present": true,
+      "cajetin_present": true
+    },
+    {
+      "layout_id": "CN-02",
+      "title": "Planta Alta · Nivel 02",
+      "format": "A3",
+      "orientation": "H",
+      "margins": {
+        "top": 20,
+        "bottom": 20,
+        "left": 25,
+        "right": 25
+      },
+      "zones": [
+        "title",
+        "cajetin",
+        "drawing",
+        "norte",
+        "scale",
+        "notes"
+      ],
+      "elements": [
+        "CN-02-title",
+        "CN-02-drawing",
+        "CN-02-cajetin",
+        "CN-02-north",
+        "CN-02-scale"
+      ],
+      "status": "VALID",
+      "collisions": 0,
+      "margin_violations": 0,
+      "truncations": 0,
+      "title_present": true,
+      "north_present": true,
+      "scale_present": true,
+      "cajetin_present": true
+    },
+    {
+      "layout_id": "CN-03",
+      "title": "Corte Longitudinal A–A",
+      "format": "A3",
+      "orientation": "H",
+      "margins": {
+        "top": 20,
+        "bottom": 20,
+        "left": 25,
+        "right": 25
+      },
+      "zones": [
+        "title",
+        "cajetin",
+        "drawing",
+        "norte",
+        "scale",
+        "notes"
+      ],
+      "elements": [
+        "CN-03-title",
+        "CN-03-drawing",
+        "CN-03-cajetin",
+        "CN-03-north",
+        "CN-03-scale"
+      ],
+      "status": "VALID",
+      "collisions": 0,
+      "margin_violations": 0,
+      "truncations": 0,
+      "title_present": true,
+      "north_present": true,
+      "scale_present": true,
+      "cajetin_present": true
+    },
+    {
+      "layout_id": "CN-04",
+      "title": "Elevación Principal · Sur",
+      "format": "A3",
+      "orientation": "H",
+      "margins": {
+        "top": 20,
+        "bottom": 20,
+        "left": 25,
+        "right": 25
+      },
+      "zones": [
+        "title",
+        "cajetin",
+        "drawing",
+        "norte",
+        "scale",
+        "notes"
+      ],
+      "elements": [
+        "CN-04-title",
+        "CN-04-drawing",
+        "CN-04-cajetin",
+        "CN-04-north",
+        "CN-04-scale"
+      ],
+      "status": "VALID",
+      "collisions": 0,
+      "margin_violations": 0,
+      "truncations": 0,
+      "title_present": true,
+      "north_present": true,
+      "scale_present": true,
+      "cajetin_present": true
+    },
+    {
+      "layout_id": "CN-05",
+      "title": "Lámina de Síntesis",
+      "format": "A3",
+      "orientation": "H",
+      "margins": {
+        "top": 20,
+        "bottom": 20,
+        "left": 25,
+        "right": 25
+      },
+      "zones": [
+        "title",
+        "cajetin",
+        "drawing",
+        "norte",
+        "scale",
+        "notes"
+      ],
+      "elements": [
+        "CN-05-title",
+        "CN-05-drawing",
+        "CN-05-cajetin",
+        "CN-05-north",
+        "CN-05-scale"
+      ],
+      "status": "VALID",
+      "collisions": 0,
+      "margin_violations": 0,
+      "truncations": 0,
+      "title_present": true,
+      "north_present": true,
+      "scale_present": true,
+      "cajetin_present": true
+    }
+  ]
+}

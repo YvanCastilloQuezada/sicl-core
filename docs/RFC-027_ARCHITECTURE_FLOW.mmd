@@ -1,0 +1,85 @@
+flowchart LR
+  subgraph SOURCES[Fuentes de trabajo del arquitecto]
+    REVIT[Revit\nRVT / Revit API]
+    ARCHICAD[Archicad\nPLN / IFC]
+    IFC[IFC\nintercambio abierto]
+    CADASTRE[Catastro / GIS\nOGC API Features]
+    USER[Usuario\nbrief, preferencias, revisión]
+  end
+
+  subgraph ADAPTERS[Adaptadores controlados]
+    BIMADAPTER[Adaptador BIM/IFC\nlectura de elementos, parámetros y unidades]
+    GISADAPTER[Adaptador GIS\nGeoJSON, bbox, CRS y vigencia]
+    COPILOT[Copiloto local\nLLM + Intent JSON]
+  end
+
+  subgraph CONTRACTS[Contratos canónicos RFC-027]
+    SNAPSHOT[BIMModelSnapshot\nappend-only + model_hash]
+    MAPPING[BIMParameterMapping\npending human review]
+    PARCEL[ParcelSnapshot / Evidence\nfuente, CRS, fecha, hash]
+    INTENT[CopilotIntent\nSICL candidate command]
+    CHANGESET[BIMChangeSet\nPREVIEW only]
+  end
+
+  subgraph VALIDATION[Validación de entrada]
+    SCHEMA[Schema validator\nTipos, unidades, CRS, IDs]
+    ONTOLOGY[Validador ontológico\n11 SpatialScope]
+    PROVENANCE[Provenance validator\nfuente, hash, versión]
+    AUTH[HumanReview gate\nconfirmación explícita]
+  end
+
+  subgraph SICL[SICL Core determinista]
+    API[/v1 HTTP contract/]
+    DOMAIN[Domain model\nFact / Assumption / Preference]
+    FEAS[Feasibility + constraints]
+    PARETO[Pareto + evaluations]
+    AUDIT[Event Log + audit trail]
+    DECISION[Decision humana\nno automática]
+  end
+
+  subgraph OUTPUTS[Resultados controlados]
+    REPORT[Resultados trazables\nJSON / reportes]
+    IFCOUT[Export IFC / Revit / Archicad\nsolo después de aprobación]
+    GISVIEW[Mapa parcela y contexto]
+  end
+
+  REVIT --> BIMADAPTER
+  ARCHICAD --> IFC
+  IFC --> BIMADAPTER
+  CADASTRE --> GISADAPTER
+  USER --> COPILOT
+  USER --> AUTH
+
+  BIMADAPTER --> SNAPSHOT
+  BIMADAPTER --> MAPPING
+  GISADAPTER --> PARCEL
+  COPILOT --> INTENT
+  INTENT --> SCHEMA
+  SNAPSHOT --> SCHEMA
+  MAPPING --> SCHEMA
+  PARCEL --> SCHEMA
+  SCHEMA --> ONTOLOGY
+  ONTOLOGY --> PROVENANCE
+  PROVENANCE --> API
+  API --> DOMAIN
+  DOMAIN --> FEAS
+  DOMAIN --> PARETO
+  FEAS --> REPORT
+  PARETO --> REPORT
+  DOMAIN --> AUDIT
+  API --> AUTH
+  AUTH --> DECISION
+  AUTH --> CHANGESET
+  CHANGESET --> IFCOUT
+  REPORT --> USER
+  PARCEL --> GISVIEW
+  AUDIT --> REPORT
+
+  classDef external fill:#e8f1ff,stroke:#2563eb,color:#111827
+  classDef adapter fill:#fff7ed,stroke:#ea580c,color:#111827
+  classDef contract fill:#ecfdf5,stroke:#059669,color:#111827
+  classDef core fill:#fefce8,stroke:#ca8a04,color:#111827
+  class REVIT,ARCHICAD,IFC,CADASTRE,USER external
+  class BIMADAPTER,GISADAPTER,COPILOT adapter
+  class SNAPSHOT,MAPPING,PARCEL,INTENT,CHANGESET contract
+  class API,DOMAIN,FEAS,PARETO,AUDIT,DECISION core

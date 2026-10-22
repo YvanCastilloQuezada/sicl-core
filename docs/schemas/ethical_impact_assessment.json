@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://arki.sicl/schemas/ethical_impact_assessment.json",
+  "title": "Algorithmic Impact Assessment (AIA)",
+  "description": "Evaluación de Impacto Algorítmico obligatoria para outputs de alto riesgo. Materializa la Regla 43 (AIA Obligatoria).",
+  "type": "object",
+  "required": ["assessment_id", "target_output_ref", "bias_declaration", "harm_assessment_score", "authority_approval_id", "status"],
+  "properties": {
+    "assessment_id": {
+      "type": "string",
+      "description": "ID único de esta evaluación de impacto"
+    },
+    "target_output_ref": {
+      "type": "string",
+      "description": "ID del output o propuesta que está siendo evaluada"
+    },
+    "bias_declaration": {
+      "type": "object",
+      "required": ["known_biases", "mitigation_steps"],
+      "properties": {
+        "known_biases": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Lista de sesgos conocidos en los datos o el modelo"
+        },
+        "mitigation_steps": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Pasos de mitigación aplicados para cada sesgo"
+        }
+      },
+      "description": "Declaración explícita de sesgos conocidos"
+    },
+    "harm_assessment_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Puntuación de riesgo de daño (0 = seguro, 100 = daño crítico). Debe estar por debajo del umbral del domain_profile."
+    },
+    "authority_approval_id": {
+      "type": ["string", "null"],
+      "description": "ID de la transacción de aprobación humana. NULL si está pendiente."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PENDING_REVIEW", "APPROVED", "REJECTED"],
+      "description": "Estado actual de la AIA"
+    },
+    "ethical_review_notes": {
+      "type": "string",
+      "description": "Notas del revisor ético humano"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora de la evaluación"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://arki.sicl/schemas/provenance_hash.json",
+  "title": "Provenance Hash",
+  "description": "Hash SHA-256 de integridad de contenido. No es una firma criptográfica ni certificación C2PA.",
+  "type": "object",
+  "required": ["generator_id", "timestamp", "content_hash", "hash_algorithm", "domain_profile_ref"],
+  "properties": {
+    "generator_id": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "content_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "hash_algorithm": {"type": "string", "enum": ["SHA256_HASH"]},
+    "domain_profile_ref": {"type": "string"},
+    "source_data_refs": {"type": "array", "items": {"type": "string"}},
+    "label_version": {"type": "string"},
+    "standard": {"type": "string", "enum": ["hash-integrity-only"]}
+  },
+  "additionalProperties": false
+}

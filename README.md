@@ -90,6 +90,12 @@ El frontend utiliza `VITE_API_URL` para apuntar a este servicio. Nunca coloque t
 
 El servicio incluye `Procfile`, `requirements.txt`, `runtime.txt` y `.env.example`. Consulte [`docs/RAILWAY_DEPLOYMENT.md`](docs/RAILWAY_DEPLOYMENT.md) para conectar el repositorio, generar el dominio público, configurar CORS, montar un volumen persistente y verificar el E2E. La ruta canónica de SQLite en Railway es `SICL_DB_PATH`; `DATABASE_URL=./sicl.db` también se acepta como ruta local compatible.
 
+Para el procedimiento actualizado de producción consulte [`docs/PRODUCTION_CORE_DEPLOYMENT_MANUAL.md`](docs/PRODUCTION_CORE_DEPLOYMENT_MANUAL.md). La suite E2E del Copiloto y SICL está en `tests/test_e2e_ollama_sicl.py` y se ejecuta con:
+
+```bash
+PYTHONPATH=.:src pytest -q tests/test_e2e_ollama_sicl.py -ra
+```
+
 ## Licencia
 
 Este repositorio se distribuye actualmente como **Proprietary — All rights reserved**. Cualquier cambio a una licencia abierta requiere una decisión explícita del Product Owner.

@@ -1,12 +1,12 @@
 # SICL Core Contract v1.0
 
-**Estado:** APPROVED FOR IMPLEMENTATION
+**Estado:** APPROVED — SiMS-DeI CANONICAL BASELINE (v2 repaired)
 
 **Línea:** `sicl-core-v1.0` — independiente de SICL 0.6.
 
-## 1. Alcance MVP aprobado
+## 1. Alcance constitucional vigente
 
-El MVP implementa exclusivamente:
+La base canónica implementa el MVP fundacional y las capacidades analíticas v2 siguientes:
 
 - `Project`
 - `Stage`
@@ -15,10 +15,20 @@ El MVP implementa exclusivamente:
 - `Role`
 - `Fact`
 - `Assumption`
+- `Evidence` y `Source` como registros de procedencia explícita
 - `Decision` como registro básico humano
 - `Event` append-only estricto
 
-`Alternative`, `Evaluation`, `Comparison` y `Recommendation` pertenecen a SICL v1.1. `Project DNA`, `Agents`, `Requirements` formales, optimización, UI, GIS, BIM, clima y APIs externas quedan fuera del MVP.
+Capacidades analíticas v2 reconocidas:
+
+- `Alternative`, `Evaluation`, `Comparison` y `Recommendation`.
+- `SiteObservation` con fuente y estado de conocimiento explícitos.
+- Agentes expertos que producen únicamente `Evaluation`.
+- Pareto, generación y debate como operaciones analíticas que no crean `Decision`.
+
+Estas capacidades no adquieren autoridad decisoria por estar reconocidas en el contrato.
+
+`Project DNA`, `Requirements` formales, UI, GIS, BIM, Digital Twin e IoT permanecen fuera de alcance. Las integraciones externas de datos solo pueden producir observaciones/facts con fuente, estado y trazabilidad explícitos.
 
 ## 2. Ontología mínima
 
@@ -30,21 +40,52 @@ El MVP implementa exclusivamente:
 
 | Entidad | Atributos mínimos |
 |---|---|
-| Project | `project_id`, `name`, `stage`, `version` |
+| Project | `project_id`, `name`, `stage`, `version`, `spatial_scope?`, `temporal_scope` |
 | Stage | valor controlado: `DRAFT`, `ACTIVE`, `CLOSED` |
-| Objective | `objective_id`, `project_id`, `key`, `direction`, `value`, `version` |
+| Objective | `objective_id`, `project_id`, `key`, `direction`, `value`, `version`, `source_parent_objective_id?` |
 | Constraint | `constraint_id`, `project_id`, `key`, `operator`, `value`, `unit`, `hard=true`, `version` |
 | Role | `role_id`, `project_id`, `name`, `actor`, `version` |
 | Fact | `fact_id`, `project_id`, `statement`, `source`, `version` |
 | Assumption | `assumption_id`, `project_id`, `statement`, `basis`, `version` |
+| Evidence | `evidence_id`, `project_id`, `source_id?`, `statement`, `evidence_type`, `captured_at`, `method_version`, `evidence_url?`, `evidence_hash?`, `state`, `version` |
+| Source | `source_id`, `project_id`, `source_type`, `title`, `url?`, `version` |
 | Decision | `decision_id`, `project_id`, `statement`, `actor`, `authority`, `version` |
+| HumanReview | `review_id`, `project_id`, `statement`, `actor`, `authority`, `status`, `version` |
+| SiteObservation | `location`, valores con unidad, `source`, `state`, `captured_at`, `method`, `evidence` |
+| Alternative | `alternative_id`, `project_id`, `name`, `description`, `parameters`, `status`, `version`, `source` |
+| Evaluation | `evaluation_id`, `alternative_id`, `objective_id`, `value`, `unit`, `confidence`, `source`, `version` |
+| Comparison | `comparison_id`, `project_id`, `alternative_ids`, `evaluations`, `tradeoffs`, `version` |
+| Simulation | `simulation_id`, `project_id`, `simulation_type`, `method`, `method_version`, `inputs`, `outputs`, `state`, `started_at`, `finished_at?`, `evidence_hash`, `version` |
+| DesignPrinciple | `principle_id`, `name`, `category`, `description`, `applicable_scopes`, `source` |
+| MultiobjectiveResult | `multiobjective_id`, `project_id`, `method`, `method_version`, `objectives`, `alternatives`, `pareto_front`, `dominated`, `incomplete`, `tradeoffs`, `state`, `inputs_hash`, `created_at`, `version` |
+| GeneratedAlternative | `generation_id`, `project_id`, `generator`, `generator_version`, `method`, `inputs`, `candidates`, `rationale`, `state`, `generation_hash`, `created_at`, `version` |
+| PlanningInstrument | `instrument_id`, `project_id?`, `instrument_type`, `name`, `jurisdiction`, `authority?`, `approval_date?`, `validity_period?`, `scope_applicable`, `status`, `objectives`, `url?`, `summary?`, `source`, `version` |
+| Regulation | `regulation_id`, `jurisdiction`, `authority`, `code`, `title`, `version`, `publication_date?`, `effective_date?`, `status`, `source_url?`, `source_type`, `evidence_hash?`, `scope_applicable`, `parent_regulation_id?`, `summary?`, `version_field` |
+| NormativeInterpretation | `interpretation_id`, `regulation_id`, `article_reference`, `interpretation_text`, `applied_to_project_id?`, `interpreted_by`, `interpretation_date`, `confidence`, `state`, `disclaimer`, `version` |
+| NormativeSnapshot | `snapshot_id`, `project_id`, `cut_date`, `jurisdiction`, `regulations_included`, `interpretations_included`, `state`, `reviewer?`, `created_at`, `version` |
+| ScaleRelation | `relation_id`, `parent_project_id`, `child_project_id`, `relation_type`, `description?`, `created_by`, `created_at`, `version` |
+| ScenarioEvolution | `evolution_id`, `scenario_id`, `from_cycle_id`, `to_cycle_id`, `changes`, `triggers`, `state`, `applied_by?`, `applied_at?`, `version` |
 | Event | `id`, `timestamp`, `project_id`, `type`, `payload`, `actor`, `source` |
+| ProjectVariable | `variable_id`, `project_id`, `normalized_key`, `variable_type`, `value`, `actor_id`, `authority`, `unit?`, `spatial_scope?`, `version` |
+| SuggestedVariable | `key`, `variable_type`, `suggested_value`, `spatial_scope?`, `source` |
+| FeasibilityResult | `alternative_id`, `state`, `checks`, `failed_constraint_ids`, `unknown_constraint_ids`, `insufficient_constraint_ids`, `evaluated_by` |
+
+### Multiscale Model
+
+`SpatialScope` admite exactamente once valores canónicos, en orden: `pais`, `macro_region`, `region`, `provincia_metropoli`, `distrito_ciudad`, `zona_barrio_sector`, `parcela_sitio`, `edificacion`, `sistema`, `espacio` y `objeto`. Los valores heredados `edificio`, `ciudad_distrito` y `barrio_sector` se migran mediante RFC-019 y no son aliases silenciosos. La jerarquía es estricta; las relaciones no adyacentes se modelan mediante `ScaleRelation`.
+
+`TemporalScope` admite `proyecto`, `corto_plazo`, `mediano_plazo`, `largo_plazo`, `escenario_2030`, `escenario_2040` y `escenario_2050`. El valor por defecto es `proyecto`.
+
+`Project.spatial_scope` es opcional y por defecto es `null`. `null` significa que no se ha declarado una escala; no se infiere escala desde ningún dato del proyecto. `Project.temporal_scope` siempre contiene un valor válido. Los comandos `/PROJECT CREATE <id> <name> [spatial_scope] [temporal_scope]` y `/PROJECT SET SCOPE <spatial_scope> [temporal_scope]` validan estos valores; el segundo registra `SCOPE_CHANGED` como evento append-only.
 
 ## 4. Comandos aprobados
 
 ```text
 /PROJECT CREATE <project_id> <name>
+/PROJECT CREATE <project_id> <name> [spatial_scope] [temporal_scope]
 /PROJECT OPEN <project_id>
+/PROJECT SET SCOPE <spatial_scope> [temporal_scope]
+/PROJECT IMPORT OBJECTIVE <source_project_id> <objective_id>
 /PROJECT SHOW
 /PROJECT LIST
 /STAGE SET <stage>
@@ -53,6 +94,44 @@ El MVP implementa exclusivamente:
 /ROLE ADD <name> <actor>
 /FACT SET <statement> [source]
 /ASSUMPTION SET <statement> [basis]
+/EVIDENCE ADD <evidence_id> <statement> <evidence_type> [source_id] [evidence_url]
+/EVIDENCE LIST
+/EVIDENCE SHOW <evidence_id>
+/EVALUATE <alternative> <objective> <value> [unit] [confidence] [source]
+/COMPARE <alternative> <alternative> [...]
+/SIMULATE RUN <simulation_type> <method> [params]
+/SIMULATE LIST
+/SIMULATE SHOW <simulation_id>
+/SIMULATE METHODS
+/GENERATE DESIGN <method> <json_inputs>
+/GENERATE LIST
+/GENERATE SHOW <generation_id>
+/GENERATE METHODS
+/ALTERNATIVE PROMOTE <generation_id> <candidate_index> <actor> <authority>
+/DESIGN PRINCIPLES
+/DESIGN PRINCIPLE <principle_id>
+/MULTIOBJECTIVE PARETO <obj_1> <obj_2> [...]
+/MULTIOBJECTIVE TRADEOFFS <obj_1> <obj_2>
+/MULTIOBJECTIVE LIST
+/MULTIOBJECTIVE SHOW <multiobjective_id>
+/PLANNING ADD <instrument_id> <instrument_type> <name> [jurisdiction] [url]
+/PLANNING LIST
+/PLANNING SHOW <instrument_id>
+/PLANNING TYPES
+/REGULATION ADD <regulation_id> <code> <title> [jurisdiction] [source_url]
+/REGULATION LIST
+/REGULATION SHOW <regulation_id>
+/REGULATION STATUS <regulation_id> <status>
+/INTERPRET ADD <interpretation_id> <regulation_id> <article_reference> <interpretation_text>
+/INTERPRET LIST [regulation_id]
+/INTERPRET REVIEW <interpretation_id> <actor> <authority>
+/SNAPSHOT CREATE <snapshot_id> <project_id> <cut_date>
+/SNAPSHOT LIST <project_id>
+/SNAPSHOT FREEZE <snapshot_id> <reviewer>
+/SCALE PARENT <scope>
+/SCALE CHILDREN <scope>
+/SCALE RELATE <parent_project_id> <child_project_id> <relation_type> [description]
+/SCALE RELATIONS <project_id>
 /DECISION RECORD <statement> <actor> <authority>
 /STATUS
 /HISTORY
@@ -68,23 +147,251 @@ El MVP implementa exclusivamente:
 4. `Objective.direction` es obligatorio y solo admite `MAXIMIZE` o `MINIMIZE`.
 5. Todo `Constraint` del MVP es `hard=true`; no se admite un nivel soft.
 6. Fact y Assumption se almacenan separadamente.
-7. Decision conserva actor y authority y no es generada por análisis automático.
+7. Decision conserva actor y authority, requiere un `HumanReview` aprobado del mismo actor y authority, y nunca es generada por análisis automático.
 8. Toda mutación exitosa produce exactamente un Event.
 9. La tabla de eventos es append-only: no se actualiza ni elimina.
 10. State y Event se persisten en una única transacción.
 11. El cierre del proyecto impide nuevas mutaciones.
 12. El historial devuelve eventos ordenados por inserción temporal.
+13. Los estados de conocimiento admitidos son `UNKNOWN`, `CONFLICTING`, `INSUFFICIENT` y `OBSERVED`; ningún estado se sustituye silenciosamente por otro.
+14. `SiteObservation` no crea restricciones normativas; la normativa requiere una fuente específica y autoridad humana.
+15. `Evidence` solo registra declaraciones capturadas; no se convierte automáticamente en `Fact` o `Assumption`.
+16. `Evidence` acepta únicamente los tipos y estados canónicos, calcula SHA-256 desde `statement` cuando falta hash y es append-only.
+17. `Evaluation` requiere una Alternative y un Objective existentes; no crea Recommendation ni Decision.
+18. `Comparison` requiere al menos dos Alternatives existentes y no crea Recommendation ni Decision.
+19. `Simulation` es append-only, no crea Recommendation ni Decision y no convierte Assumption en Fact.
+20. Los tipos admitidos son `DETERMINISTIC`, `MONTE_CARLO`, `SCENARIO` y `SENSITIVITY`. RFC-006.1 implementa `monte_carlo_v1` para distribuciones `NORMAL`, `UNIFORM` y `TRIANGULAR`, con semilla reproducible y un máximo de 10 000 iteraciones. Los tipos `SCENARIO` y cualquier método no implementado permanecen catalogados sin ejecución.
+21. `DesignPrinciple` es un catálogo read-only con fuente declarada; no crea Decision, Recommendation ni Evaluation automática.
+22. `MultiobjectiveResult` es descriptivo: no crea Recommendation, Decision, Alternative ni Evaluation.
+23. Cada objetivo multiobjetivo requiere dirección explícita `MAXIMIZE` o `MINIMIZE`; la ausencia produce `OBJECTIVE_DIRECTION_REQUIRED`.
+24. Si falta una evaluación requerida, la alternativa aparece en `incomplete` y el estado del resultado es `INSUFFICIENT`.
+25. `MultiobjectiveResult` es append-only y conserva el hash SHA-256 de sus entradas.
+26. `PlanningInstrument` no es normativa obligatoria, `DesignPrinciple`, `Reference` ni `Preference`.
+27. Si falta una fuente verificable, `PlanningInstrument.status=UNKNOWN`.
+28. Un `PlanningInstrument` no crea automáticamente Constraint, Recommendation, Preference ni Decision.
+29. El vínculo a un Project es explícito, admite 0..N instrumentos y registra `PLANNING_INSTRUMENT_LINKED` con actor y timestamp.
+30. Planning Instruments y sus vínculos son append-only; una modificación requiere una nueva versión.
+31. `Regulation` no es `PlanningInstrument`, `DesignPrinciple`, `Reference` ni `Preference`.
+32. Sin fuente oficial o sin vigencia verificada, una Regulation no se presenta como vigente y su estado inicial es `NO_VERIFICADA`.
+33. `NormativeInterpretation` siempre contiene el disclaimer: `No constituye certificación legal ni reemplaza revisión profesional.`
+34. Una Interpretation requiere revisión humana con actor y authority para estar en estado `REVIEWED`; no crea Constraint automáticamente.
+35. Un `NormativeSnapshot` en estado `FROZEN` es inmutable; los cambios normativos requieren un snapshot nuevo.
+36. Regulatory Intelligence no decide, recomienda ni certifica cumplimiento.
+37. La jerarquía espacial solo es un catálogo consultable; no infiere relaciones territoriales.
+38. `CONTAINS` requiere scopes espaciales explícitos y una relación ancestro→descendiente válida.
+39. `ScaleRelation` es append-only; no se actualiza ni elimina y toda creación conserva actor, timestamp y evento.
+40. La importación de un Objective requiere una relación `CONTAINS` explícita y conserva `source_parent_objective_id`; no copia autoridad ni crea decisiones.
+41. `GeneratedAlternative` es una propuesta de candidatos y no es `Alternative`; su generación no crea Recommendation ni Decision.
+42. `parametric_grid_v1` y `pattern_variation_v1` operan únicamente sobre inputs declarados y no aplican filtros ocultos.
+43. `evolutionary_v1` es un generador determinista con semilla declarada, límites de población y generaciones, y solo propone candidatos; no crea Recommendation ni Decision.
+44. `llm_assisted_v1` conserva un contrato mínimo, no ejecuta comandos ni afirma datos y devuelve `LLM_NOT_CONFIGURED` mientras no exista un proveedor configurado y autorizado.
+45. Una generación con inputs críticos ausentes conserva `state=INSUFFICIENT`; un método desconocido produce `METHOD_NOT_FOUND`.
+46. La promoción de un candidato a `Alternative` requiere `actor` y `authority` humanos explícitos y no crea Recommendation ni Decision.
+47. `GeneratedAlternative` y su tabla de persistencia son append-only y conservan `generation_hash`.
+48. `ScenarioEvolution` solo registra una transición explícita entre ciclos y no reescribe ciclos, escenarios, recomendaciones ni decisiones previas.
+49. `ScenarioEvolution` es append-only; crear, enriquecer y aplicar una evolución insertan versiones nuevas.
+50. Aplicar una `ScenarioEvolution` requiere `actor` y `authority` humanos explícitos y no crea Recommendation ni Decision.
 
 ## 6. Persistencia
 
 SQLite es el adaptador aprobado del MVP. Se usan tablas de estado para Project y sus entidades, y una tabla `events` inmutable. Cada mutación escribe estado y evento atómicamente.
 
+### HTTP v1 — Evaluation y Comparison
+
+La superficie canónica expone `POST` y `GET` para `/v1/projects/{project_id}/evaluations` y `/v1/projects/{project_id}/comparisons`. Las respuestas usan el envelope v1 con `contract_version`, `status`, `code`, `message`, `project_id`, `observed_version` y `data`. Evaluation puede filtrarse por `alternative` y `objective`; Comparison recibe al menos dos alternativas. Recommendation continúa separada y Decision conserva autoridad humana.
+
+### HTTP v1 — Design Intelligence
+
+La superficie read-only expone `GET /v1/design/principles`, `GET /v1/design/principles?category=<CATEGORY>` y `GET /v1/design/principles/{principle_id}`. Solo se exponen principios con `source` declarada; no se cargan referentes reales en esta fase.
+
+### HTTP v1 — Multiobjective
+
+La superficie canónica expone `POST /v1/projects/{project_id}/multiobjective/pareto`, `POST /v1/projects/{project_id}/multiobjective/tradeoffs`, `GET /v1/projects/{project_id}/multiobjective` y `GET /v1/projects/{project_id}/multiobjective/{multiobjective_id}`. Todas las respuestas usan el envelope v1 y conservan `contract_version`, `project_id` y `observed_version`.
+
+### HTTP v1 — Planning Instruments
+
+La superficie canónica expone `GET /v1/planning/instruments`, `GET /v1/planning/instruments/{instrument_id}`, `GET /v1/planning/types`, `POST /v1/projects/{project_id}/planning/instruments` y `GET /v1/projects/{project_id}/planning/instruments`. La carga de instrumentos reales no pertenece a esta fase.
+
+### HTTP v1 — Regulatory Corpus
+
+La superficie canónica expone los diez endpoints de RFC-003 para Regulations, NormativeInterpretations y NormativeSnapshots. El corpus real, la interpretación jurídica y la certificación de vigencia están fuera de esta fase.
+
+### HTTP v1 — Multiscale Relations
+
+La superficie canónica expone `GET /v1/scales`, `GET /v1/scales/{scope}/parent`, `GET /v1/scales/{scope}/children`, `POST /v1/projects/{project_id}/scale-relations`, `GET /v1/projects/{project_id}/scale-relations` y `POST /v1/projects/{project_id}/import-objective`. Estas operaciones registran relaciones y trazabilidad explícitas; no cargan GIS ni realizan inferencia territorial.
+
+### HTTP v1 — Design Generation
+
+La superficie canónica expone `POST /v1/projects/{project_id}/generations`, `GET /v1/projects/{project_id}/generations`, `GET /v1/projects/{project_id}/generations/{generation_id}`, `POST /v1/projects/{project_id}/generations/{generation_id}/promote` y `GET /v1/generations/methods`. La generación no decide ni recomienda; la promoción exige actor y authority y crea únicamente una Alternative formal.
+
+### Institutional Memory — RFC-011
+
+`InstitutionalMemory` es una proyección global derivada de proyectos cerrados; no pertenece al estado canónico de `Project` y no reescribe hechos, decisiones ni eventos previos. Sus registros son versionados y append-only, con tipos `DECISION_PATTERN`, `PREFERENCE_PATTERN`, `EVALUATION_PATTERN`, `GENERATION_PATTERN` y `LESSON_LEARNED`, estados `ACTIVE`, `SUPERSEDED` y `REVOKED`, y confianza `HIGH`, `MEDIUM`, `LOW` o `UNKNOWN`.
+
+La extracción requiere `actor` y `authority` humanos y aplica anonimización por defecto. La memoria no decide, no recomienda y no se auto-aplica. Aplicarla requiere acción humana explícita; únicamente registra un evento de aplicación y no modifica hechos, preferencias, alternativas, evaluaciones, recomendaciones ni decisiones del proyecto destino. Una memoria revocada no puede aplicarse.
+
+La superficie HTTP canónica expone `GET /v1/memory`, `GET /v1/memory/{memory_id}`, `GET /v1/memory/types`, `POST /v1/memory/extract`, `POST /v1/memory/{memory_id}/revoke` y `POST /v1/projects/{project_id}/memory/apply`.
+
+### Multi-Actor Model — RFC-012
+
+`Actor` y `ActorPosition` son entidades canónicas asociadas a `Project`. Actor expresa rol, nombre, autoridad explícita, intereses, restricciones y estado. ActorPosition expresa la posición de un actor sobre una `Recommendation`, `Alternative`, `DECISION_PROPOSED` o `Generation`, incluyendo postura, razón y condiciones.
+
+Los niveles de autoridad son `ADVISORY`, `CONTRIBUTORY`, `DECISIONAL` y `VETO`. Solo un actor activo `DECISIONAL` puede registrar una `Decision`; la operación continúa requiriendo `HumanReview` aprobado, actor y authority. Un `VETO` activo con postura `OPPOSE` o `CONDITIONAL` sobre un `DECISION_PROPOSED` bloquea el registro. Las posiciones no sustituyen `HumanReview` ni `Decision`, y los desacuerdos no se resuelven automáticamente.
+
+La superficie HTTP canónica expone `POST`, `GET` colección y `GET` individual para `/v1/projects/{project_id}/actors`, además de `POST`, `GET` colección y `GET` individual para `/v1/projects/{project_id}/positions`. Las tablas de actores y posiciones son append-only y sus mutaciones generan eventos auditables.
+
+### Temporal Cycles — RFC-013
+
+`TemporalCycle` representa un horizonte operativo `2030`, `2040`, `2050` o `CUSTOM`, con fechas, supuestos, objetivos a horizonte y actores involucrados. `ScenarioBranch` representa una rama de escenario asociada opcionalmente a un ciclo, con condiciones, objetivos y estado explícito. `ScenarioEvolution` registra una transición propuesta entre dos ciclos para un escenario, con cambios, triggers y estado `PROPOSED`, `EVALUATED`, `APPLIED` o `REJECTED`.
+
+Los ciclos no modifican decisiones pasadas. Las ramas no sobrescriben otras ramas: toda evolución se conserva como una nueva versión append-only. La selección de escenario requiere un actor activo y un `HumanReview` aprobado con actor y authority coincidentes. No existe selección automática ni supuesto de corrección del escenario.
+
+La superficie HTTP canónica expone `POST`, `GET` colección y `GET` individual para `/v1/projects/{project_id}/cycles`, `POST` y `GET` colección para `/v1/projects/{project_id}/scenarios`, y `POST /v1/projects/{project_id}/scenarios/{branch_id}/select`. RFC-013.1 añade `POST`, `GET` colección y `GET` individual para `/v1/projects/{project_id}/scenario-evolutions`, además de `POST /v1/scenario-evolutions/{evolution_id}/apply`. Los comandos equivalentes son `/CYCLE CREATE`, `/CYCLE LIST`, `/CYCLE SHOW`, `/SCENARIO CREATE`, `/SCENARIO LIST`, `/SCENARIO SELECT`, `/EVOLUTION CREATE`, `/EVOLUTION ADD CHANGE`, `/EVOLUTION ADD TRIGGER`, `/EVOLUTION APPLY`, `/EVOLUTION LIST` y `/EVOLUTION SHOW`.
+
+Una evolución nunca reescribe ciclos, escenarios, recomendaciones o decisiones previas. Su aplicación requiere actor y authority humanos explícitos y no crea Recommendation ni Decision.
+
 ## 7. Respuestas y errores
 
 La CLI devuelve objetos `Response` con `status`, `code`, `message` y `data`. Códigos mínimos: `OK`, `INVALID_COMMAND`, `INVALID_ARGUMENT`, `PROJECT_NOT_FOUND`, `PROJECT_ALREADY_EXISTS`, `INVALID_STATE`, `PERSISTENCE_ERROR`, `UNKNOWN_COMMAND`.
 
-## 8. Exclusiones
+## 8. Límites y exclusiones
 
-No se implementan Alternative, Evaluation, Comparison, Recommendation, Project DNA, Agents, Requirements formales, Optimization, Site Intelligence, Generative, Feasibility avanzada, UI ni integraciones externas.
+Los agentes, Pareto, generación, debate y Site Intelligence son analíticos y no autoritativos. RFC-010 implementa únicamente generación paramétrica y por patrón; no se implementan generación asistida por LLM, generación evolutiva, Project DNA, Requirements formales, UI, BIM, GIS, Digital Twin, IoT ni decisiones automáticas.
 
 **Este contrato no modifica SICL 0.6.**
+
+### HTTP v1 — Source
+
+La superficie canónica expone `POST /v1/projects/{project_id}/sources`, `GET /v1/projects/{project_id}/sources` y `GET /v1/projects/{project_id}/sources/{source_id}`. Source es un registro de procedencia project-scoped, con tipos `OFFICIAL`, `SECONDARY`, `USER_PROVIDED` y `UNKNOWN`; su creación es append-only, produce `SOURCE_ADDED` y no crea Evidence, Fact, Recommendation ni Decision. No existen endpoints HTTP de actualización o eliminación.
+
+
+## RFC-020 y RFC-021 — extensiones implementadas
+
+El baseline `main@faff4f8e` expone el registro explícito de variables y el filtro de factibilidad sin crear autoridad implícita. Los estados de factibilidad son `FEASIBLE`, `INFEASIBLE`, `INSUFFICIENT_DATA` y `UNKNOWN`. Solo las alternativas `FEASIBLE` pueden integrar `feasible_pareto_front`; las demás permanecen visibles para auditoría.
+
+Comandos CLI: `/VARIABLE ADD <variable_id> <key> <type> <value> <actor_id> <authority> [unit] [spatial_scope]`, `/VARIABLE LIST`, `/FEASIBILITY CHECK <alternative_id> '<values_json>'` y `/MULTIOBJECTIVE FEASIBLE_PARETO '<pareto_ids_json>'`.
+
+Endpoints HTTP: `POST /v1/projects/{project_id}/variables`, `GET /v1/projects/{project_id}/variables`, `POST /v1/projects/{project_id}/feasibility` y `POST /v1/projects/{project_id}/multiobjective/feasible-pareto`.
+
+
+## 19. Capacidades de integración vigentes
+
+El contrato vigente incorpora RFC-027–029. Las rutas BIM soportan snapshots IFC, importación física IFC y change sets PREVIEW. Las rutas GIS soportan snapshots GeoJSON, persistencia SQLite, consulta OGC y catálogo de fuentes. `ParcelBoundaryConflict` y `BIMConflict` se reportan como `HUMAN_REVIEW_REQUIRED`.
+
+`POST /v1/copilot/translate` devuelve una intención SICL candidata. Su contrato exige `PREVIEW_ONLY`, `executed: false` y `decision_created: false`. El Core conserva la validación determinista y la autoridad humana.
+
+Los contratos nativos Revit y Archicad responden `HOST_REQUIRED` fuera de sus aplicaciones. No se afirma compatibilidad propietaria sin el SDK y host correspondientes.
+
+## 20. Estado de despliegue
+
+El código está publicado en `main` y el tag `sims-dei-2.11-deploy-e2e`. La suite vigente contiene 241 pruebas. La verificación E2E remota queda condicionada a una URL HTTPS real, `SICL_CORE_SERVICE_TOKEN`, volumen persistente y Ollama accesible desde el Core.
+
+
+## Matriz vigente RFC-015–026
+
+Consulte [`SIMS_DEI_CURRENT_ARCHITECTURE_v2.11.md`](SIMS_DEI_CURRENT_ARCHITECTURE_v2.11.md) y [`RFC_015_026_COHERENCE_AUDIT.md`](RFC_015_026_COHERENCE_AUDIT.md). Estas referencias corrigen la lectura de estados históricos y registran las mejoras de simulación, factibilidad, generación, variables, normativa y conocimiento de diseño.
+
+## Principio Canónico N.º 5 — Se diseña lo que cumple los parámetros
+
+> **SE DISEÑA LO QUE CUMPLE LOS PARÁMETROS.**
+
+ARKI determina primero los parámetros y restricciones aplicables al problema arquitectónico y restringe el espacio de posibilidades antes de iniciar el diseño.
+
+> **LO QUE NO CUMPLE, NO NACE.**
+> **LO QUE NO NACE, NO VALE Y SE ELIMINA.**
+
+Una posibilidad que no supera los parámetros aplicables no constituye una propuesta arquitectónica rechazada: nunca llegó a nacer como propuesta. La distinción canónica es:
+
+```text
+POSIBILIDAD ≠ CANDIDATO ARQUITECTÓNICO
+CONSIDERAR ≠ DISEÑAR
+EXPLORAR ≠ GENERAR
+```
+
+### Parámetros y aplicabilidad
+
+`PARÁMETROS` es un concepto contextual y no cerrado. Puede comprender, según la escala, tipología, ubicación, jurisdicción y naturaleza del problema: legal/normativo, cliente, funcional, espacial, climático, bioclimático, cultural, social, histórico, patrimonial, natural, ambiental, ecológico, topográfico, geomorfológico, geológico, geotécnico, sísmico, hidrológico, hidrogeológico, urbano, territorial, estructural, constructivo, técnico, MEP, energético, de recursos, accesibilidad, seguridad, habitabilidad, económico, temporal, operacional, mantenimiento y ciclo de vida.
+
+```text
+PARAMETER AVAILABLE ≠ PARAMETER APPLICABLE
+```
+
+La aplicabilidad depende de `WHAT`, `WHO`, `WHERE`, `WHEN`, `SCALE`, `ENTITY TYPE`, `JURISDICTION`, `SOURCE`, `VERSION` y `CONTEXT`. Una norma jurisdiccional no se convierte en norma universal; una preferencia cultural no se convierte en obligación legal; una recomendación climática no se convierte en prohibición normativa; y una heurística no se convierte en certeza.
+
+El canon preserva como distinciones conceptuales mínimas:
+
+```text
+HARD CONSTRAINT
+SOFT CONSTRAINT
+OBJECTIVE
+PREFERENCE
+ASSUMPTION
+UNKNOWN
+```
+
+Una preferencia no se convierte automáticamente en restricción dura, ni una recomendación en prohibición.
+
+### Frontera de nacimiento
+
+El flujo conceptual es:
+
+```text
+ESPACIO DE POSIBILIDADES BRUTAS
+        ↓
+DETERMINACIÓN DE PARÁMETROS
+        ↓
+DETERMINACIÓN DE APLICABILIDAD
+        ↓
+SUFICIENCIA DE INFORMACIÓN
+        ↓
+¿SE PUEDE EVALUAR?
+   NO → UNKNOWN → RESOLVER INFORMACIÓN → REEVALUAR
+   SÍ → ¿CUMPLE?
+          NO → NO NACE → NO VALE → SE ELIMINA
+          SÍ → NACE → DISEÑO
+```
+
+Una posibilidad solo adquiere derecho a nacer como candidato cuando supera las condiciones requeridas para esa etapa:
+
+```text
+CUMPLE → PUEDE NACER
+NO CUMPLE → NO NACE
+NO NACE → NO VALE
+NO VALE → SE ELIMINA
+```
+
+Una posibilidad eliminada antes de nacer no genera geometría, `ArchiElement`, `DerivationRecord`, entrada H-001, estado arquitectónico canónico, simulación posterior ni propuesta visible al usuario. No se crea un cementerio de candidatos ni se registra como derivación arquitectónica descartada.
+
+`UNKNOWN` no equivale a cumplimiento ni a incumplimiento. La falta de datos (`MISSING DATA`) no equivale a no conformidad (`NON-COMPLIANCE`). La información indispensable debe resolverse antes de avanzar.
+
+### Invariantes y límites
+
+```text
+CUMPLIR ≠ SER ÓPTIMO
+NACER ≠ SER BUEN DISEÑO
+NACER ≠ SER SELECCIONADO
+SELECCIONADO ≠ HUMAN APPROVED
+SYSTEM FILTERING ≠ HUMAN SELECTION
+SYSTEM COMPLIANCE ≠ HUMAN APPROVAL
+```
+
+Superar el Principio 5 concede derecho a entrar al proceso de diseño, pero no implica calidad, optimalidad ni selección. Después del nacimiento pueden actuar generación, simulación, evaluación, crítica, mutación, optimización, comparación de alternativas y autoridad humana.
+
+### Relación con las capas existentes
+
+Esta incorporación es documental y no modifica A-002, H-001–H-005, D-1, D-2, D-2.1 ni ARKI-DRAW.
+
+- A-002 puede determinar si existe información suficiente para evaluar una operación, pero `INPUT SUFFICIENCY ≠ PARAMETRIC COMPLIANCE`.
+- Antes de nacer no existe `DerivationRecord` arquitectónico ni entrada H-001.
+- RAP queda subordinado al Principio 5 como mecanismo futuro especializado y permanece `DEFERRED_AFTER_D2_CORE`.
+- ARKI-DRAW recibe candidatos que ya superaron las barreras aplicables; no decide cumplimiento ni dibuja todo para comprobarlo después.
+
+> **ARKI no empieza diseñando para después comprobar si la solución corresponde al problema. Primero determina los parámetros aplicables, restringe el espacio de posibilidades y luego diseña dentro del espacio que los cumple.**
+
+**Estado de implementación:** `RUNTIME_ENFORCEMENT = NOT_IMPLEMENTED`. Esta sección no crea reglas normativas, catálogo de anti-patrones, Candidate Pruning ni lógica de enforcement.
+
+## Ley canónica — La vida de las ideas es cruel
+
+La doctrina transversal **LEY — LA VIDA DE LAS IDEAS ES CRUEL**, cuya fórmula es **MUCHAS IDEAS NACEN... POCAS SOBREVIVEN.**, y su mecanismo conceptual **Ley del Embudo** están incorporados en [ARKI_LAW_LIFE_OF_IDEAS_IS_CRUEL.md](ARKI_LAW_LIFE_OF_IDEAS_IS_CRUEL.md).
+
+Esta incorporación es exclusivamente documental. No implementa runtime pruning, survival pipeline ni asignación automática de cómputo; no modifica D-1, D-2.2R, H-001–H-005, A-002 ni ARKI-DRAW. Human Authority permanece como invariante y el Principio 5 permanece preservado.

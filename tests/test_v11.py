@@ -85,6 +85,7 @@ def test_recommendation_requires_human_approval(tmp_path: Path):
     recommendation = next(iter(state["recommendations"].values()))
     assert recommendation["status"] != "APPROVED"
     assert state["decisions"] == {}
+    assert cli.execute('/HUMAN REVIEW Architect 2026-09-15T00:00:00Z "Select OPCION_B" "Reviewed recommendation" PRODUCT_OWNER')["code"] == "OK"
     assert cli.execute('/DECISION RECORD "Select OPCION_B" Architect PRODUCT_OWNER')["code"] == "OK"
     repo.close()
 

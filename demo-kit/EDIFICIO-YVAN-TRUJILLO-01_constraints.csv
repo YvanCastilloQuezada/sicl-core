@@ -1,0 +1,3 @@
+constraint_id,hard,key,operator,project_id,unit,value,version
+CON-635d7d7cfc,True,ZONIFICACION,=,EDIFICIO-YVAN-TRUJILLO-01,Municipalidad,C-2 (Comercial),1
+CON-32d64d7952,True,HEIGHT,<=,EDIFICIO-YVAN-TRUJILLO-01,FLOORS,6,1

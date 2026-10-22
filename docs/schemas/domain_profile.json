@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://arki.sicl/schemas/domain_profile.json",
+  "title": "Domain Profile",
+  "description": "Perfil de dominio que define las reglas del juego para cualquier IA en el Laboratorio. Materializa la Regla 41 (Clasificación Dinámica de Riesgo).",
+  "type": "object",
+  "required": ["domain_id", "risk_tier", "hard_constraints", "aia_required"],
+  "properties": {
+    "domain_id": {
+      "type": "string",
+      "description": "Identificador único del dominio (ej. 'bio_longevity_v1', 'arch_layout_v2')"
+    },
+    "risk_tier": {
+      "type": "string",
+      "enum": ["MINIMAL", "LIMITED", "HIGH", "UNACCEPTABLE"],
+      "description": "Nivel de riesgo según EU AI Act. Determina los controles de ARKI."
+    },
+    "hard_constraints": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Lista de reglas inquebrantables específicas del dominio."
+    },
+    "aia_required": {
+      "type": "boolean",
+      "description": "True si risk_tier es HIGH o LIMITED. Exige Evaluación de Impacto Algorítmico."
+    },
+    "max_acceptable_trade_off_penalty": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.15,
+      "description": "Umbral máximo de trade-off aceptable (ej. 0.15 = 15%)."
+    },
+    "allowed_modification_scope": {
+      "type": "string",
+      "enum": ["somatic_only", "theoretical_germline_allowed", "unrestricted"],
+      "default": "somatic_only",
+      "description": "Alcance permitido de modificaciones (para dominios biológicos)."
+    },
+    "required_corpus_tags": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Tags requeridos en las fuentes del corpus (ej. 'peer_reviewed', 'mammalian_model')."
+    }
+  },
+  "additionalProperties": false
+}
