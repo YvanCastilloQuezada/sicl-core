@@ -57,19 +57,13 @@ Base: `main@de43b6b833731c87fb6277834484545bd953d76a`. Tests no ejecutados.
 - Recomendación: identificar si el trabajo está ya integrado; si no, revisar tests, dependencias y contrato antes de rescatar.
 
 ## feat/rfc-030-ifc-regeneration
-- SHA: `9d2b4ade66439a6237b9fc4a4f61e33e9a14f4e3`
-- Último commit: feat(rfc-030): regenerate IFC with ifcopenshell.api (fecha desconocida) https://github.com/YvanCastilloQuezada/sicl-core/commit/9d2b4ade66439a6237b9fc4a4f61e33e9a14f4e3
-- Comparación: diverged; ahead 5, behind 158; commits exclusivos 5; rutas 39.
-- Rutas: data/drawing_rules/README.md, data/drawing_rules/iso128_nte_peru.json, data/drawing_symbols/default_symbols.json, data/title_blocks/peru_generic.json, docs/reference/RFC030_OUTPUT/COMPARISON.md
-- Lectura: Regeneración IFC RFC-030; revisar round-trip, pérdidas y evidencia de regeneración.
-- Pruebas: no ejecutadas.
-- Recomendación: identificar si el trabajo está ya integrado; si no, revisar tests, dependencias y contrato antes de rescatar.
-
-## feat/rfc-034-1-layout-engine
-- SHA: `a6f727f2b3088e3ff416b937d7d4c92d2dbc55db`
-- Último commit: fix(rfc-030): improve hatch cuts elevation and roof plan (fecha desconocida) https://github.com/YvanCastilloQuezada/sicl-core/commit/a6f727f2b3088e3ff416b937d7d4c92d2dbc55db
-- Comparación: diverged; ahead 4, behind 158; commits exclusivos 4; rutas 39.
-- Rutas: data/drawing_rules/README.md, data/drawing_rules/iso128_nte_peru.json, data/drawing_symbols/default_symbols.json, data/title_blocks/peru_generic.json, docs/reference/RFC030_OUTPUT/COMPARISON.md
-- Lectura: Motor de layout RFC-034.1; determinar límites del solver y datos canónicos.
-- Pruebas: no ejecutadas.
-- Recomendación: identificar si el trabajo está ya integrado; si no, revisar tests, dependencias y contrato antes de rescatar.
+- SHA histórico de PR #22: `9d2b4ade66439a6237b9fc4a4f61e33e9a14f4e3`.
+- PR: [#22](https://github.com/YvanCastilloQuezada/sicl-core/pull/22), sigue abierto, no fusionado, `mergeable=false`; base registrado por PR: `1aba412f9fdb035c970a18b2a6f60b58a19cd662`, obsoleto frente a main actual.
+- Comparación actual `main@6dd4f3006450754e2fab01ff4040b5ba79afb0bc...feat/rfc-030-ifc-regeneration`: `diverged`, 5 commits de rama y 162 commits detrás de main.
+- CI histórico del PR: [run 36274189118](https://github.com/YvanCastilloQuezada/sicl-core/actions/runs/36274189118) FAIL en Python 3.12 durante colección; Python 3.11 cancelado. Causa real: `ModuleNotFoundError: No module named 'reportlab'` al importar `sicl.drawing.pdf_export`; `pyproject.toml` de la rama había quitado `reportlab` de `.[test]` aunque PDF exporter y tests lo importan.
+- La funcionalidad de RFC-030/RFC-034.1 está en gran parte ya en main con implementaciones distintas y más recientes. Se confirmó en main: `src/sicl/drawing/__init__.py`, `ifc_synthetic.py`, `projector.py`, `pdf_export.py`, `http_api.py`, `composer.py`, `scripts/generate_synthetic_ifc.py`, `scripts/drawing_cli.py`, `src/sicl/layout/layout_engine.py`, `src/sicl/layout/http_api.py`, tests `test_rfc030_drawing.py` y `test_rfc0341_layout.py`, y RFCs/documentación correspondientes.
+- Regla de seguridad de generación IFC ya mejorada en main: el helper recibe un destino/archivo temporal, en vez de reescribir silenciosamente el IFC rastreado.
+- No integrar el PR #22 en bloque: las versiones de rama tienen diferencias respecto del estado más nuevo de main, usan rule set obsoleto `iso128_nte_peru.json` frente a `iso128_rne_peru.json`, y los tests contienen afirmaciones triviales (`or True`, comprobación de título que acepta cualquier longitud, el modo PDF no valida número de páginas). Son señal de que falta prueba real de calidad, no evidencia de salida profesional.
+- Dependencias: el PR/branch editaba `pyproject.toml` removiendo `reportlab` y dependencias base. No copiar ese cambio; main conserva `reportlab>=4,<5` en `.[test]`. CI actual de main pasa en Python 3.11/3.12.
+- Estado de producto: RFC-030 documentado como base técnica, pero la fase DAM de dibujo sigue bloqueada para graduación según `docs/learning/PHASE1_REPORT.md`: se probó IfcOpenShell Draw (1.094 entidades, SVG 62.135 bytes), pero solo un maestro disponible, el IFC no corresponde al fixture A-01, y no se reprodujo indistinguiblemente el plano. No declarar graduación ni calidad profesional demostrada.
+- Dictamen actual: **cerrar PR #22 sin fusionar**, conservar el registro de procedencia y continuar desde main integrado, arreglando/verificando dependencias y agregando pruebas no triviales sobre el motor actual. No se modifica H-001..H-004 ni se altera la autoridad canónica.
