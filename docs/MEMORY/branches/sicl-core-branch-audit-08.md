@@ -58,8 +58,8 @@ Base: `main@de43b6b833731c87fb6277834484545bd953d76a`. Tests no ejecutados.
 
 ## feat/rfc-030-ifc-regeneration
 - SHA histórico de PR #22: `9d2b4ade66439a6237b9fc4a4f61e33e9a14f4e3`.
-- PR: [#22](https://github.com/YvanCastilloQuezada/sicl-core/pull/22), sigue abierto, no fusionado, `mergeable=false`; base registrado por PR: `1aba412f9fdb035c970a18b2a6f60b58a19cd662`, obsoleto frente a main actual.
-- Comparación actual `main@6dd4f3006450754e2fab01ff4040b5ba79afb0bc...feat/rfc-030-ifc-regeneration`: `diverged`, 5 commits de rama y 162 commits detrás de main.
+- PR: [#22](https://github.com/YvanCastilloQuezada/sicl-core/pull/22), cerrado sin fusionar el 2026-10-22; no es candidato a integración directa (`mergeable=false`); base registrado por PR: `1aba412f9fdb035c970a18b2a6f60b58a19cd662`, obsoleto frente a main actual.
+- Comparación actual `main@e89577adb5ed1a6b58e57d06ed080b9a7f1dac54...feat/rfc-030-ifc-regeneration`: `diverged`, 5 commits exclusivos y 165 commits detrás de main.
 - CI histórico del PR: [run 36274189118](https://github.com/YvanCastilloQuezada/sicl-core/actions/runs/36274189118) FAIL en Python 3.12 durante colección; Python 3.11 cancelado. Causa real: `ModuleNotFoundError: No module named 'reportlab'` al importar `sicl.drawing.pdf_export`; `pyproject.toml` de la rama había quitado `reportlab` de `.[test]` aunque PDF exporter y tests lo importan.
 - La funcionalidad de RFC-030/RFC-034.1 está en gran parte ya en main con implementaciones distintas y más recientes. Se confirmó en main: `src/sicl/drawing/__init__.py`, `ifc_synthetic.py`, `projector.py`, `pdf_export.py`, `http_api.py`, `composer.py`, `scripts/generate_synthetic_ifc.py`, `scripts/drawing_cli.py`, `src/sicl/layout/layout_engine.py`, `src/sicl/layout/http_api.py`, tests `test_rfc030_drawing.py` y `test_rfc0341_layout.py`, y RFCs/documentación correspondientes.
 - Regla de seguridad de generación IFC ya mejorada en main: el helper recibe un destino/archivo temporal, en vez de reescribir silenciosamente el IFC rastreado.
