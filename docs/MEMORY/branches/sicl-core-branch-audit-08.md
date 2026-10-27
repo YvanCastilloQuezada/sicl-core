@@ -68,3 +68,14 @@ PR #21 y #22 son ramas divergentes de la implementación actual. Sus artefactos 
 - No confundir claim, diseño, implementación, ejecución, observación, verificación y freeze.
 - No reportar despliegue verde cuando Railway está rojo.
 - No abrir contratos FROZEN por la vía de una corrección incidental.
+
+## 8. feat/rfc-030-drawing-standard — verificación (27-oct-2026)
+
+**Estado:** 100% histórica. Verificada el 27-oct-2026.
+
+- 6 commits exclusivos (septiembre-octubre 2026).
+- 42 archivos en el diff, **0 archivos exclusivos** (todos ya están en `main`).
+- La funcionalidad de RFC-030/RFC-034.1 está en `main` con implementaciones posteriores.
+- No hay nada que rescatar.
+
+**Acción:** conservar la rama por procedencia. No crear PR. No eliminar.
