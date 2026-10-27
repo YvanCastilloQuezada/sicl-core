@@ -351,3 +351,16 @@ Conservados en `DOCS_LIMPIO/ARKI_DOCS_LAPTOP/`:
 *Fin del Expediente Maestro al 27-oct-2026.*
 
 *Este documento es un índice. No reemplaza a los documentos que enlaza. Se actualiza a medida que el proyecto avanza. La versión `.docx` se genera con `pandoc` para presentación formal.*
+
+---
+
+## Cambios del 27-oct-2026 (post-cierre del índice)
+
+- `av023-arbol-vivo` restaurado de `_BASURA_2026-10-27/VALIDACIONES_DIRS_2026-10-27/` a `/home/arki/ARKI/av023-arbol-vivo`.
+- Confirmado: `c0a82dae` existe en `canonical/sicl-web` (NO en `sicl-core`).
+- Confirmado: `av023-arbol-vivo/00-START.md` (14-oct-2026, 8.6 KB) documenta continuidad con misión pendiente.
+- Confirmado: `av023-arbol-vivo/arki-arbol-vivo.cjs` existe.
+- Conteos reales: 608 docs limpios, 19 archivos de evidencia forense (recursivo), 341 entradas en `_BASURA`.
+- `00-START.txt` de la raíz actualizado para apuntar a `00_LEER_PRIMERO.md` y al HEAD real de `sicl-core` (`5dfd17a`).
+
+*Nota: el commit `c0a82dae` y el commit `48c8e2c7` (mencionado en `av023-arbol-vivo/00-START.md`) son anclas distintas de continuidad. El primero es de `sicl-web`, el segundo es el HEAD del web aislado `validacion-f6-descongelada` al 14-oct-2026.*
