@@ -1,0 +1,117 @@
+# AV036 — Inventario completo de referencias de ramas
+
+Repositorio: `YvanCastilloQuezada/sicl-core`.
+Ramas observadas: **107**.
+Estado: NAMES_DISCOVERED_ONLY; no implica auditoría de contenido, extracción completa ni autorización de borrado.
+
+| Rama | Clasificación preliminar | Auditoría | Extracción | Poda |
+|---|---|---|---|---|
+| `ace85/local-sync-20261011T233918Z` | OTHER | PENDING | PENDING | BLOCKED |
+| `docs/commands-reference` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/dl-multiscale-variable` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/dl-project-intelligence-01` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/frozen-arki-motor-integration-design` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/integrate-master-frozen-future-orders` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/manuals-syntax-fix` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/master-architecture-v2` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/master-architecture-v2.2` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/master-frozen-future-orders` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/mv-p0-1-common-variable-schema` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/mv-p0-2-object-variable-matrix` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/mv-p0-3-space-variable-matrix` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/mv-p0-13-cross-scale-canonicalization` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/mv-p0-batch-a2-system-building-site` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/mv-p0-current-variable-architecture-audit` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/mv-p0-final-batch` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/mv-p0-territorial-batch` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/operations-manual` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/production-deployment-e2e` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/rfc-014-user-copilot` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/rfc-014-user-copilot-llm` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/rfc-017-versioning` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/rfc-018-process` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/user-manual` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/user-manual-alignment` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `docs/user-manual-update` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `experiment/arki-ideas-core-20261015` | EXPERIMENT | PENDING | PENDING | BLOCKED |
+| `feat/a002-input-sufficiency` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/a002-v1.4-unified` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/ace88-core-service-auth` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/arki3d-archi-model` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/arki-are-001-contract` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/arki-are-002-runtime-foundation` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/arki-are-003-2d-projection` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/arki-case-001-controlled-house` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/arki-m1-vector-plan-pipeline` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/arki-phase1-multimaster` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/arkidraw-block1` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/arkidraw-block2-scene-adapter` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/commit-8a-d2-persistence` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/commit-8b1-human-review-binding` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/commit-8b2-fix-publication-duplication` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/commit-8b2-publication-refactor` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/commit-8b3a-creation-validation` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/commit-8b3a-ri-referential-integrity` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/commit-8b3b-a002-creation-adapter` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/commit-8b4a-promote-initial-elements` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/commit-8b4b1-d2-event-contract` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/commit-8b4b2-developer-proposal-schemas` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/commit-8b4b3-developer-promotion-service` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/commit-8b4b4-developer-promotions-endpoint` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/core-promotion-concurrency-guarantee` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/dam-dna-advisor-examiner-foundation` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/h001-examen-11-rt-a-rt-d` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/h005-selective-recomputation` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/multiscale-capability-foundation-s7p05` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/mv-p1-final-integration` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/mv-p1-runtime-variable-foundation` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/mv-p1-spatial-location-runtime` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/rfc-030-drawing-standard` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/rfc-030-ifc-regeneration` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/rfc-034-1-layout-engine` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/rfc-037-1-vsm` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/rfc-037-dam-doctrine` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/spatial-representation-s1` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/upao001-canonical-evaluation-s6p01` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/upao001-environmental-solar-s7p0` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/upao001-pareto-transport-s6p02` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/upao001-spatial-generator-s2` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/upao001-spatial-transport-s3` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/vsm-phase1-registry-script` | FEATURE | PENDING | PENDING | BLOCKED |
+| `feat/weather-environmental-context-p1` | FEATURE | PENDING | PENDING | BLOCKED |
+| `fix/railway-src-import` | FIX | PENDING | PENDING | BLOCKED |
+| `fix/revert-railway-editable-install` | FIX | PENDING | PENDING | BLOCKED |
+| `fix/site-semantics-001` | FIX | PENDING | PENDING | BLOCKED |
+| `integrate/spatial-s6p01-core` | INTEGRATION | PENDING | PENDING | BLOCKED |
+| `integration-v2` | INTEGRATION | PENDING | PENDING | BLOCKED |
+| `main` | OTHER | PENDING | PENDING | BLOCKED |
+| `railway/fix-deploy-ba7603` | OTHER | PENDING | PENDING | BLOCKED |
+| `reconcile/arki-live-map-2026-10-07` | INTEGRATION | PENDING | PENDING | BLOCKED |
+| `rfc-001-multiscale-model` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-002-evidence-http` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-002-phase-c` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-003-regulatory-corpus` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-004-design-intelligence-scope` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-005-evaluation-comparison-http` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-006-1-monte-carlo` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-006-simulation-contract` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-007-multiobjective-contract` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-008-planning-instruments` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-009-multiscale-relations` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-010-design-generation` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-011-institutional-memory` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-012-multi-actor-model` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-013-1-temporal-evolution` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-013-temporal-cycles` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-016-1-design-generation-extended` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-016-source-http` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-020-021-feasibility-variables` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-025-peruvian-regulatory-corpus` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-026-design-knowledge` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-027-bim-ifc-exchange` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-028-029-completion-phases` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-028-029-gis-ollama` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `rfc-028-gis-cadastral-ifc-adapter` | KNOWLEDGE_OR_SPEC | PENDING | PENDING | BLOCKED |
+| `test/microcase-dev-001-e2e` | TEST_EVIDENCE | PENDING | PENDING | BLOCKED |
+
+Regla: nunca borrar hasta revisar diferencias, blobs, pruebas, PR, referencias y genealogía; comparar con canon y banco experimental.
