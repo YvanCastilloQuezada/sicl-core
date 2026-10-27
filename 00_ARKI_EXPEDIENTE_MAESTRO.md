@@ -386,3 +386,15 @@ El generador `tools/arki_mapa_vivo.py` declara 4 documentos prerequisito (`REQUI
 Mientras no se resuelvan, el ciclo vivo reporta `ACE88`, `AUTO_V0` e `INVENTORY` como `UNKNOWN` en el `LATEST.json`. **No es un fallo del ciclo vivo; es un hueco del corpus documental.**
 
 *Documentado el 27-oct-2026 como deuda explícita, no oculta.*
+
+---
+
+## Deuda de entorno: MariaDB para test de integración (27-oct-2026)
+
+El test `server/_core/arkiMo22RealIntegration.test.ts` de `sicl-web` requiere MariaDB local. MariaDB está instalado y corriendo, pero el usuario `sicl@127.0.0.1` no autentica por TCP (`Access denied`), a pesar de tener el hash correcto y el plugin `mysql_native_password`.
+
+**Impacto:** 1 test de integración falla. Los otros 947 tests de `sicl-web` pasan. Los 967 tests de `sicl-core` pasan.
+
+**Estado:** deuda de entorno, no de código. El test está diseñado para un entorno con MariaDB funcional.
+
+**Solución pendiente:** diagnosticar la autenticación de MariaDB (plugin, `skip-name-resolve`, `unix_socket` vs `mysql_native_password`).
