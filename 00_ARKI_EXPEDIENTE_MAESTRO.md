@@ -364,3 +364,25 @@ Conservados en `DOCS_LIMPIO/ARKI_DOCS_LAPTOP/`:
 - `00-START.txt` de la raíz actualizado para apuntar a `00_LEER_PRIMERO.md` y al HEAD real de `sicl-core` (`5dfd17a`).
 
 *Nota: el commit `c0a82dae` y el commit `48c8e2c7` (mencionado en `av023-arbol-vivo/00-START.md`) son anclas distintas de continuidad. El primero es de `sicl-web`, el segundo es el HEAD del web aislado `validacion-f6-descongelada` al 14-oct-2026.*
+
+---
+
+## Huecos conocidos del mapa vivo (27-oct-2026)
+
+El generador `tools/arki_mapa_vivo.py` declara 4 documentos prerequisito (`REQUIRED`). De ellos:
+
+| ID | Ruta esperada | Estado | Impacto |
+|---|---|---|---|
+| `ACE88` | `docs/ace88/ACE88_ROOT_INTEGRATION.md` | ❌ No existe | Sin autorización humana D2 verificable en el grafo |
+| `AUTO_V0` | `docs/arki-automejora/ARKI_AUTONOMOUS_IMPROVEMENT_CONTRACT_V0.md` | ❌ No existe | Contrato de automejora sin verificar |
+| `INVENTORY` | `tools/arki_automejora_inventario.py` | ❌ No existe | Inventario de solo lectura sin verificar |
+| `START` | `00-start.md` | ✅ Recuperado de `av023-arbol-vivo/00_START.md` | — |
+
+**Los 3 huecos restantes (ACE88, AUTO_V0, INVENTORY)** requieren decisión de contenido, no de organización:
+
+- **Reconstruirlos**: redactar el contenido desde cero, con evidencia.
+- **Modificarlos como opcionales**: cambiar `REQUIRED` por `OPTIONAL` en el `.py` (no recomendado: rompe la filosofía `UNKNOWN BEFORE INVENTING`).
+
+Mientras no se resuelvan, el ciclo vivo reporta `ACE88`, `AUTO_V0` e `INVENTORY` como `UNKNOWN` en el `LATEST.json`. **No es un fallo del ciclo vivo; es un hueco del corpus documental.**
+
+*Documentado el 27-oct-2026 como deuda explícita, no oculta.*
