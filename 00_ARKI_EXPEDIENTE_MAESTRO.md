@@ -91,6 +91,21 @@
 
 ---
 
+
+
+### Estado de ARKI VIVO al 2026-10-27
+
+- Servicio `arki02-continuity.service` + timer: activo, dispara cada hora.
+- Disparo verificado 27-oct-2026 19:00:12 con `ACE_SNAPSHOT_PASS` + `ADVISORY_PULSE_COMPLETED`.
+- Servicio `arki-arbol-vivo.service`: active (running), bind `0.0.0.0:8768`.
+- `LATEST.json`: schema `ARKI-LIVE-CYCLE-1`, 38235 bytes.
+- Core SHA: `d48a3301ba532d77e0d2eb1dd4b3b54df6fc0ab8`.
+- Web SHA: `e51170b3ffff152b7a250038520f86ff285638b5`.
+- 102 information gaps, 0 confirmed defects.
+- Sandbox: 5 correcciones temporales, `rollbackVerified=true`.
+- Política: `canonicalMutation=false`, `poApproval=PENDING`.
+- Doc de referencia: `docs/ops/ARKI-LIVE-SYSTEMD-INTEGRATION-20261014.md`.
+
 ## Nivel 2 — Arquitectura y Diseño
 
 **Estado:** Vigente.
