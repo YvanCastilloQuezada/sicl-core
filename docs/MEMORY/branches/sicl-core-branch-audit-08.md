@@ -79,3 +79,17 @@ PR #21 y #22 son ramas divergentes de la implementación actual. Sus artefactos 
 - No hay nada que rescatar.
 
 **Acción:** conservar la rama por procedencia. No crear PR. No eliminar.
+
+---
+
+## Actualización 2026-10-28: PR #22 (RFC-030 + RFC-034.1) cerrado definitivamente
+
+**Verificación:** los 14 archivos del commit `5fa7138` (sheet composition and layout engine) están en `main`:
+- `src/sicl/layout/` (10 archivos: `__init__.py`, `case_study.py`, `collision.py`, `http_api.py`, `layout_engine.py`, `layout_report.py`, `margin_validator.py`, `sheet_format.py`, `sheet_grid.py`, `sheet_zone.py`).
+- `scripts/layout_cli.py`, `scripts/layout_http.py`.
+- `docs/reference/RFC0341_CASA_NIDO_LAYOUT_REPORT.json`.
+
+**Decisión:** PR #22 cerrado definitivamente. Rama `feat/rfc-030-ifc-regeneration` borrada de GitHub. El PR es 100% redundante.
+
+**Los commits originales (`5fa7138`, `2de6011`, `8e41ed3`, `a6f727f`, `9d2b4ad`) no están en `main` por SHA, pero su contenido sí está integrado por otra vía (probablemente squash-merge o cherry-pick anterior).**
+
