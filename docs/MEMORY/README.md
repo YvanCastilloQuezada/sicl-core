@@ -121,3 +121,24 @@ La auditoría 01 se amplió con el paquete de preservación de conocimiento de W
 - [10 — Reconciliación estática del contrato MEMORY en Core](10-reconciliacion-contrato-core-memory-20261021.md)
 
 - [11 — Compatibilidad de esquemas y recuperación E2E](11-compatibilidad-esquemas-y-recuperacion.md)
+
+
+## Continuidad histórica permanente — decisión 2026-10-30
+
+La auditoría inicial queda preservada como antecedente. La dirección de implementación autorizada ahora es el contrato [12 — Continuidad histórica permanente](12-continuidad-historica-permanente.md).
+
+**Decisión:** MEMORY será la arquitectura de continuidad histórica de ARKI. SICL Core conserva la autoridad y el registro append-only existente; no se crea un segundo Event Store. RFC-011 mantiene su alcance de memoria institucional derivada de proyectos cerrados y no se convierte en bitácora de sesiones.
+
+**Ciclo objetivo:** captura validada → persistencia en Core → proyecciones automáticas → checkpoint → recuperación de sesión → verificación → backup/restauración.
+
+**Estado honesto de implementación:**
+- M0 contrato: DOCUMENTADO.
+- M1 API idempotente de continuidad Core: NO IMPLEMENTED.
+- M2 adaptador Web y cola/reintentos: NO IMPLEMENTED.
+- M3 proyecciones de bitácora/roadmap/evidencias/handoff: PARCIAL; los generadores existentes no están reconciliados con un flujo canónico completo.
+- M4 integración conversacional: NOT CONNECTED.
+- M5 backup, restauración y recuperación E2E: NO VERIFIED.
+
+**Límite crítico:** GitHub no captura automáticamente conversaciones de ChatGPT. La captura conversacional requiere una integración explícita. Hasta probarla, MEMORY debe declarar CHAT_CAPTURE = NOT_CONNECTED; no afirmar continuidad total.
+
+No se modifica la autoridad humana, los contratos FROZEN ni las fronteras de AGK. Ninguna propuesta de REVIVIR o ACS se convierte automáticamente en decisión.
