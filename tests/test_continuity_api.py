@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import sqlite3
 from fastapi.testclient import TestClient
 
 from api.deps import get_repository
@@ -164,7 +165,7 @@ def test_continuity_key_index_is_append_only(continuity_client, monkeypatch):
         headers={"Authorization": "Bearer test-secret"},
     )
     assert response.status_code == 200
-    with pytest.raises(Exception, match="append-only"):
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
         repo.conn.execute(
             "UPDATE continuity_event_keys SET sha256=? WHERE project_id=? AND event_id=?",
             ("0" * 64, "MEMORY-P1", "evt-001"),
