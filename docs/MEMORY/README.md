@@ -1,5 +1,7 @@
 # MEMORY — auditoría de integración ARKI
 
+> **Entrada operativa obligatoria:** [000 — LEER PRIMERO: Continuidad y operación de ARKI en el servidor](../../000_LEER_PRIMERO_CONTINUIDAD_Y_OPERACION.md). Arki-02 es el runtime primario; GitHub es el espejo versionado. Este documento de entrada explica el flujo de trabajo y la sincronización segura.
+
 **Fecha de corte de esta primera entrega:** 2026-10-21 (Perú)  
 **Estado:** auditoría documental inicial; NO es autorización de implementación ni declaración de integración terminada.  
 **Rama de documentación:** `docs/memory-auditoria-integracion-20261021`  
