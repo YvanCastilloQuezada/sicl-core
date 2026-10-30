@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily SICL Core encrypted MEMORY backup
+
+[Timer]
+OnCalendar=*-*-* 03:20:00
+Persistent=true
+RandomizedDelaySec=5m
+Unit=sicl-core-backup.service
+
+[Install]
+WantedBy=timers.target
