@@ -192,3 +192,17 @@ Commits en `sicl-core/main`: `9c9961b`, `02ee596`, `0eec797`, `9f2be89`, `98b65e
 6. Ejecutar backup cifrado y restauración aislada; conservar manifiesto y SHA.
 7. Abrir y cerrar una sesión real, registrar una decisión confirmada por el propietario, reiniciar Web/Core y recuperar el estado desde Core.
 8. No marcar M1–M5 como VERIFIED hasta que cada evidencia anterior exista y esté asociada al SHA, entorno y fecha exactos.
+
+### M5 — instalación del backup diario en Ubuntu
+
+Los archivos systemd incluidos son plantillas de despliegue. No se activan solos al hacer merge.
+
+1. Instalar cryptography en el entorno virtual de Core (ya declarado en pyproject.toml).
+2. Crear /etc/sicl-core/backup.env, accesible solo por root y el usuario de servicio, con SICL_DB_PATH y SICL_BACKUP_FERNET_KEY. La clave debe generarse y custodiarse fuera de Git.
+3. Crear /var/backups/sicl-core con propietario sicl:sicl y permisos 0700.
+4. Instalar deploy/systemd/sicl-core-backup.service y deploy/systemd/sicl-core-backup.timer en /etc/systemd/system/.
+5. Ejecutar systemctl daemon-reload && systemctl enable --now sicl-core-backup.timer.
+6. Ejecutar una primera vez systemctl start sicl-core-backup.service y revisar journalctl -u sicl-core-backup.service.
+7. Probar restauración en un directorio aislado con restore-verify. No apuntar el destino a la base activa.
+
+El timer está programado para las 03:20 hora local del servidor. El huso horario del servidor debe verificarse; no se asume que sea Perú.
