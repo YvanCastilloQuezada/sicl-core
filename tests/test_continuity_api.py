@@ -111,3 +111,66 @@ def test_continuity_rejects_unknown_event_type(continuity_client, monkeypatch):
         headers={"Authorization": "Bearer test-secret"},
     )
     assert response.status_code == 422
+
+
+def test_continuity_event_id_conflict_does_not_append(continuity_client, monkeypatch):
+    client, repo = continuity_client
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "test-secret")
+    headers = {"Authorization": "Bearer test-secret"}
+    url = "/v1/projects/MEMORY-P1/continuity/events"
+    assert client.post(url, json=_event(), headers=headers).status_code == 200
+
+    changed = _event(event_id="evt-001", idempotency_key="idem-002")
+    changed["payload"] = {"decision": "Different content"}
+    response = client.post(url, json=changed, headers=headers)
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "CONTINUITY_IDEMPOTENCY_CONFLICT"
+    assert len([e for e in repo.events("MEMORY-P1") if e.type.startswith("CONTINUITY_")]) == 1
+
+
+def test_continuity_rejects_oversized_payload_without_append(continuity_client, monkeypatch):
+    client, repo = continuity_client
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "test-secret")
+    body = _event()
+    body["payload"] = {"large": "x" * 260_000}
+    response = client.post(
+        "/v1/projects/MEMORY-P1/continuity/events",
+        json=body,
+        headers={"Authorization": "Bearer test-secret"},
+    )
+    assert response.status_code == 413
+    assert response.json()["detail"]["code"] == "CONTINUITY_EVENT_TOO_LARGE"
+    assert len([e for e in repo.events("MEMORY-P1") if e.type.startswith("CONTINUITY_")]) == 0
+
+
+def test_continuity_rejects_unknown_project(continuity_client, monkeypatch):
+    client, _ = continuity_client
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "test-secret")
+    response = client.post(
+        "/v1/projects/DOES-NOT-EXIST/continuity/events",
+        json=_event(),
+        headers={"Authorization": "Bearer test-secret"},
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "PROJECT_NOT_FOUND"
+
+
+def test_continuity_key_index_is_append_only(continuity_client, monkeypatch):
+    client, repo = continuity_client
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "test-secret")
+    response = client.post(
+        "/v1/projects/MEMORY-P1/continuity/events",
+        json=_event(),
+        headers={"Authorization": "Bearer test-secret"},
+    )
+    assert response.status_code == 200
+    with pytest.raises(Exception, match="append-only"):
+        repo.conn.execute(
+            "UPDATE continuity_event_keys SET sha256=? WHERE project_id=? AND event_id=?",
+            ("0" * 64, "MEMORY-P1", "evt-001"),
+        )
+    with pytest.raises(Exception, match="append-only"):
+        repo.conn.execute(
+            "DELETE FROM continuity_event_keys WHERE project_id=? AND event_id=?",
+            ("MEMORY-P1", "evt-001"),
+        )
