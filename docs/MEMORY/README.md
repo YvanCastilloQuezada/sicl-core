@@ -142,3 +142,15 @@ La auditoría inicial queda preservada como antecedente. La dirección de implem
 **Límite crítico:** GitHub no captura automáticamente conversaciones de ChatGPT. La captura conversacional requiere una integración explícita. Hasta probarla, MEMORY debe declarar CHAT_CAPTURE = NOT_CONNECTED; no afirmar continuidad total.
 
 No se modifica la autoridad humana, los contratos FROZEN ni las fronteras de AGK. Ninguna propuesta de REVIVIR o ACS se convierte automáticamente en decisión.
+
+## Continuidad histórica permanente — ejecución M1–M5 (2026-10-30)
+
+Contrato y estado de implementación: [12 — Continuidad histórica permanente](12-continuidad-historica-permanente.md).
+
+- Core M1: endpoints autenticados de escritura, lectura incremental y checkpoint incorporados; ejecución de pruebas pendiente.
+- Web M2/M4: adaptador autenticado, outbox cifrada y captura explícita de decisiones en una única rama PR; migración y E2E pendientes.
+- M3: proyección desde Core y workflow read-only incorporados en la misma rama; ejecución pendiente de secretos/variables.
+- M5: backup cifrado y restauración aislada implementados como script; prueba real pendiente.
+- **No hay cierre VERIFIED de M1–M5.** Los gates y bloqueos operativos están enumerados en el contrato 12.
+
+La fuente canónica continúa siendo el Event Store existente de Core. La tabla Web outbox es una cola temporal de sincronización; no sustituye ni replica la autoridad de Core.
