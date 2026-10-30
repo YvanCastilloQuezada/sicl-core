@@ -1,5 +1,7 @@
 # SICL Core
 
+> **Primero:** lea [000 — LEER PRIMERO: Continuidad y operación de ARKI en el servidor](000_LEER_PRIMERO_CONTINUIDAD_Y_OPERACION.md). Define Arki-02 como entorno operativo primario y GitHub como espejo de código.
+
 SICL (Spatial Intelligence Command Language) es una arquitectura de decisión espacial que conserva la separación entre evidencia, análisis y autoridad humana. El Core es la fuente de verdad del dominio: registra proyectos, hechos, supuestos, objetivos, restricciones, alternativas, evaluaciones, recomendaciones y decisiones mediante eventos trazables.
 
 ## Estado actual
@@ -86,15 +88,20 @@ export SICL_CORS_ORIGINS=https://<frontend-host>
 
 El frontend utiliza `VITE_API_URL` para apuntar a este servicio. Nunca coloque tokens de servicio en código cliente.
 
-## Despliegue Railway
+## Operación en Arki-02
 
-El servicio incluye `Procfile`, `requirements.txt`, `runtime.txt` y `.env.example`. Consulte [`docs/RAILWAY_DEPLOYMENT.md`](docs/RAILWAY_DEPLOYMENT.md) para conectar el repositorio, generar el dominio público, configurar CORS, montar un volumen persistente y verificar el E2E. La ruta canónica de SQLite en Railway es `SICL_DB_PATH`; `DATABASE_URL=./sicl.db` también se acepta como ruta local compatible.
+El runtime objetivo de SICL Core es el servidor físico Arki-02 (Ubuntu). GitHub conserva el espejo versionado del código; no es el entorno de producción. La sincronización servidor↔GitHub debe seguir el protocolo de [000 — Continuidad y operación](000_LEER_PRIMERO_CONTINUIDAD_Y_OPERACION.md): fetch, inspección de SHA, fast-forward cuando sea seguro y bloqueo ante árboles dirty o divergencias. No usar Railway como destino de despliegue.
 
-Para el procedimiento actualizado de producción consulte [`docs/PRODUCTION_CORE_DEPLOYMENT_MANUAL.md`](docs/PRODUCTION_CORE_DEPLOYMENT_MANUAL.md). La suite E2E del Copiloto y SICL está en `tests/test_e2e_ollama_sicl.py` y se ejecuta con:
+Para la instalación real, consulte el inventario de servicios, rutas, variables y puertos de Arki-02. No se deben inferir ni inventar unidades systemd ni rutas de producción a partir de esta guía general.
+
+Las pruebas locales se ejecutan en el servidor sobre el checkout que se va a desplegar:
 
 ```bash
-PYTHONPATH=.:src pytest -q tests/test_e2e_ollama_sicl.py -ra
+python -m pytest -ra
+python -m compileall -q src api tests
 ```
+
+Un CI verde en GitHub no sustituye las pruebas locales ni el health check de Core en Arki-02.
 
 ## Licencia
 
