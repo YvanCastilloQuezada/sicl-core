@@ -9,7 +9,8 @@ from sicl.repository import SQLiteRepository
 
 
 @pytest.fixture
-def continuity_client(tmp_path):
+def continuity_client(tmp_path, monkeypatch):
+    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
     repo = SQLiteRepository(tmp_path / "continuity.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
     client = TestClient(app)
