@@ -70,7 +70,7 @@ class ContinuityEventRequest(BaseModel):
 
     def canonical(self) -> dict[str, Any]:
         data = self.model_dump()
-        data["recorded_at"] = data["recorded_at"] or datetime.now(timezone.utc).isoformat()
+        data["recorded_at"] = data["recorded_at"] or data["occurred_at"]
         return data
 
 
