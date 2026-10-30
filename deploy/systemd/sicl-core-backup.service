@@ -1,0 +1,19 @@
+[Unit]
+Description=SICL Core encrypted MEMORY backup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=sicl
+Group=sicl
+WorkingDirectory=/opt/sicl-core
+EnvironmentFile=/etc/sicl-core/backup.env
+Environment=SICL_BACKUP_DIR=/var/backups/sicl-core
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/sicl-core
+ExecStart=/opt/sicl-core/.venv/bin/python scripts/arki_memory_backup.py backup --output-dir /var/backups/sicl-core
