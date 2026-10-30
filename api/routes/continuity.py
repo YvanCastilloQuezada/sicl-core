@@ -78,6 +78,27 @@ def _canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+
+def _ensure_continuity_key_index(repo: SQLiteRepository) -> None:
+    repo.conn.executescript("""
+        CREATE TABLE IF NOT EXISTS continuity_event_keys (
+          project_id TEXT NOT NULL,
+          event_id TEXT NOT NULL,
+          idempotency_key TEXT NOT NULL,
+          event_sequence INTEGER NOT NULL UNIQUE REFERENCES events(id),
+          sha256 TEXT NOT NULL,
+          PRIMARY KEY(project_id, event_id),
+          UNIQUE(project_id, idempotency_key)
+        );
+        CREATE TRIGGER IF NOT EXISTS continuity_event_keys_no_update
+        BEFORE UPDATE ON continuity_event_keys
+        BEGIN SELECT RAISE(ABORT, 'continuity event keys are append-only'); END;
+        CREATE TRIGGER IF NOT EXISTS continuity_event_keys_no_delete
+        BEFORE DELETE ON continuity_event_keys
+        BEGIN SELECT RAISE(ABORT, 'continuity event keys are append-only'); END;
+    """)
+    repo.conn.commit()
+
 def _project_or_404(repo: SQLiteRepository, project_id: str) -> None:
     if repo.get_project(project_id) is None:
         raise HTTPException(status_code=404, detail={"code": "PROJECT_NOT_FOUND", "project_id": project_id})
@@ -98,31 +119,27 @@ def append_continuity_event(
     stored_payload = {"continuity": event, "continuity_sha256": fingerprint}
 
     try:
+        _ensure_continuity_key_index(repo)
         repo.conn.execute("BEGIN IMMEDIATE")
-        rows = repo.conn.execute(
-            "SELECT id, payload FROM events WHERE project_id=? ORDER BY id",
-            (project_id,),
-        ).fetchall()
-        for row in rows:
-            existing_payload = json.loads(row["payload"])
-            existing = existing_payload.get("continuity") if isinstance(existing_payload, dict) else None
-            if not isinstance(existing, dict):
-                continue
-            if existing.get("event_id") == event["event_id"] or existing.get("idempotency_key") == event["idempotency_key"]:
-                same = existing_payload.get("continuity_sha256") == fingerprint
-                repo.conn.commit()
-                if same:
-                    return {
-                        "status": "OK", "code": "DUPLICATE",
-                        "project_id": project_id, "event_id": event["event_id"],
-                        "event_sequence": int(row["id"]), "sha256": fingerprint,
-                    }
-                raise HTTPException(
-                    status_code=409,
-                    detail={"code": "CONTINUITY_IDEMPOTENCY_CONFLICT",
-                            "event_id": event["event_id"],
-                            "message": "event_id or idempotency_key already exists with different content"},
-                )
+        existing = repo.conn.execute(
+            """SELECT event_sequence, sha256 FROM continuity_event_keys
+               WHERE project_id=? AND (event_id=? OR idempotency_key=?) LIMIT 1""",
+            (project_id, event["event_id"], event["idempotency_key"]),
+        ).fetchone()
+        if existing is not None:
+            repo.conn.commit()
+            if existing["sha256"] == fingerprint:
+                return {
+                    "status": "OK", "code": "DUPLICATE",
+                    "project_id": project_id, "event_id": event["event_id"],
+                    "event_sequence": int(existing["event_sequence"]), "sha256": fingerprint,
+                }
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "CONTINUITY_IDEMPOTENCY_CONFLICT",
+                        "event_id": event["event_id"],
+                        "message": "event_id or idempotency_key already exists with different content"},
+            )
 
         cursor = repo.conn.execute(
             """INSERT INTO events(timestamp, project_id, type, payload, actor, source)
@@ -131,6 +148,11 @@ def append_continuity_event(
              _canonical_json(stored_payload), event["actor"], event["source_system"]),
         )
         sequence = int(cursor.lastrowid)
+        repo.conn.execute(
+            """INSERT INTO continuity_event_keys(project_id, event_id, idempotency_key, event_sequence, sha256)
+               VALUES (?, ?, ?, ?, ?)""",
+            (project_id, event["event_id"], event["idempotency_key"], sequence, fingerprint),
+        )
         repo.conn.commit()
     except HTTPException:
         if repo.conn.in_transaction:
