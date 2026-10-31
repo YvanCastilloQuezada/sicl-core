@@ -14,8 +14,9 @@ from sicl.archi import ArchiElement, ArchiElementId, ArchiGeometry, ElementKind,
 
 
 @pytest.fixture(autouse=True)
-def clear_service_token(monkeypatch):
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+def configure_test_service_token(monkeypatch):
+    # The canonical API is fail-closed; tests use an explicit non-production token.
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "test-service-token")
 
 
 def client_for(tmp_path: Path):
@@ -112,7 +113,15 @@ def test_v1_auth_rejects_invalid_token(tmp_path: Path, monkeypatch):
     assert client.get("/v1/health").status_code == 401
     assert client.get("/v1/health", headers={"Authorization": "Bearer secret-for-test"}).status_code == 200
     close(repo)
-    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN")
+
+
+def test_v1_auth_fails_closed_when_service_token_is_missing(tmp_path: Path, monkeypatch):
+    monkeypatch.delenv("SICL_CORE_SERVICE_TOKEN", raising=False)
+    client, repo = client_for(tmp_path)
+    response = client.get("/v1/health")
+    assert response.status_code == 503
+    assert "not configured" in response.json()["detail"]
+    close(repo)
 
 
 def test_legacy_endpoints_remain_available(tmp_path: Path):
