@@ -110,7 +110,7 @@ def test_v1_read_only_debate_does_not_create_decision(tmp_path: Path):
 def test_v1_auth_rejects_invalid_token(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "secret-for-test")
     client, repo = client_for(tmp_path)
-    assert client.get("/v1/health").status_code == 401
+    assert client.get("/v1/health", headers={"Authorization": "Bearer wrong-token"}).status_code == 401
     assert client.get("/v1/health", headers={"Authorization": "Bearer secret-for-test"}).status_code == 200
     close(repo)
 
