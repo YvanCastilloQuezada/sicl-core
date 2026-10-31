@@ -22,7 +22,7 @@ def configure_test_service_token(monkeypatch):
 def client_for(tmp_path: Path):
     repo = SQLiteRepository(tmp_path / "v1.sqlite", check_same_thread=False)
     app.dependency_overrides[get_repository] = lambda: repo
-    return TestClient(app), repo
+    return TestClient(app, headers={"Authorization": "Bearer test-service-token"}), repo
 
 
 def close(repo: SQLiteRepository) -> None:
