@@ -65,7 +65,7 @@ def test_continuity_normalizes_timestamps_to_utc(continuity_client, monkeypatch)
     )
     assert response.status_code == 200
     event = repo.events("MEMORY-P1")[0]
-    stored = json.loads(event.payload)["continuity"]
+    stored = event.payload["continuity"]
     assert stored["occurred_at"] == "2026-10-30T12:00:00.000Z"
     assert stored["recorded_at"] == "2026-10-30T15:00:00.000Z"
 
