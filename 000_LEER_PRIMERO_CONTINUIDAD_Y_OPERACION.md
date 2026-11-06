@@ -201,3 +201,202 @@ Antes de activar automatización en Arki-02 deben verificarse:
 **Espejo remoto:** GitHub  
 **Autoridad del historial MEMORY:** SICL Core  
 **Regla de integridad:** no sobrescribir, no forzar, no perder cambios; ante duda, detener y auditar.
+
+---
+
+## 11. Registro histórico de auditorías de repositorios y Gitea — 2026-10-30
+
+**Fecha de corte:** 2026-10-30 (hora local de Perú, UTC-05:00).  
+**Alcance:** comparación de las instancias Gitea Docker y Snap para los repositorios ARKI-ACS, SICL-Core y SICL-Web; preservación de historia Git y evaluación de metadatos.  
+**Carácter:** auditorías de solo lectura, salvo la generación de informes y respaldos en directorios de auditoría. Este registro no autoriza sincronización, poda, integración, merge, push ni eliminación de referencias.
+
+### 11.1. Inventario inicial Snap vs Docker — 2026-10-30 11:46:43
+
+**Evidencia:** `/home/arki/ARKI/RESPALDOS/GITEA/AUDITORIA-SNAP-DOCKER-20261030-114643`
+
+Se localizaron y validaron seis almacenes bare (tres repositorios en cada instancia), sin errores de localización o validación.
+
+- Refs: Snap 42; Docker 241.
+- ARKI-ACS: Snap 1 ref; Docker 3.
+- SICL-Core: Snap 33; Docker 139.
+- SICL-Web: Snap 8; Docker 99.
+- La comparación inicial de commits alcanzables por todas las refs encontró historia exclusiva en ambas instancias. Estos conteos no equivalen a funcionalidades únicas ni a ramas pendientes de integración.
+- Bases SQLite: Snap 118 tablas; Docker 113. Ambas devolvieron `integrity_check: ok`.
+- Metadatos observados: Snap 39 releases y 31 action runs; Docker 31 releases y 23 action runs. En ambas bases se observaron 3 repositorios, 1 usuario, 0 issues y 0 PR según el inventario ejecutado.
+
+**Lectura:** ninguna instancia podía declararse copia completa de la otra. Los objetos Git y los metadatos de Gitea debían reconciliarse por separado.
+
+### 11.2. Verificación de respaldo Gitea — 2026-10-30 11:28:11
+
+**Evidencia:**  
+- Directorio: `/home/arki/ARKI/RESPALDOS/GITEA/GITEA-20261030-112811`
+- Archivo: `/home/arki/ARKI/RESPALDOS/GITEA/GITEA-20261030-112811.tar.gz`
+- SHA-256: `/home/arki/ARKI/RESPALDOS/GITEA/GITEA-20261030-112811.tar.gz.sha256`
+- Log: `/home/arki/ARKI/RESPALDOS/GITEA/RESPALDO-GITEA-20261030-112811.log`
+
+Se verificaron los checksums internos, la integridad del archivo tar y el checksum del archivo comprimido. Los archivos de base de datos estaban presentes.
+
+**Límite de la evidencia:** esto acredita integridad del respaldo generado, no una restauración funcional. No se ha declarado un restore test satisfactorio.
+
+### 11.3. Auditoría cruzada de almacenes — 2026-10-30 13:27:52
+
+**Evidencia:** `/home/arki/ARKI/RESPALDOS/GITEA/AUDITORIA-CRUZADA-20261030-132752`
+
+Los seis almacenes bare superaron `git fsck --full --strict --no-reflogs` con código de salida 0.
+
+| Repositorio | Refs Snap | Refs Docker | Commits alcanzables Snap | Commits alcanzables Docker |
+|---|---:|---:|---:|---:|
+| ARKI-ACS | 1 | 3 | 90 | 90 |
+| SICL-Core | 33 | 139 | 318 | 486 |
+| SICL-Web | 8 | 99 | 1.868 | 2.117 |
+
+Se identificaron referencias exclusivas en ambas instancias. Entre las referencias que requerían preservación estaban:
+
+- ARKI-ACS Docker: `experiment/arki-ideas-acs-20261015` y `feat/oece-arki-integration-v1`.
+- SICL-Core Snap: etiquetas históricas ACE85 y ACE88.
+- SICL-Web Snap: etiquetas históricas AV028, AV029, AV031, AV032, AV023 y continuidad syntax.
+- SICL-Core y SICL-Web Docker: referencias de trabajo relacionadas con MEMORY, AGK, F7/F8, Árbol Vivo, continuidad, DAM, IFC y otras líneas de desarrollo.
+
+**Corrección metodológica importante:** la comprobación de ancestros debe realizarse en un almacén que contenga ambos objetos. La ausencia de un objeto remoto produce un resultado no verificable; no demuestra por sí sola que las historias sean incompatibles.
+
+En la rama `main`, la evidencia disponible mostró que el main de Docker era ancestro del main de Snap en los tres repositorios. Snap estaba adelantado respecto a Docker:
+
+- ARKI-ACS: Docker `1a48ed4426b958cb45be2599efc1e8d624baab80`; Snap `302f63d7c66126b248f03432fc402a4a1be6a7a6`; Snap añadía 2 commits.
+- SICL-Core: Docker `588d8fa44dab7122a718e98bc1dec579c697cdbe`; Snap `934c0e56eae3c78c1f6d523d746da3e47b62ff09`; Snap añadía 12 commits.
+- SICL-Web: Docker `a6d9d1bfd1962302ba1a4a41136522d6143ce694`; Snap `5c03107cda3f8c4a1d74415610fe5efa67100079`; Snap añadía 1.310 commits.
+
+Estos resultados corresponden a las referencias y objetos examinados en esa fecha. No constituyen autorización para mover `main`.
+
+### 11.4. Catálogo de recuperación — Macroorden 6, 2026-10-30 14:59:11
+
+**Evidencia:** `/home/arki/ARKI/RESPALDOS/GITEA/CATALOGO-RECUPERACION-20261030-145911`
+
+Se generó una matriz de 215 filas y un informe de 2.065 líneas:
+
+- 53 referencias clasificadas como `EXCLUSIVA_REQUIERE_PRESERVACION`.
+- 26 como `INTEGRADA_EN_MAIN_OPUESTO`.
+- 132 como `INTEGRADA_EN_MAIN_PROPIO`.
+- 4 como `OBJETO_EN_AMBOS_REQUIERE_REVISION`.
+- 3 conflictos de nombre, correspondientes a `main`.
+
+Las cuatro filas de objeto presente en ambas instancias representaban dos pares de referencias con el mismo SHA en SICL-Core (ACE85 y ACE88), no cuatro desarrollos independientes.
+
+**Límite:** las categorías expresan relaciones de alcanzabilidad Git, no equivalencia funcional, vigencia ni aprobación de integración. La clasificación `INTEGRADA` no sustituye una revisión de código y pruebas.
+
+### 11.5. Inspección de bloques y ramas — Macroorden 7, 2026-10-30
+
+Se inspeccionaron ramas y etiquetas seleccionadas para identificar commits, archivos y alcance. Entre los resultados:
+
+- ARKI-ACS: `experiment/arki-ideas-acs-20261015` conserva dos commits exclusivos y documentación de inventario/protocolo de recuperación.
+- ARKI-ACS: `feat/oece-arki-integration-v1` no mostró commits únicos frente a main en el contraste realizado.
+- SICL-Core: la etiqueta histórica ACE85 contiene cambios acotados; ACE88 contiene nueve commits, 40 archivos, 1.349 inserciones y 61 eliminaciones, incluyendo autenticación de servicio, autorización humana D2, Mapa Vivo V1, pruebas, CLI y documentación.
+
+**Límite:** inspeccionar los cambios de una rama no acredita que sus pruebas hayan sido ejecutadas en el entorno actual ni que la funcionalidad esté desplegada.
+
+### 11.6. Pruebas cruzadas de refs y objetos — Macroorden 8, 2026-10-30 15:27:43
+
+**Evidencia:** `/home/arki/ARKI/RESPALDOS/GITEA/PRUEBAS-CRUZADAS-20261030-152743`
+
+- 57 pruebas registradas.
+- 535 filas de matriz.
+- Cero errores reportados.
+- Los seis almacenes superaron `git fsck`.
+- Todas las referencias examinadas resolvieron sus objetos; cero objetos faltantes.
+- Se compararon nombres de refs y SHA entre instancias.
+
+Conteo de referencias:
+
+| Repositorio | Mismo nombre | Mismo SHA | Mismo nombre, SHA diferente | Solo Snap | Solo Docker |
+|---|---:|---:|---:|---:|---:|
+| ARKI-ACS | 1 | 0 | 1 | 0 | 2 |
+| SICL-Core | 31 | 30 | 1 | 2 | 108 |
+| SICL-Web | 2 | 1 | 1 | 6 | 97 |
+
+El informe inicial registró 283 comprobaciones de diferencias: 242 sin hallazgos y 41 con diagnósticos. La revisión posterior determinó que estos diagnósticos incluían hallazgos de espacios en blanco/trailing whitespace; no deben interpretarse como corrupción Git ni como fallos de integridad. Un código de salida distinto de cero en `git diff --check` puede indicar esos hallazgos.
+
+### 11.7. Equivalencia de parches — Macroorden 9, 2026-10-30 15:31:20
+
+**Evidencia:** `/home/arki/ARKI/RESPALDOS/GITEA/PATCH-AUDIT-20261030-153120`
+
+Se indexaron commits alcanzables y sus patch IDs:
+
+| Repositorio | Snap: commits / patch IDs | Docker: commits / patch IDs |
+|---|---:|---:|
+| ARKI-ACS | 90 / 89 | 90 / 89 |
+| SICL-Core | 318 / 255 | 486 / 424 |
+| SICL-Web | 1.868 / 1.770 | 2.117 / 2.050 |
+
+Resultado global de la tabla de equivalencias: 10.684 registros:
+- 10.029 registros con patch equivalente localizado en la otra instancia.
+- 614 registros sin patch localizado en la otra instancia.
+- 41 registros sin patch ID.
+
+Se compararon 283 referencias mediante `git diff --check`: 242 sin hallazgos y 41 con diagnósticos.
+
+**Interpretación y límites:**
+- Los 10.029 registros no equivalen a 10.029 funcionalidades únicas: los mismos commits pueden aparecer en varias referencias.
+- Los 614 registros no equivalen a 614 commits únicos.
+- `patch-id` no es prueba universal de equivalencia; puede no representar adecuadamente merges, commits vacíos, cambios binarios, renombres o cambios solo de espacios.
+- Un patch no localizado es candidato a preservación e inspección, no prueba automática de que falte una funcionalidad.
+- Los 41 casos sin patch ID deben inspeccionarse por SHA y estructura de padres.
+
+### 11.8. Deduplicación de commits no localizados — Macroorden 10, 2026-10-30 15:35:20
+
+**Evidencia:** `/home/arki/ARKI/RESPALDOS/GITEA/EXCLUSIVOS-REALES-20261030-153520`
+
+La macroorden terminó con código 0, cero errores y modo solo lectura.
+
+| Repositorio | Origen | Commits únicos no localizados | Archivos cambiados |
+|---|---|---:|---:|
+| ARKI-ACS | Docker | 2 | 2 |
+| SICL-Core | Docker | 174 | 359 |
+| SICL-Web | Docker | 328 | 9.108 |
+| SICL-Web | Snap | 9 | 24 |
+| **Total** | | **513** | **9.493** |
+
+Otros datos:
+- 614 registros originales de patch no localizado.
+- 513 commits únicos después de deduplicar.
+- 614 asociaciones de referencias dependientes.
+- 9.493 registros de archivos afectados y 8.801 rutas distintas.
+- 41 commits sin patch ID.
+- Cero errores.
+
+Los principales bloques pendientes de revisión funcional son:
+- SICL-Web: `feat/spatial-pilot-media-studio-v1` (196 commits), `experiment/arki-ideas-mapa-vivo-20261015` (62) y `feat/arki-operational-vitality-mo05-20261015` (44).
+- SICL-Core: `docs/memory-auditoria-integracion-20261021` (69), `feat/weather-environmental-context-p1` (39), `feat/dam-dna-advisor-examiner-foundation` (32) y `feat/core-promotion-concurrency-guarantee` (26).
+- ARKI-ACS: dos commits de `experiment/arki-ideas-acs-20261015`.
+- SICL-Web Snap: nueve commits históricos que requieren preservación y evaluación.
+
+Los 41 registros sin patch ID corresponden a 11 SHA distintos según el análisis de los archivos entregados. No deben descartarse ni atribuirse todos a merges: deben examinarse individualmente.
+
+### 11.9. Conclusiones consolidadas y decisiones
+
+1. **Integridad Git:** los seis almacenes examinados superaron las verificaciones `git fsck`; no se reportaron objetos faltantes en la auditoría cruzada.
+2. **Divergencia de referencias:** Docker y Snap contienen refs y objetos exclusivos. La relación de `main` observada no elimina la necesidad de preservar ramas y etiquetas históricas.
+3. **Metadatos Gitea:** las bases SQLite pasaron `integrity_check`, pero difieren en releases y action runs. La sincronización de refs Git no sincroniza usuarios, releases, ejecuciones, issues/PR ni configuración.
+4. **Respaldo:** el archivo generado pasó verificaciones de integridad; falta acreditar restauración aislada.
+5. **Equivalencia:** patch IDs reducen el universo de comparación, pero no prueban equivalencia funcional ni sustituyen revisión de código.
+6. **Volumen pendiente:** el análisis deduplicado identificó 513 commits no localizados por patch ID, no 513 funcionalidades demostradas como faltantes.
+7. **Prioridad de revisión:** SICL-Web y SICL-Core concentran el trabajo pendiente; ACS tiene un volumen menor.
+8. **No poda:** ninguna rama o etiqueta debe eliminarse por estos conteos.
+9. **No integración:** no se autoriza merge, cherry-pick, push, sincronización ni movimiento de `main` con base exclusiva en estas auditorías.
+10. **Arquitectura:** conservar SICL Core como autoridad de eventos; SICL Web como captura/orquestación/proyección; ACS como laboratorio; AGK como única autoridad geométrica. No crear autoridades paralelas ni alterar D-2/FROZEN.
+
+### 11.10. Próxima auditoría requerida
+
+La siguiente etapa debe ser una auditoría funcional dirigida, de solo lectura, sobre los 513 commits y los 11 SHA sin patch ID:
+
+- Agrupar por bloque funcional, rama, SHA y dependencias.
+- Inspeccionar contenido, pruebas, contratos y evidencia de CI asociada al SHA exacto.
+- Identificar cambios que afectan AGK, D-2, MEMORY, CONTINUIDAD, Árbol Vivo, DAM, IFC y Spatial Pilot.
+- Clasificar cada bloque como `PRESERVAR`, `CANDIDATO_A_INTEGRAR`, `ARCHIVAR`, `OBSOLETO_POR_VERIFICAR` o `REQUIERE_REVISION`.
+- Mantener separado lo declarado, implementado, ejecutado y verificado.
+- No modificar refs, ramas, tags, main, servicios ni workflows.
+
+**Criterio CERO DEUDA:** No Evidence = Not Green. Ningún bloque se declara integrado, obsoleto, recuperado o validado sin evidencia trazable.
+
+**Estado al cierre del 2026-10-30:** `GIT_INTEGRITY_CHECKED`; `BACKUP_ARCHIVE_INTEGRITY_CHECKED`; `RESTORE_TEST_NOT_VERIFIED`; `FUNCTIONAL_EQUIVALENCE_NOT_VERIFIED`; `513_COMMITS_REQUIRE_CLASSIFICATION`; `NO_PRUNE_OR_SYNC_AUTHORIZED`.
+
+**Nota de cronología:** las horas y fechas de los directorios de salida se conservan como identificadores de evidencia. Los informes no deben reordenarse por fecha de carga de archivos ni por fecha de modificación posterior. Cuando una fecha de commit original no fue recuperada, se mantiene como desconocida; no se inventa.
+
