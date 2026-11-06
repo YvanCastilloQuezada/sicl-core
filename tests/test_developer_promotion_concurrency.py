@@ -908,3 +908,62 @@ def test_tc04_migrated_schema_with_inconsistent_ledger_fails_closed_at_startup(t
         match="^PROMOTION_LEDGER_BINDING_INTEGRITY_FAILURE$",
     ):
         SQLiteRepository(str(db))
+
+
+def test_tc25_promotion_recovers_after_repository_reopen(tmp_path, monkeypatch):
+    """A committed promotion survives SQLite close/reopen and stays idempotent."""
+    db = tmp_path / "tc25-promotion-recovery.sqlite"
+
+    # First process/repository instance.
+    repo1 = setup_repo(str(db))
+
+    first = run(repo1)
+
+    assert first.committed is True
+    assert first.snapshot_id is not None
+    assert first.d2_version is not None
+
+    snapshot_id = first.snapshot_id
+    d2_version = first.d2_version
+
+    committed_events_before = [
+        event for event in repo1.events(PROJECT)
+        if event.type == "DEVELOPER_PROMOTION_COMMITTED"
+    ]
+    assert len(committed_events_before) == 1
+
+    repo1.close()
+
+    # Reopen the same persistent SQLite database.
+    repo2 = SQLiteRepository(str(db))
+
+    # Same promotion identity: project, proposal, fingerprint and review.
+    # Idempotent recovery must not execute publication effects again.
+    def forbidden_effects(*args, **kwargs):
+        raise AssertionError("promotion effects must not replay after recovery")
+
+    monkeypatch.setattr(
+        dp.ArchiTransaction,
+        "promote_initial_elements",
+        forbidden_effects,
+    )
+
+    second = run(repo2)
+
+    assert second.committed is True
+    assert second.reason == "ALREADY_COMMITTED"
+    assert second.snapshot_id == snapshot_id
+    assert second.d2_version == d2_version
+    assert second.effects_status == "NOT_ATTEMPTED"
+
+    committed_events_after = [
+        event for event in repo2.events(PROJECT)
+        if event.type == "DEVELOPER_PROMOTION_COMMITTED"
+    ]
+    assert len(committed_events_after) == 1
+
+    snapshot = repo2.get_d2_snapshot(PROJECT, d2_version)
+    assert snapshot is not None
+    assert snapshot.snapshot_id == snapshot_id
+
+    repo2.close()
