@@ -206,3 +206,66 @@ Los archivos systemd incluidos son plantillas de despliegue. No se activan solos
 7. Probar restauración en un directorio aislado con restore-verify. No apuntar el destino a la base activa.
 
 El timer está programado para las 03:20 hora local del servidor. El huso horario del servidor debe verificarse; no se asume que sea Perú.
+
+## 14. Conciliación técnica entre SICL Core y SICL Web — 2026-11-02
+
+**Propósito:** corregir la descripción operativa heredada de M2–M5. Esta sección prevalece sobre instrucciones de despliegue incompatibles de la sección 13. No acredita instalación ni ejecución en Arki-02.
+
+### 14.1. Arquitectura observada en los repositorios
+
+| Capa | Implementación localizada | Autoridad / límite |
+|---|---|---|
+| Core M1 | `api/routes/continuity.py`; rutas POST events, GET events y GET checkpoint | Core escribe en `events`, que sigue siendo el Event Store canónico |
+| Web M2 | `server/continuityApi.ts` + `server/continuityOutbox.ts` | SQLite local cifrada como outbox de entrega; no es Event Store |
+| Web→Core | `server/coreHttpClient.ts` y worker/flush del adaptador | El evento solo es canónico después de confirmación de Core |
+| Web M3 | `scripts/arki-memory-core-projection.mjs` | Proyección JSON/Markdown derivada, regenerable y no canónica |
+| Proyección programada | `.github/workflows/arki-memory-core-projection.yml` | GitHub Actions genera artefactos; no despliega ni escribe en el runtime |
+| Core backup | `scripts/arki_memory_backup.py` | Backup cifrado Fernet de la base Core |
+| Web outbox backup | `scripts/arki-memory-outbox-backup.mjs` | Snapshot SQLite de la cola Web; las cargas de evento están cifradas AES-256-GCM |
+
+### 14.2. Corrección obligatoria de instrucciones antiguas
+
+La instrucción anterior de aplicar `drizzle/0005_arki_memory_continuity.sql` en MySQL **no corresponde al diseño actual observado de la outbox Web**. El documento vigente de SICL Web, `docs/MEMORY/WEB-OUTBOX-SQLITE.md`, especifica SQLite local con `node:sqlite`, Node.js 22.5 o superior y sin migración MariaDB/MySQL para esta cola.
+
+Por tanto:
+
+- No ejecutar ni crear una migración MySQL para `arki_continuity_outbox`.
+- No instalar ni activar unidades systemd de una versión anterior sin contrastarlas con el checkout actual.
+- La outbox Web y el Event Store Core tienen backups distintos y deben verificarse por separado.
+- El backup Core no respalda automáticamente la outbox Web; el backup Web no sustituye el backup de Core.
+- Mantener la clave Fernet de Core y la clave AES-256-GCM de Web separadas, protegidas y respaldadas según su política. No regenerarlas mientras existan backups o eventos pendientes que dependan de ellas.
+
+### 14.3. Estado epistemológico conciliado
+
+| Hito | Código localizado | Pruebas en repositorio | Runtime Arki-02 |
+|---|---|---|---|
+| M1 Core API | IMPLEMENTED | Tests presentes; ejecución actual no aportada en esta auditoría | UNKNOWN |
+| M2 Web outbox y adaptador | IMPLEMENTED en `main` observado | Tests unitarios presentes | UNKNOWN |
+| M3 proyección Core | Script y workflow presentes | Test renderer referenciado por workflow | UNKNOWN; workflow real y artefacto no comprobados aquí |
+| M4 captura conversacional | Endpoint Web y validación de autoridad presentes | No se declara E2E de producción | UNKNOWN |
+| M5 backup Core | Script y tests presentes | Tests de backup/restauración aislada presentes | UNKNOWN |
+| Backup Web outbox | Script y tests presentes | Pruebas de snapshot/restauración presentes | UNKNOWN |
+
+**No declarar** `PERMANENT_CONTINUITY = VERIFIED`, `SERVER_GITHUB_MIRROR_VERIFIED` ni `CHAT_CAPTURE = CONNECTED` con esta evidencia de repositorio.
+
+### 14.4. Riesgos técnicos que siguen abiertos
+
+1. Ejecutar pruebas de Core y Web sobre los SHA exactos que se instalarán.
+2. Confirmar que el worker Web realmente se inicia en el ciclo de vida del servidor y que no depende de una llamada aislada.
+3. Confirmar persistencia de la ruta SQLite Web, permisos, WAL y backup diario en Arki-02.
+4. Probar dos escritores concurrentes, caída de Core, reintento, evento bloqueado y recuperación.
+5. Confirmar que el endpoint Core valida timestamps con zona horaria y normaliza UTC; el contrato exige UTC y no debe aceptar fechas locales ambiguas.
+6. Probar que los eventos sensibles son rechazados tanto en Web como en Core. La validación Web no sustituye validación en la frontera canónica Core.
+7. Ejecutar backup y restauración aislada de ambas bases, cada una con su manifiesto y clave correspondiente.
+8. Ejecutar un E2E real: decisión de prueba no decisoria → outbox Web → Core → checkpoint/proyección → reinicio → recuperación.
+9. Verificar artefactos del workflow de proyección y su fecha/SHA. Un workflow definido no equivale a una ejecución exitosa.
+10. Registrar evidencia de Arki-02 con host, timestamp, SHA, comandos, resultados y rutas de artefactos.
+
+### 14.5. Fuente de verdad documental
+
+- Core API y Event Store: SICL Core.
+- Outbox, captura Web y backup de outbox: SICL Web.
+- Contrato de operación del host y sincronización: `000_LEER_PRIMERO_CONTINUIDAD_Y_OPERACION.md`.
+- Este documento define la separación de responsabilidades y no reemplaza los procedimientos de despliegue específicos de cada repositorio.
+
+**Resultado de conciliación:** `IMPLEMENTATION_PRESENT / CROSS_REPO_RUNTIME_NOT_VERIFIED / LEGACY_MYSQL_OUTBOX_INSTRUCTION_SUPERSEDED`.
