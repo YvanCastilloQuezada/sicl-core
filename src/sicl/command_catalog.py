@@ -1,37 +1,65 @@
 """
-Catálogo de comandos SICL, cargado desde commands-catalog.json.
+Catálogo de comandos SICL, cargado desde commands-catalog.json del frontend.
 
 Se usa en el copiloto para que el LLM no invente comandos que no existen
 en el dominio real.
 
 Uso:
     from sicl.command_catalog import COMMANDS, is_known_command
+
+Estrategia de búsqueda (en orden):
+1. Variable de entorno SICL_COMMANDS_CATALOG (path absoluto).
+2. Ruta relativa desde este archivo (asumiendo layout canonical/).
+3. Ruta relativa desde el CWD (tests, scripts).
 """
 from __future__ import annotations
 
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 
 
-# Ruta canónica del catálogo (relativa al repo)
-_CATALOG_PATH = (
-    Path(__file__).parent.parent.parent.parent
-    / "canonical" / "sicl-web" / "client" / "src" / "content" / "commands-catalog.json"
-)
+def _candidate_paths() -> list[Path]:
+    """Lista de candidatos, en orden de prioridad."""
+    candidates: list[Path] = []
 
-# Alternativa: buscar relativo al repo actual
-_CATALOG_FALLBACK = Path(__file__).parent.parent.parent / "canonical" / "sicl-web" / "client" / "src" / "content" / "commands-catalog.json"
+    # 1. Env var override
+    env_path = os.getenv("SICL_COMMANDS_CATALOG")
+    if env_path:
+        candidates.append(Path(env_path))
+
+    # 2. Relativo a este archivo.
+    #    command_catalog.py está en sicl-core/src/sicl/
+    #    parent.parent.parent = sicl-core/
+    #    parent.parent.parent.parent = canonical/ (que contiene sicl-core/ y sicl-web/)
+    here = Path(__file__).resolve()
+    for levels_up in (3, 4, 5):
+        base = here
+        for _ in range(levels_up):
+            base = base.parent
+        candidates.append(base / "sicl-web" / "client" / "src" / "content" / "commands-catalog.json")
+
+    # 3. Relativo al CWD
+    cwd = Path.cwd()
+    candidates.append(cwd / "client" / "src" / "content" / "commands-catalog.json")
+    candidates.append(cwd.parent / "sicl-web" / "client" / "src" / "content" / "commands-catalog.json")
+    candidates.append(cwd / ".." / "sicl-web" / "client" / "src" / "content" / "commands-catalog.json")
+
+    return candidates
 
 
 @lru_cache(maxsize=1)
 def _load_catalog() -> list[dict]:
-    """Carga commands-catalog.json. Retorna [] si no existe (modo offline)."""
-    candidates = [_CATALOG_FALLBACK, _CATALOG_PATH]
-    for p in candidates:
-        if p.is_file():
+    """Carga commands-catalog.json. Retorna [] si no se encuentra."""
+    for p in _candidate_paths():
+        try:
+            resolved = p.resolve()
+        except (OSError, RuntimeError):
+            continue
+        if resolved.is_file():
             try:
-                return json.loads(p.read_text(encoding="utf-8"))
+                return json.loads(resolved.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 continue
     return []
@@ -45,11 +73,9 @@ def _build_command_map() -> dict[str, dict]:
     for entry in catalog:
         name = str(entry.get("name", "")).upper().strip()
         if name.startswith("/"):
-            # Es el comando canónico
             result[name] = entry
         compact = str(entry.get("compact", "")).upper().strip()
         if compact and not compact.startswith("/"):
-            # Alias compacto (ej. PRO-CRE) apunta al mismo comando
             result[compact] = entry
     return result
 
@@ -61,6 +87,18 @@ COMMANDS: tuple[str, ...] = tuple(
 
 # Todos los aliases (canónicos + compactos)
 ALL_ALIASES: tuple[str, ...] = tuple(sorted(_build_command_map().keys()))
+
+
+def catalog_path() -> str | None:
+    """Retorna el path del catálogo cargado, o None si no se encontró."""
+    for p in _candidate_paths():
+        try:
+            resolved = p.resolve()
+        except (OSError, RuntimeError):
+            continue
+        if resolved.is_file():
+            return str(resolved)
+    return None
 
 
 def is_known_command(command: str) -> bool:
@@ -78,7 +116,6 @@ def is_known_command(command: str) -> bool:
     if normalized.upper() == "UNKNOWN":
         return True
 
-    # Tomar los primeros 2 tokens para comandos multi-palabra (ej. /PROJECT CREATE)
     parts = normalized.split()
     if not parts:
         return False
@@ -90,10 +127,7 @@ def is_known_command(command: str) -> bool:
 
 
 def catalog_for_prompt() -> str:
-    """
-    Retorna un bloque de texto con el catálogo para incluir en el
-    system prompt del copiloto. Formato compacto.
-    """
+    """Retorna un bloque de texto con el catálogo para el system prompt."""
     catalog = _load_catalog()
     lines: list[str] = []
     for entry in catalog:
@@ -101,6 +135,5 @@ def catalog_for_prompt() -> str:
         syntax = entry.get("syntax", "")
         if not name:
             continue
-        # Formato: - /PROJECT CREATE: PRO-CRE <project_id> <name> [scopes]
         lines.append(f"- {name}: {syntax}")
     return "\n".join(lines)
