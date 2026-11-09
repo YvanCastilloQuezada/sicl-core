@@ -1,0 +1,5 @@
+{
+  "command": "/GENERATE DESIGN parametric_grid_v1",
+  "inputs": {"floors":120,"areaM2":120000},
+  "actor": "test"
+}

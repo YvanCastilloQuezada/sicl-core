@@ -16,6 +16,7 @@ from api.routes.projects import router as projects_router
 from api.routes.v1 import router as v1_router
 from api.routes.continuity import router as continuity_router
 from api.routes.gis_copilot import router as gis_copilot_router
+from .routes import bim, specialties
 
 
 def create_app() -> FastAPI:
@@ -37,6 +38,9 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok", "service": "sicl-core-api"}
+
+    app.include_router(specialties.router, prefix="/v1", tags=["specialties"])
+    app.include_router(bim.router, prefix="/v1", tags=["bim"])
 
     return app
 

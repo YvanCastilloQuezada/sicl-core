@@ -21,30 +21,40 @@ from pathlib import Path
 
 
 def _candidate_paths() -> list[Path]:
-    """Lista de candidatos, en orden de prioridad."""
+    """Rutas candidatas para el catálogo de comandos SICL.
+    
+    Prioridad:
+    1. Variable de entorno SICL_COMMANDS_CATALOG
+    2. src/sicl/commands-catalog.json (catálogo plano, nativo del core)
+    3. commands-catalog.json en la raíz del core
+    4. sicl-web/client/src/content/commands-catalog.json (formato con categorías)
+    """
     candidates: list[Path] = []
 
-    # 1. Env var override
+    # 1. Env var override (máxima prioridad)
     env_path = os.getenv("SICL_COMMANDS_CATALOG")
     if env_path:
         candidates.append(Path(env_path))
 
-    # 2. Relativo a este archivo.
-    #    command_catalog.py está en sicl-core/src/sicl/
-    #    parent.parent.parent = sicl-core/
-    #    parent.parent.parent.parent = canonical/ (que contiene sicl-core/ y sicl-web/)
+    # 2. Catálogo plano nativo del core (src/sicl/commands-catalog.json)
     here = Path(__file__).resolve()
+    candidates.append(here.parent / "commands-catalog.json")  # sicl-core/src/sicl/commands-catalog.json
+
+    # 3. Catálogo plano en la raíz del core
+    candidates.append(here.parent.parent.parent / "commands-catalog.json")  # sicl-core/commands-catalog.json
+
+    # 4. Fallback: catálogo del frontend (con categorías, requiere aplanado)
     for levels_up in (3, 4, 5):
         base = here
         for _ in range(levels_up):
             base = base.parent
         candidates.append(base / "sicl-web" / "client" / "src" / "content" / "commands-catalog.json")
 
-    # 3. Relativo al CWD
+    # 5. Relativo al CWD
     cwd = Path.cwd()
+    candidates.append(cwd / "commands-catalog.json")
     candidates.append(cwd / "client" / "src" / "content" / "commands-catalog.json")
     candidates.append(cwd.parent / "sicl-web" / "client" / "src" / "content" / "commands-catalog.json")
-    candidates.append(cwd / ".." / "sicl-web" / "client" / "src" / "content" / "commands-catalog.json")
 
     return candidates
 
@@ -66,17 +76,41 @@ def _load_catalog() -> list[dict]:
 
 
 @lru_cache(maxsize=1)
-def _build_command_map() -> dict[str, dict]:
-    """Mapa de comando canónico (mayúsculas) → entrada del catálogo."""
-    catalog = _load_catalog()
-    result: dict[str, dict] = {}
-    for entry in catalog:
-        name = str(entry.get("name", "")).upper().strip()
-        if name.startswith("/"):
-            result[name] = entry
-        compact = str(entry.get("compact", "")).upper().strip()
-        if compact and not compact.startswith("/"):
-            result[compact] = entry
+def _build_command_map():
+    """Construye el mapa de comandos, tolerante a ambos formatos:
+    - Array plano: [{name, description}, ...]
+    - Objeto con categorías: {categories: {cat: [{command/name, description}, ...]}}
+    """
+    raw = _load_catalog()
+    commands = []
+
+    # Formato 1: array plano
+    if isinstance(raw, list):
+        commands = raw
+
+    # Formato 2: objeto con categorías
+    elif isinstance(raw, dict):
+        if "categories" in raw and isinstance(raw["categories"], dict):
+            for cat_commands in raw["categories"].values():
+                if isinstance(cat_commands, list):
+                    commands.extend(cat_commands)
+        elif "commands" in raw and isinstance(raw["commands"], list):
+            commands = raw["commands"]
+
+    # Construir el mapa
+    result = {}
+    for entry in commands:
+        if not isinstance(entry, dict):
+            continue
+        # Aceptar tanto 'name' como 'command'
+        name = str(entry.get("name") or entry.get("command") or "").upper().strip()
+        if not name:
+            continue
+        # Normalizar para que empiece con /
+        if not name.startswith("/"):
+            name = "/" + name
+        result[name] = entry
+
     return result
 
 

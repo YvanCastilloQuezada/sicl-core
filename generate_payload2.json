@@ -1,0 +1,9 @@
+{
+  "method": "parametric_grid_v1",
+  "inputs": {
+    "floors": 120,
+    "areaM2": 120000,
+    "location": "Trujillo"
+  },
+  "actor": "test"
+}

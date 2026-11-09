@@ -14,7 +14,7 @@ import json
 import os
 import urllib.error
 import urllib.request
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from .command_catalog import catalog_for_prompt, is_known_command
@@ -29,81 +29,84 @@ class CopilotIntent:
     status: str = "PREVIEW_ONLY"  # PREVIEW_ONLY | NO_MATCH | NEEDS_REVIEW
     executed: bool = False
     decision_created: bool = False
+    questions: list = field(default_factory=list)
 
 
-_SYSTEM_PROMPT = (
-    "Eres un copiloto de ARKI/SICL. Tu única tarea es traducir solicitudes "
-    "de arquitectura (en español o inglés) a UN comando SICL del catálogo "
-    "proporcionado abajo.\n\n"
-    "REGLAS ESTRICTAS:\n"
-    "1. Devuelve SOLO JSON con las claves: command, explanation, confidence.\n"
-    "2. `command` DEBE empezar con '/' y corresponder a un comando del catálogo.\n"
-    "3. Si NINGÚN comando del catálogo puede satisfacer la solicitud, "
-    "devuelve command=\"UNKNOWN\", confidence=0.0, explanation=\"No hay "
-    "comando SICL para esta solicitud.\"\n"
-    "4. NO inventes comandos. NO ejecutes nada. NUNCA inventes.\n"
-    "5. `confidence` es un número entre 0.0 y 1.0.\n\n"
-    "CATÁLOGO DE COMANDOS SICL DISPONIBLES:\n"
-    "{catalog}\n\n"
-    "EJEMPLOS:\n"
-    "Solicitud: \"crea un proyecto llamado UPAO-001\"\n"
-    "Comando: \"/PROJECT CREATE UPAO-001 \\\"UPAO\\\"\"\n"
-    "Confidence: 0.95\n\n"
-    "Solicitud: \"registra el hecho: el FAR es 5\"\n"
-    "Comando: \"/FACT SET \\\"el FAR es 5\\\" <source>\"\n"
-    "Confidence: 0.9\n\n"
-    "Solicitud: \"abre el proyecto UPAO-001\"\n"
-    "Comando: \"/PROJECT OPEN UPAO-001\"\n"
-    "Confidence: 0.98\n\n"
-    "Solicitud: \"crea una pared de 5 metros\"\n"
-    "Comando: \"UNKNOWN\"\n"
-    "Confidence: 0.0\n"
-    "Explanation: \"No hay comando SICL para crear paredes. "
-    "Los comandos SICL gestionan proyectos, decisiones y conocimiento, "
-    "no geometría directa.\"\n"
-)
+_SYSTEM_PROMPT = """Eres ARKI, un Arquitecto Senior con 30 años de experiencia en diseño de hospitales, aeropuertos, puertos, terminales terrestres, vivienda y espacio público. Trabajas para Yvan Castillo en Trujillo, Perú.
+
+Tu tarea es doble:
+1. TRADUCIR la solicitud del usuario a UN comando SICL del catálogo (si es aplicable).
+2. ACTUAR COMO ARQUITECTO: si la solicitud es un proyecto de diseño, analiza el brief y devuelve las PREGUNTAS CRÍTICAS que un arquitecto senior haría antes de diseñar (sitio, normativa, programa, usuarios, clima, presupuesto, sostenibilidad).
+
+REGLAS:
+- Devuelve SOLO JSON con las claves: command, explanation, confidence, questions.
+- Si es un comando: command debe empezar con '/' y estar en el catálogo.
+- Si es un proyecto de diseño (hospital, terminal, aeropuerto, etc.): command="UNKNOWN", confidence=0, y en 'questions' devuelve 3-5 preguntas técnicas concretas.
+- NUNCA inventes comandos.
+- NUNCA ejecutes. Solo propones.
+
+CATÁLOGO SICL:
+{catalog}
+
+EJEMPLOS:
+Solicitud: "Crea un proyecto UPAO-001"
+Respuesta: {"command":"/PROJECT CREATE UPAO-001 UPAO","explanation":"Crear proyecto","confidence":0.95,"questions":[]}
+
+Solicitud: "Quiero un hospital de 500 camas en Trujillo"
+Respuesta: {"command":"UNKNOWN","explanation":"Proyecto de diseño. Necesito más información.","confidence":0,"questions":["¿Es público (MINSA/EsSalud) o privado?","¿Qué especialidades médicas requiere?","¿El terreno está en zona urbana consolidada o expansión?","¿Cuál es el presupuesto estimado en UIT?","¿Requiere helipuerto o área de emergencia aérea?"]}
+
+Solicitud: "Registra el FAR=5"
+Respuesta: {"command":"/FACT SET el FAR es 5 INSPECCION","explanation":"Registrar hecho","confidence":0.9,"questions":[]}
+"""
 
 
-def _validate(payload: dict[str, Any], text: str) -> CopilotIntent:
+def _validate(payload: Any, text: str) -> CopilotIntent:
+    """Valida el payload del LLM. Tolera tanto dict como str (JSON serializado)."""
+    # Si el LLM devolvió un string, intentar parsearlo como JSON
+    if isinstance(payload, str):
+        import json as _json
+        try:
+            payload = _json.loads(payload)
+        except _json.JSONDecodeError:
+            # Intentar extraer el primer objeto JSON que aparezca en el texto
+            match_json = re.search(r'\{[^{}]*\}', payload, re.DOTALL)
+            if match_json:
+                try:
+                    payload = _json.loads(match_json.group(0))
+                except _json.JSONDecodeError:
+                    raise ValueError(f"LLM output is not valid JSON: {payload[:200]}")
+
+    if not isinstance(payload, dict):
+        raise ValueError(f"LLM output must be a dict, got {type(payload).__name__}: {str(payload)[:200]}")
+
     command = str(payload.get("command", "")).strip()
     explanation = str(payload.get("explanation", "")).strip()
     try:
         confidence = float(payload.get("confidence", 0.0))
     except (TypeError, ValueError):
         confidence = 0.0
-    # acotar
     confidence = max(0.0, min(1.0, confidence))
 
     if not command:
         raise ValueError("copilot output must include 'command'")
+
+    questions = payload.get("questions", [])
+    if not isinstance(questions, list):
+        questions = []
 
     # Caso UNKNOWN: el modelo admite que no hay match. NO es error.
     if command.upper() == "UNKNOWN":
         return CopilotIntent(
             natural_language=text,
             command="UNKNOWN",
-            explanation=explanation or "No SICL command matches this request.",
-            confidence=0.0,
+            explanation=explanation,
+            confidence=confidence,
             status="NO_MATCH",
+            questions=questions,
         )
 
-    # Debe empezar con /
-    if not command.startswith("/"):
-        raise ValueError("copilot output must be a SICL command beginning with /")
-
-    # Debe pertenecer al catálogo
     if not is_known_command(command):
-        # El modelo inventó un comando. No lo aceptamos como PREVIEW_ONLY.
-        return CopilotIntent(
-            natural_language=text,
-            command="UNKNOWN",
-            explanation=(
-                f"El comando '{command}' no existe en el catálogo SICL. "
-                f"Modelo alucinó. {explanation}"
-            ),
-            confidence=0.0,
-            status="NO_MATCH",
-        )
+        raise ValueError(f"copilot output command is not in catalog: {command}")
 
     return CopilotIntent(
         natural_language=text,
@@ -111,6 +114,65 @@ def _validate(payload: dict[str, Any], text: str) -> CopilotIntent:
         explanation=explanation,
         confidence=confidence,
         status="PREVIEW_ONLY",
+        questions=questions,
+    )
+
+
+
+
+def _parse_llm_response(content: str, text: str) -> CopilotIntent:
+    """Parseo tolerante de la respuesta del LLM.
+    
+    Acepta:
+    - JSON puro: {"command": "/FACT SET ...", ...}
+    - Texto con JSON embebido: "Aquí está: {...}"
+    - Texto plano (no JSON): "Lo siento, no puedo..."
+    """
+    if content is None:
+        content = ""
+    content = str(content).strip()
+
+    if not content:
+        return CopilotIntent(
+            natural_language=text,
+            command="UNKNOWN",
+            explanation="El modelo no devolvio contenido.",
+            confidence=0.0,
+            status="NO_MATCH",
+            questions=[],
+        )
+
+    # 1. Intentar parseo directo como JSON
+    try:
+        payload = json.loads(content)
+        return _validate(payload, text)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # 2. Intentar extraer JSON embebido (bloques { ... })
+    import re as _re
+    json_candidates = _re.findall(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", content, _re.DOTALL)
+    for candidate in json_candidates:
+        try:
+            payload = json.loads(candidate)
+            if isinstance(payload, dict) and ("command" in payload or "questions" in payload):
+                return _validate(payload, text)
+        except (json.JSONDecodeError, ValueError):
+            continue
+
+    # 3. Fallback: texto plano -> extraer preguntas (lineas que terminen en ?)
+    questions = [
+        line.strip()
+        for line in content.split("\n")
+        if line.strip().endswith("?")
+    ]
+    return CopilotIntent(
+        natural_language=text,
+        command="UNKNOWN",
+        explanation=content[:500],
+        confidence=0.0,
+        status="NO_MATCH",
+        questions=questions,
     )
 
 
@@ -131,7 +193,7 @@ class OllamaCopilot:
         if not self.base_url:
             raise RuntimeError("COPILOT_NOT_CONFIGURED")
 
-        system_prompt = _SYSTEM_PROMPT.format(catalog=catalog_for_prompt())
+        system_prompt = _SYSTEM_PROMPT.replace("{catalog}", catalog_for_prompt())
 
         body = {
             "model": self.model,
@@ -156,7 +218,7 @@ class OllamaCopilot:
             raise RuntimeError(f"COPILOT_UNAVAILABLE: {exc}") from exc
 
         content = response_payload["choices"][0]["message"]["content"]
-        return _validate(json.loads(content), text)
+        return _parse_llm_response(content, text)
 
 
 def intent_to_dict(intent: CopilotIntent) -> dict[str, Any]:

@@ -1,0 +1,4 @@
+{
+  "command": "/GENERATE DESIGN parametric_grid_v1 {\"floors\":120,\"areaM2\":120000,\"location\":\"Trujillo\"}",
+  "actor": "test"
+}
