@@ -37,25 +37,35 @@ class CopilotIntent:
 
 _SYSTEM_PROMPT = """Eres un EXTRACTOR DE PARÁMETROS ARQUITECTÓNICOS.
 
-Devuelve SOLO el JSON con los parámetros extraídos. Sin explicaciones, sin markdown, sin bloques de código. El JSON debe tener SOLO estas claves:
+Tu única tarea es leer la descripción del usuario (el Arquitecto) y devolver un JSON con los parámetros del proyecto extraídos. NO HACES PREGUNTAS. NO PIDES ACLARACIONES. Si un dato no está, ponlo como null.
 
-- tipo: "terminal_terrestre" | "hospital" | "aeropuerto" | "puerto" | "vivienda" | "otro"
-- area_m2: número o null
-- buses_interprovinciales: número o null
-- buses_provinciales: número o null
-- taxis: número o null
-- estilo: string o null
-- areas_verdes: true | false | null
-- feng_shui: true | false | null
-- parque_infantil: true | false | null
-- presupuesto_uit: número o null
-- ciudad: string o null
+REGLAS:
+- Devuelve SOLO JSON con las claves: command, explanation, confidence, parameters, questions.
+- `command`: SIEMPRE "UNKNOWN".
+- `questions`: SIEMPRE [].
+- `confidence`: 0.95 si extrajiste todos los datos clave, 0.5 si faltan algunos.
+- `parameters`: objeto con:
+  - tipo: "terminal_terrestre" | "hospital" | "aeropuerto" | "puerto" | "vivienda" | "oficina" | "comercio" | "educacion" | "deporte" | "cultura" | "otro"
+  - area_m2: número o null
+  - buses_interprovinciales: número o null
+  - buses_provinciales: número o null
+  - taxis: número o null
+  - capacidad: número o null (camas de hospital, pasajeros, etc.)
+  - pisos: número o null
+  - estilo: string o null (ej. "neo_futurista", "moderno", "clasico")
+  - areas_verdes: true | false | null
+  - feng_shui: true | false | null
+  - parque_infantil: true | false | null
+  - presupuesto_uit: número o null
+  - ciudad: string o null
+  - terreno_dimensiones: string o null (ej. "300x400")
 
 EJEMPLO:
 Solicitud: "Quiero un terminal terrestre para 120 buses interprovinciales, 60 provinciales y 240 taxis, en 120,000 m², estilo neo futurista con áreas verdes y feng shui, y parque infantil interno"
 Respuesta:
-{"tipo":"terminal_terrestre","area_m2":120000,"buses_interprovinciales":120,"buses_provinciales":60,"taxis":240,"estilo":"neo_futurista","areas_verdes":true,"feng_shui":true,"parque_infantil":true,"presupuesto_uit":null,"ciudad":null}
+{"command":"UNKNOWN","explanation":"Terminal terrestre de 120,000 m² con 120 buses interprovinciales, 60 provinciales, 240 taxis, estilo neo-futurista, áreas verdes, feng shui y parque infantil.","confidence":0.95,"parameters":{"tipo":"terminal_terrestre","area_m2":120000,"buses_interprovinciales":120,"buses_provinciales":60,"taxis":240,"capacidad":null,"pisos":null,"estilo":"neo_futurista","areas_verdes":true,"feng_shui":true,"parque_infantil":true,"presupuesto_uit":null,"ciudad":null,"terreno_dimensiones":null},"questions":[]}
 """
+
 
 
 
@@ -82,10 +92,11 @@ def _validate(payload: Any, text: str) -> CopilotIntent:
         return CopilotIntent(
             natural_language=text,
             command="UNKNOWN",
-            explanation="El modelo no devolvió un JSON válido.",
+            explanation="El modelo no devolvio un JSON valido.",
             confidence=0.0,
             status="NO_MATCH",
             questions=[],
+            parameters={},
         )
 
     # CASO 1: JSON con formato completo (tiene 'command' o 'questions')
@@ -102,6 +113,10 @@ def _validate(payload: Any, text: str) -> CopilotIntent:
         if not isinstance(questions, list):
             questions = []
 
+        parameters = payload.get("parameters", {})
+        if not isinstance(parameters, dict):
+            parameters = {}
+
         if not command:
             return CopilotIntent(
                 natural_language=text,
@@ -110,16 +125,18 @@ def _validate(payload: Any, text: str) -> CopilotIntent:
                 confidence=confidence,
                 status="NO_MATCH",
                 questions=questions,
+                parameters=parameters,
             )
 
         if command.upper() == "UNKNOWN":
             return CopilotIntent(
                 natural_language=text,
                 command="UNKNOWN",
-                explanation=explanation or "Proyecto de diseño.",
+                explanation=explanation or "Proyecto de diseno.",
                 confidence=confidence,
                 status="NO_MATCH",
                 questions=questions,
+                parameters=parameters,
             )
 
         if not is_known_command(command):
@@ -130,6 +147,7 @@ def _validate(payload: Any, text: str) -> CopilotIntent:
                 confidence=0.0,
                 status="NO_MATCH",
                 questions=questions,
+                parameters=parameters,
             )
 
         return CopilotIntent(
@@ -139,18 +157,19 @@ def _validate(payload: Any, text: str) -> CopilotIntent:
             confidence=confidence,
             status="PREVIEW_ONLY",
             questions=questions,
+            parameters=parameters,
         )
 
-    # CASO 2: JSON plano (solo parámetros). El modelo extrajo los datos.
+    # CASO 2: JSON plano (solo parametros). El modelo extrajo los datos.
     # Envolverlo en el formato esperado por el frontend.
     return CopilotIntent(
         natural_language=text,
         command="UNKNOWN",
-        explanation=f"Parámetros extraídos: {json.dumps(payload, ensure_ascii=False)[:200]}",
+        explanation=f"Parametros extraidos: {str(payload)[:200]}",
         confidence=0.9,
         status="NO_MATCH",
         questions=[],
-        parameters=payload,  # <-- NUEVO: guardar el JSON plano como parámetros
+        parameters=payload,  # <-- AQUI SE GUARDAN LOS PARAMETROS
     )
 
 
