@@ -234,10 +234,15 @@ class OllamaCopilot:
         self,
         base_url: str | None = None,
         model: str | None = None,
-        timeout: float = 120.0,
+        timeout: float = 300.0,
     ) -> None:
-        self.base_url = (base_url or os.getenv("OLLAMA_BASE_URL", "")).rstrip("/")
-        self.model = model or os.getenv("OLLAMA_MODEL", "deepseek-coder-v2:16b")
+        self.base_url = (base_url or "http://127.0.0.1:11435").rstrip("/")
+        # Limpiar /v1 o /api si quedaron en la URL
+        if self.base_url.endswith("/v1"):
+            self.base_url = self.base_url[:-3]
+        if self.base_url.endswith("/api"):
+            self.base_url = self.base_url[:-4]
+        self.model = model or "llama3:latest"
         self.timeout = timeout
 
     def translate_preview(self, text: str) -> CopilotIntent:
@@ -246,31 +251,36 @@ class OllamaCopilot:
         if not self.base_url:
             raise RuntimeError("COPILOT_NOT_CONFIGURED")
 
+        import httpx
         system_prompt = _SYSTEM_PROMPT.replace("{catalog}", catalog_for_prompt())
 
         body = {
             "model": self.model,
-            "temperature": 0,
             "stream": False,
-            "response_format": {"type": "json_object"},
+            "format": "json",
+            "options": {"temperature": 0},
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text},
             ],
         }
-        request = urllib.request.Request(
-            self.base_url + "/v1/chat/completions",
-            data=json.dumps(body).encode(),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
+        
+        url = self.base_url.rstrip("/") + "/api/chat"
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                response_payload = json.load(response)
-        except (urllib.error.URLError, TimeoutError) as exc:
+            response = httpx.post(url, json=body, timeout=300.0)
+            response.raise_for_status()
+            response_payload = response.json()
+        except httpx.HTTPStatusError as exc:
+            # Extraer el detalle real de Ollama
+            try:
+                detail = exc.response.json().get("error", str(exc))
+            except Exception:
+                detail = str(exc)
+            raise RuntimeError(f"COPILOT_UNAVAILABLE: {detail}") from exc
+        except (httpx.RequestError, TimeoutError) as exc:
             raise RuntimeError(f"COPILOT_UNAVAILABLE: {exc}") from exc
 
-        content = response_payload["choices"][0]["message"]["content"]
+        content = response_payload["message"]["content"]
         return _parse_llm_response(content, text)
 
 
