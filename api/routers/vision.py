@@ -1,0 +1,110 @@
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from pydantic import BaseModel
+from pathlib import Path
+import uuid
+import base64
+from typing import Optional
+import httpx
+
+router = APIRouter(prefix="/api/v1/vision", tags=["vision"])
+
+VISION_UPLOAD_DIR = Path("data/vision_uploads")
+VISION_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+class VisionAnalysisRequest(BaseModel):
+    image_base64: Optional[str] = None
+    prompt: str = "Describe lo que ves en esta imagen"
+    model: str = "mapler/llama3-llava-next-8b:latest"
+
+class VisionAnalysisResponse(BaseModel):
+    status: str
+    analysis: str
+    image_path: Optional[str] = None
+
+@router.post("/analyze", response_model=VisionAnalysisResponse)
+async def analyze_image(
+    file: Optional[UploadFile] = File(None),
+    prompt: str = Form("Describe lo que ves en esta imagen"),
+    image_base64: Optional[str] = Form(None)
+):
+    """
+    Analiza una imagen usando visión artificial.
+    Puede recibir:
+    - Archivo subido (multipart/form-data)
+    - Base64 en el body
+    """
+    
+    image_path = None
+    
+    # Si se subió un archivo
+    if file:
+        file_ext = Path(file.filename).suffix.lower()
+        allowed = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+        
+        if file_ext not in allowed:
+            raise HTTPException(status_code=400, detail=f"Formato no permitido. Usa: {', '.join(allowed)}")
+        
+        unique_filename = f"vision_{uuid.uuid4().hex}{file_ext}"
+        image_path = VISION_UPLOAD_DIR / unique_filename
+        
+        with open(image_path, "wb") as buffer:
+            buffer.write(await file.read())
+        
+        # Convertir a base64 para enviar al modelo
+        with open(image_path, "rb") as img_file:
+            image_base64 = base64.b64encode(img_file.read()).decode('utf-8')
+    
+    if not image_base64:
+        raise HTTPException(status_code=400, detail="No se proporcionó imagen")
+    
+    # Intentar llamar al modelo de visión local (LLaVA)
+    try:
+        # LLaVA en Ollama (puerto 11434)
+        ollama_response = await httpx.post(
+            "http://127.0.0.1:11434/api/generate",
+            json={
+                "model": "mapler/llama3-llava-next-8b:latest",
+                "prompt": prompt,
+                "images": [image_base64],
+                "stream": False
+            },
+            timeout=120.0
+        )
+        
+        if ollama_response.status_code == 200:
+            result = ollama_response.json()
+            analysis = result.get("response", "No se pudo analizar la imagen")
+        else:
+            # Fallback: análisis básico
+            analysis = f"📷 Imagen recibida ({len(image_base64)} bytes en base64).\n\n⚠️ El modelo de visión (LLaVA) no está disponible. Instalación:\n```bash\nollama pull llava\n```\n\nMientras tanto, ARKI puede trabajar con la descripción que me proporciones."
+    
+    except httpx.ConnectError:
+        analysis = f"📷 Imagen recibida correctamente.\n\n⚠️ Ollama no está corriendo en el puerto 11434. Para activar visión artificial:\n```bash\nollama pull llava\nollama serve\n```\n\nUna vez activo, ARKI podrá analizar planos, fotos de terrenos, renders y más."
+    
+    return VisionAnalysisResponse(
+        status="success",
+        analysis=analysis,
+        image_path=str(image_path) if image_path else None
+    )
+
+@router.get("/status")
+async def vision_status():
+    """Verifica si el modelo de visión está disponible"""
+    try:
+        response = await httpx.get("http://127.0.0.1:11434/api/tags", timeout=5.0)
+        if response.status_code == 200:
+            models = response.json().get("models", [])
+            llava_available = any("llava" in m.get("name", "").lower() for m in models)
+            return {
+                "ollama_status": "online",
+                "llava_available": llava_available,
+                "models": [m["name"] for m in models]
+            }
+    except:
+        pass
+    
+    return {
+        "ollama_status": "offline",
+        "llava_available": False,
+        "message": "Ollama no está corriendo. Ejecuta: ollama serve"
+    }
