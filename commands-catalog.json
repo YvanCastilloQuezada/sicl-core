@@ -1,48 +1,422 @@
 [
-  {"name": "/PROJECT CREATE", "compact": "/PROJ CREATE", "description": "Crear un proyecto"},
-  {"name": "/PROJECT OPEN", "compact": "/PROJ OPEN", "description": "Abrir un proyecto existente"},
-  {"name": "/PROJECT SHOW", "compact": "/PROJ SHOW", "description": "Mostrar un proyecto"},
-  {"name": "/PROJECT LIST", "compact": "/PROJ LIST", "description": "Listar proyectos"},
-  {"name": "/FACT SET", "compact": "/FACT", "description": "Registrar un hecho"},
-  {"name": "/ASSUMPTION SET", "compact": "/ASSUME", "description": "Registrar un supuesto"},
-  {"name": "/EVIDENCE ADD", "compact": "/EVID", "description": "Añadir evidencia"},
-  {"name": "/EVIDENCE LIST", "compact": "/EVID LIST", "description": "Listar evidencias"},
-  {"name": "/OBJECTIVE SET", "compact": "/OBJ", "description": "Establecer un objetivo"},
-  {"name": "/CONSTRAINT SET", "compact": "/CONS", "description": "Establecer una restricción"},
-  {"name": "/ALTERNATIVE CREATE", "compact": "/ALT", "description": "Crear una alternativa"},
-  {"name": "/ALTERNATIVE PROMOTE", "compact": "/ALT PROMOTE", "description": "Promover una alternativa"},
-  {"name": "/EVALUATE", "compact": "/EVAL", "description": "Evaluar una alternativa"},
-  {"name": "/COMPARE", "compact": "/CMP", "description": "Comparar alternativas"},
-  {"name": "/RECOMMEND", "compact": "/REC", "description": "Generar una recomendación"},
-  {"name": "/DECISION RECORD", "compact": "/DEC REC", "description": "Registrar una decisión"},
-  {"name": "/HUMAN REVIEW", "compact": "/REVIEW", "description": "Revisión humana"},
-  {"name": "/GENERATE DESIGN", "compact": "/GEN DESIGN", "description": "Generar un diseño"},
-  {"name": "/GENERATE LIST", "compact": "/GEN LIST", "description": "Listar generaciones"},
-  {"name": "/GENERATE SHOW", "compact": "/GEN SHOW", "description": "Mostrar generación"},
-  {"name": "/GENERATE METHODS", "compact": "/GEN METHODS", "description": "Métodos de generación"},
-  {"name": "/PARETO", "compact": "/PARETO", "description": "Análisis de Pareto"},
-  {"name": "/TRADEOFF_MATRIX", "compact": "/TRADEOFF", "description": "Matriz de tradeoffs"},
-  {"name": "/MULTIOBJECTIVE", "compact": "/MULTI", "description": "Análisis multiobjetivo"},
-  {"name": "/SITE INTELLIGENCE", "compact": "/SITE INTEL", "description": "Inteligencia del sitio"},
-  {"name": "/AGENT RUN", "compact": "/AGENT", "description": "Ejecutar agente"},
-  {"name": "/DEBATE", "compact": "/DEBATE", "description": "Debate de agentes"},
-  {"name": "/STATUS", "compact": "/STATUS", "description": "Estado del proyecto"},
-  {"name": "/HISTORY", "compact": "/HIST", "description": "Historial de eventos"},
-  {"name": "/PLANNING ADD", "compact": "/PLAN ADD", "description": "Añadir plan"},
-  {"name": "/PLANNING LIST", "compact": "/PLAN LIST", "description": "Listar planes"},
-  {"name": "/PLANNING SHOW", "compact": "/PLAN SHOW", "description": "Mostrar plan"},
-  {"name": "/PLANNING TYPES", "compact": "/PLAN TYPES", "description": "Tipos de plan"},
-  {"name": "/REGULATION ADD", "compact": "/REG ADD", "description": "Añadir regulación"},
-  {"name": "/REGULATION LIST", "compact": "/REG LIST", "description": "Listar regulaciones"},
-  {"name": "/REGULATION STATUS", "compact": "/REG STATUS", "description": "Estado de regulación"},
-  {"name": "/INTERPRET ADD", "compact": "/INTERP ADD", "description": "Añadir interpretación"},
-  {"name": "/INTERPRET LIST", "compact": "/INTERP LIST", "description": "Listar interpretaciones"},
-  {"name": "/INTERPRET REVIEW", "compact": "/INTERP REVIEW", "description": "Revisar interpretación"},
-  {"name": "/SNAPSHOT CREATE", "compact": "/SNAP", "description": "Crear snapshot"},
-  {"name": "/SNAPSHOT LIST", "compact": "/SNAP LIST", "description": "Listar snapshots"},
-  {"name": "/SNAPSHOT FREEZE", "compact": "/SNAP FREEZE", "description": "Congelar snapshot"},
-  {"name": "/MEMORY LIST", "compact": "/MEM LIST", "description": "Listar memoria"},
-  {"name": "/MEMORY SHOW", "compact": "/MEM SHOW", "description": "Mostrar memoria"},
-  {"name": "/MEMORY EXTRACT", "compact": "/MEM EXTRACT", "description": "Extraer memoria"},
-  {"name": "/MEMORY TYPES", "compact": "/MEM TYPES", "description": "Tipos de memoria"}
+  {
+    "name": "/PROJECT CREATE",
+    "compact": "/PROJ CREATE",
+    "description": "Crear un proyecto"
+  },
+  {
+    "name": "/PROJECT OPEN",
+    "compact": "/PROJ OPEN",
+    "description": "Abrir un proyecto existente"
+  },
+  {
+    "name": "/PROJECT SHOW",
+    "compact": "/PROJ SHOW",
+    "description": "Mostrar un proyecto"
+  },
+  {
+    "name": "/PROJECT LIST",
+    "compact": "/PROJ LIST",
+    "description": "Listar proyectos"
+  },
+  {
+    "name": "/FACT SET",
+    "compact": "/FACT",
+    "description": "Registrar un hecho"
+  },
+  {
+    "name": "/ASSUMPTION SET",
+    "compact": "/ASSUME",
+    "description": "Registrar un supuesto"
+  },
+  {
+    "name": "/EVIDENCE ADD",
+    "compact": "/EVID",
+    "description": "Añadir evidencia"
+  },
+  {
+    "name": "/EVIDENCE LIST",
+    "compact": "/EVID LIST",
+    "description": "Listar evidencias"
+  },
+  {
+    "name": "/OBJECTIVE SET",
+    "compact": "/OBJ",
+    "description": "Establecer un objetivo"
+  },
+  {
+    "name": "/CONSTRAINT SET",
+    "compact": "/CONS",
+    "description": "Establecer una restricción"
+  },
+  {
+    "name": "/ALTERNATIVE CREATE",
+    "compact": "/ALT",
+    "description": "Crear una alternativa"
+  },
+  {
+    "name": "/ALTERNATIVE PROMOTE",
+    "compact": "/ALT PROMOTE",
+    "description": "Promover una alternativa"
+  },
+  {
+    "name": "/EVALUATE",
+    "compact": "/EVAL",
+    "description": "Evaluar una alternativa"
+  },
+  {
+    "name": "/COMPARE",
+    "compact": "/CMP",
+    "description": "Comparar alternativas"
+  },
+  {
+    "name": "/RECOMMEND",
+    "compact": "/REC",
+    "description": "Generar una recomendación"
+  },
+  {
+    "name": "/DECISION RECORD",
+    "compact": "/DEC REC",
+    "description": "Registrar una decisión"
+  },
+  {
+    "name": "/HUMAN REVIEW",
+    "compact": "/REVIEW",
+    "description": "Revisión humana"
+  },
+  {
+    "name": "/GENERATE DESIGN",
+    "compact": "/GEN DESIGN",
+    "description": "Generar un diseño"
+  },
+  {
+    "name": "/GENERATE LIST",
+    "compact": "/GEN LIST",
+    "description": "Listar generaciones"
+  },
+  {
+    "name": "/GENERATE SHOW",
+    "compact": "/GEN SHOW",
+    "description": "Mostrar generación"
+  },
+  {
+    "name": "/GENERATE METHODS",
+    "compact": "/GEN METHODS",
+    "description": "Métodos de generación"
+  },
+  {
+    "name": "/PARETO",
+    "compact": "/PARETO",
+    "description": "Análisis de Pareto"
+  },
+  {
+    "name": "/TRADEOFF_MATRIX",
+    "compact": "/TRADEOFF",
+    "description": "Matriz de tradeoffs"
+  },
+  {
+    "name": "/MULTIOBJECTIVE",
+    "compact": "/MULTI",
+    "description": "Análisis multiobjetivo"
+  },
+  {
+    "name": "/SITE INTELLIGENCE",
+    "compact": "/SITE INTEL",
+    "description": "Inteligencia del sitio"
+  },
+  {
+    "name": "/AGENT RUN",
+    "compact": "/AGENT",
+    "description": "Ejecutar agente"
+  },
+  {
+    "name": "/DEBATE",
+    "compact": "/DEBATE",
+    "description": "Debate de agentes"
+  },
+  {
+    "name": "/STATUS",
+    "compact": "/STATUS",
+    "description": "Estado del proyecto"
+  },
+  {
+    "name": "/HISTORY",
+    "compact": "/HIST",
+    "description": "Historial de eventos"
+  },
+  {
+    "name": "/PLANNING ADD",
+    "compact": "/PLAN ADD",
+    "description": "Añadir plan"
+  },
+  {
+    "name": "/PLANNING LIST",
+    "compact": "/PLAN LIST",
+    "description": "Listar planes"
+  },
+  {
+    "name": "/PLANNING SHOW",
+    "compact": "/PLAN SHOW",
+    "description": "Mostrar plan"
+  },
+  {
+    "name": "/PLANNING TYPES",
+    "compact": "/PLAN TYPES",
+    "description": "Tipos de plan"
+  },
+  {
+    "name": "/REGULATION ADD",
+    "compact": "/REG ADD",
+    "description": "Añadir regulación"
+  },
+  {
+    "name": "/REGULATION LIST",
+    "compact": "/REG LIST",
+    "description": "Listar regulaciones"
+  },
+  {
+    "name": "/REGULATION STATUS",
+    "compact": "/REG STATUS",
+    "description": "Estado de regulación"
+  },
+  {
+    "name": "/INTERPRET ADD",
+    "compact": "/INTERP ADD",
+    "description": "Añadir interpretación"
+  },
+  {
+    "name": "/INTERPRET LIST",
+    "compact": "/INTERP LIST",
+    "description": "Listar interpretaciones"
+  },
+  {
+    "name": "/INTERPRET REVIEW",
+    "compact": "/INTERP REVIEW",
+    "description": "Revisar interpretación"
+  },
+  {
+    "name": "/SNAPSHOT CREATE",
+    "compact": "/SNAP",
+    "description": "Crear snapshot"
+  },
+  {
+    "name": "/SNAPSHOT LIST",
+    "compact": "/SNAP LIST",
+    "description": "Listar snapshots"
+  },
+  {
+    "name": "/SNAPSHOT FREEZE",
+    "compact": "/SNAP FREEZE",
+    "description": "Congelar snapshot"
+  },
+  {
+    "name": "/MEMORY LIST",
+    "compact": "/MEM LIST",
+    "description": "Listar memoria"
+  },
+  {
+    "name": "/MEMORY SHOW",
+    "compact": "/MEM SHOW",
+    "description": "Mostrar memoria"
+  },
+  {
+    "name": "/MEMORY EXTRACT",
+    "compact": "/MEM EXTRACT",
+    "description": "Extraer memoria"
+  },
+  {
+    "name": "/MEMORY TYPES",
+    "compact": "/MEM TYPES",
+    "description": "Tipos de memoria"
+  },
+  {
+    "name": "/ACTOR",
+    "compact": "/ACTOR",
+    "description": "Comando /ACTOR"
+  },
+  {
+    "name": "/ACTOR ADD",
+    "compact": "/ACTOR ADD",
+    "description": "Comando /ACTOR ADD"
+  },
+  {
+    "name": "/ACTOR LIST",
+    "compact": "/ACTOR LIST",
+    "description": "Comando /ACTOR LIST"
+  },
+  {
+    "name": "/ACTOR SHOW",
+    "compact": "/ACTOR SHOW",
+    "description": "Comando /ACTOR SHOW"
+  },
+  {
+    "name": "/CONSTRAINT",
+    "compact": "/CONSTRAINT",
+    "description": "Comando /CONSTRAINT"
+  },
+  {
+    "name": "/CYCLE",
+    "compact": "/CYCLE",
+    "description": "Comando /CYCLE"
+  },
+  {
+    "name": "/CYCLE CREATE",
+    "compact": "/CYCLE CREATE",
+    "description": "Comando /CYCLE CREATE"
+  },
+  {
+    "name": "/CYCLE LIST",
+    "compact": "/CYCLE LIST",
+    "description": "Comando /CYCLE LIST"
+  },
+  {
+    "name": "/CYCLE SHOW",
+    "compact": "/CYCLE SHOW",
+    "description": "Comando /CYCLE SHOW"
+  },
+  {
+    "name": "/EVIDENCE SHOW",
+    "compact": "/EVIDENCE SHOW",
+    "description": "Comando /EVIDENCE SHOW"
+  },
+  {
+    "name": "/EXIT",
+    "compact": "/EXIT",
+    "description": "Comando /EXIT"
+  },
+  {
+    "name": "/FEASIBILITY",
+    "compact": "/FEASIBILITY",
+    "description": "Comando /FEASIBILITY"
+  },
+  {
+    "name": "/GENERATE",
+    "compact": "/GENERATE",
+    "description": "Comando /GENERATE"
+  },
+  {
+    "name": "/HELP",
+    "compact": "/HELP",
+    "description": "Comando /HELP"
+  },
+  {
+    "name": "/MEMORY APPLY",
+    "compact": "/MEMORY APPLY",
+    "description": "Comando /MEMORY APPLY"
+  },
+  {
+    "name": "/MEMORY REVOKE",
+    "compact": "/MEMORY REVOKE",
+    "description": "Comando /MEMORY REVOKE"
+  },
+  {
+    "name": "/OBJECTIVE",
+    "compact": "/OBJECTIVE",
+    "description": "Comando /OBJECTIVE"
+  },
+  {
+    "name": "/POSITION",
+    "compact": "/POSITION",
+    "description": "Comando /POSITION"
+  },
+  {
+    "name": "/POSITION ADD",
+    "compact": "/POSITION ADD",
+    "description": "Comando /POSITION ADD"
+  },
+  {
+    "name": "/POSITION LIST",
+    "compact": "/POSITION LIST",
+    "description": "Comando /POSITION LIST"
+  },
+  {
+    "name": "/PROJECT",
+    "compact": "/PROJECT",
+    "description": "Comando /PROJECT"
+  },
+  {
+    "name": "/PROJECT IMPORT OBJECTIVE",
+    "compact": "/PROJECT IMPORT OBJECTIVE",
+    "description": "Comando /PROJECT IMPORT OBJECTIVE"
+  },
+  {
+    "name": "/PROJECT SET SCOPE",
+    "compact": "/PROJECT SET SCOPE",
+    "description": "Comando /PROJECT SET SCOPE"
+  },
+  {
+    "name": "/REGULATION SHOW",
+    "compact": "/REGULATION SHOW",
+    "description": "Comando /REGULATION SHOW"
+  },
+  {
+    "name": "/ROLE",
+    "compact": "/ROLE",
+    "description": "Comando /ROLE"
+  },
+  {
+    "name": "/ROLE ADD",
+    "compact": "/ROLE ADD",
+    "description": "Comando /ROLE ADD"
+  },
+  {
+    "name": "/SCALE",
+    "compact": "/SCALE",
+    "description": "Comando /SCALE"
+  },
+  {
+    "name": "/SCALE CHILDREN",
+    "compact": "/SCALE CHILDREN",
+    "description": "Comando /SCALE CHILDREN"
+  },
+  {
+    "name": "/SCALE PARENT",
+    "compact": "/SCALE PARENT",
+    "description": "Comando /SCALE PARENT"
+  },
+  {
+    "name": "/SCALE RELATE",
+    "compact": "/SCALE RELATE",
+    "description": "Comando /SCALE RELATE"
+  },
+  {
+    "name": "/SCALE RELATIONS",
+    "compact": "/SCALE RELATIONS",
+    "description": "Comando /SCALE RELATIONS"
+  },
+  {
+    "name": "/SCENARIO",
+    "compact": "/SCENARIO",
+    "description": "Comando /SCENARIO"
+  },
+  {
+    "name": "/SCENARIO CREATE",
+    "compact": "/SCENARIO CREATE",
+    "description": "Comando /SCENARIO CREATE"
+  },
+  {
+    "name": "/SCENARIO LIST",
+    "compact": "/SCENARIO LIST",
+    "description": "Comando /SCENARIO LIST"
+  },
+  {
+    "name": "/SCENARIO SELECT",
+    "compact": "/SCENARIO SELECT",
+    "description": "Comando /SCENARIO SELECT"
+  },
+  {
+    "name": "/STAGE",
+    "compact": "/STAGE",
+    "description": "Comando /STAGE"
+  },
+  {
+    "name": "/STAGE SET",
+    "compact": "/STAGE SET",
+    "description": "Comando /STAGE SET"
+  },
+  {
+    "name": "/VARIABLE",
+    "compact": "/VARIABLE",
+    "description": "Comando /VARIABLE"
+  }
 ]
