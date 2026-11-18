@@ -39,6 +39,37 @@ def _event(event_id="evt-001", idempotency_key="idem-001"):
     }
 
 
+def test_continuity_rejects_timestamps_without_timezone(continuity_client, monkeypatch):
+    client, _ = continuity_client
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "test-secret")
+    body = _event()
+    body["occurred_at"] = "2026-10-30T12:00:00"
+    response = client.post(
+        "/v1/projects/MEMORY-P1/continuity/events",
+        json=body,
+        headers={"Authorization": "Bearer test-secret"},
+    )
+    assert response.status_code == 422
+
+
+def test_continuity_normalizes_timestamps_to_utc(continuity_client, monkeypatch):
+    client, repo = continuity_client
+    monkeypatch.setenv("SICL_CORE_SERVICE_TOKEN", "test-secret")
+    body = _event()
+    body["occurred_at"] = "2026-10-30T15:00:00+03:00"
+    body["recorded_at"] = "2026-10-30T10:00:00-05:00"
+    response = client.post(
+        "/v1/projects/MEMORY-P1/continuity/events",
+        json=body,
+        headers={"Authorization": "Bearer test-secret"},
+    )
+    assert response.status_code == 200
+    event = repo.events("MEMORY-P1")[0]
+    stored = event.payload["continuity"]
+    assert stored["occurred_at"] == "2026-10-30T12:00:00.000Z"
+    assert stored["recorded_at"] == "2026-10-30T15:00:00.000Z"
+
+
 def test_continuity_fails_closed_when_service_token_is_not_configured(
     continuity_client, monkeypatch
 ):

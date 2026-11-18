@@ -59,14 +59,18 @@ class ContinuityEventRequest(BaseModel):
             raise ValueError("Unsupported continuity event_type")
         return value
 
-    @field_validator("occurred_at")
+    @field_validator("occurred_at", "recorded_at")
     @classmethod
-    def validate_occurred_at(cls, value: str) -> str:
+    def validate_utc_timestamp(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         try:
-            datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError as exc:
-            raise ValueError("occurred_at must be ISO-8601") from exc
-        return value
+            raise ValueError("timestamps must be ISO-8601") from exc
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError("timestamps must include an explicit timezone")
+        return parsed.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
     def canonical(self) -> dict[str, Any]:
         data = self.model_dump()
