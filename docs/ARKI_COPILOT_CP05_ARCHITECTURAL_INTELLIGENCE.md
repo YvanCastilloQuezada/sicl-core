@@ -79,3 +79,8 @@ Scores must not create false precision. A numeric score is only meaningful when 
 8. Engine requests are typed and validated.
 9. Geometry authority is not duplicated.
 10. Outputs can be independently reviewed and reproduced where supported.
+
+
+## CP-05 implementation checkpoint — 2026-11-26
+
+Added structured `DesignBrief`, `DesignCriterion`, `DesignAlternative`, and `AlternativeScore` contracts. Criteria require unique IDs and weights summing to 1; TARGET criteria require explicit targets; alternatives may only score registered criteria; normalized scores are bounded; facts retain epistemic status and provenance through CopilotFact. No design generation, weighted-score calculation, spatial optimization, CAD/AGK/OCCT/Manifold invocation, or project mutation is included. Tests authored but not executed.
