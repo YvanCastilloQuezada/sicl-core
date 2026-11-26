@@ -1,7 +1,7 @@
 """ARKI Copilot CP-01: conversation/action contract.
 
-This module is intentionally policy-only. It does not call LLMs, tools, project
-repositories, generation pipelines, or geometry engines.
+Policy-only primitives. This module must not call LLMs, tools, repositories,
+generation pipelines, or geometry engines.
 """
 from __future__ import annotations
 
@@ -69,6 +69,24 @@ class CopilotMessage:
 
 
 @dataclass(frozen=True)
+class IntentAssessment:
+    """Classifier output; an assessment is not permission to execute."""
+    intent: CopilotIntent
+    confidence: float
+    ambiguous: bool = False
+    clarification_question: str | None = None
+    rationale: str = ""
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError("intent confidence must be between 0 and 1")
+        if self.ambiguous and not (self.clarification_question or "").strip():
+            raise ValueError("ambiguous intent requires a clarification question")
+        if self.intent is not CopilotIntent.EXECUTE and self.ambiguous is False and self.clarification_question:
+            raise ValueError("clarification question must be paired with ambiguous intent")
+
+
+@dataclass(frozen=True)
 class ActionGateInput:
     """Facts required to evaluate an action. This gate never performs the action."""
     intent: CopilotIntent
@@ -79,6 +97,7 @@ class ActionGateInput:
     risk_policy_satisfied: bool = False
     confirmation_required: bool = True
     user_confirmed: bool = False
+    intent_ambiguous: bool = False
 
 
 @dataclass(frozen=True)
@@ -93,6 +112,8 @@ def evaluate_action_gate(request: ActionGateInput) -> ActionGateDecision:
 
     if request.intent is not CopilotIntent.EXECUTE:
         reasons.append("intent_is_not_execute")
+    if request.intent_ambiguous:
+        reasons.append("intent_is_ambiguous")
     if not request.explicit_execution_request:
         reasons.append("explicit_execution_request_missing")
     if not request.capability_available:
