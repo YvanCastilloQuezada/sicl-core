@@ -93,3 +93,8 @@ Never silently convert a low-confidence visual inference into a confirmed fact. 
 8. Missing/uncertain inputs remain visible.
 9. Saved project knowledge retains provenance.
 10. Tests cover stale source, conflict, unsupported claim, missing citation, and unverified visual inference.
+
+
+## CP-04 implementation checkpoint — 2026-11-26
+
+Added `src/sicl/copilot_evidence.py` contracts for source records, evidence links, claims, and research packets. Enforces ISO-8601 retrieval/publication dates, source hashes (when supplied), claim status distinctions, links to known sources, unique IDs, and separation of proposed claims from sourced claims. This is provenance validation only: no web/document retrieval, URL validation, source credibility scoring, freshness policy, contradiction resolution, or research synthesis adapter is implemented. Tests authored but not executed.
