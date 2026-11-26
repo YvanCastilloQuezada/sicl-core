@@ -94,3 +94,8 @@ The Office Copilot is a floating desktop panel with text and optional microphone
 10. Field observation facts/inferences/questions are distinct and reviewable.
 11. Session/project permissions apply equally across surfaces.
 12. No mobile surface can bypass capability authorization or action gates.
+
+
+## CP-06 implementation checkpoint — 2026-11-26
+
+Added `src/sicl/copilot_field.py` capture metadata and lifecycle contract: local draft, upload, uploaded acknowledgement, message attachment, processing, completed, failed, and cancellation states. Invalid transitions fail; remote lifecycle states require remote asset/message IDs; location captures require explicit consent and valid coordinates. This is metadata only: mobile UI, offline queue, binary upload, server staging, image/audio processing, retry/backoff and synchronization are not implemented. Tests authored but not executed.
