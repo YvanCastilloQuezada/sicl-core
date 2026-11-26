@@ -66,6 +66,8 @@ class CopilotMessage:
             raise ValueError("session_id must not be empty")
         if self.role not in {"architect", "copilot", "system", "tool"}:
             raise ValueError("role must be architect, copilot, system, or tool")
+        if not self.content.strip() and not self.attachments:
+            raise ValueError("message must include content or attachments")
 
 
 @dataclass(frozen=True)
@@ -82,7 +84,7 @@ class IntentAssessment:
             raise ValueError("intent confidence must be between 0 and 1")
         if self.ambiguous and not (self.clarification_question or "").strip():
             raise ValueError("ambiguous intent requires a clarification question")
-        if self.intent is not CopilotIntent.EXECUTE and self.ambiguous is False and self.clarification_question:
+        if not self.ambiguous and self.clarification_question:
             raise ValueError("clarification question must be paired with ambiguous intent")
 
 
