@@ -4,15 +4,28 @@ from sicl.copilot_contract import (
     ActionGateInput,
     CopilotIntent,
     CopilotFact,
+    CopilotMessage,
     FactStatus,
     IntentAssessment,
     evaluate_action_gate,
 )
 
 
-def test_non_execute_intent_is_never_allowed():
+@pytest.mark.parametrize(
+    "intent",
+    [
+        CopilotIntent.CONVERSE,
+        CopilotIntent.RESEARCH,
+        CopilotIntent.EXPLORE,
+        CopilotIntent.DESIGN_INTENT,
+        CopilotIntent.PREPARE_ACTION,
+        CopilotIntent.REVIEW,
+        CopilotIntent.CONTINUE,
+    ],
+)
+def test_every_non_execute_intent_is_blocked_from_execution(intent):
     decision = evaluate_action_gate(ActionGateInput(
-        intent=CopilotIntent.PREPARE_ACTION,
+        intent=intent,
         explicit_execution_request=True,
         capability_available=True,
         inputs_validated=True,
@@ -129,3 +142,31 @@ def test_clear_intent_may_not_have_clarification_question():
             ambiguous=False,
             clarification_question="¿Quieres que ejecute?",
         )
+
+
+def test_message_rejects_empty_identity_fields():
+    with pytest.raises(ValueError, match="message_id"):
+        CopilotMessage(message_id=" ", session_id="session-1", role="architect", content="Hola")
+    with pytest.raises(ValueError, match="session_id"):
+        CopilotMessage(message_id="msg-1", session_id=" ", role="architect", content="Hola")
+
+
+def test_message_rejects_unknown_role():
+    with pytest.raises(ValueError, match="role"):
+        CopilotMessage(message_id="msg-1", session_id="session-1", role="assistant", content="Hola")
+
+
+def test_message_rejects_empty_body_without_attachments():
+    with pytest.raises(ValueError, match="content or attachments"):
+        CopilotMessage(message_id="msg-1", session_id="session-1", role="architect", content=" ")
+
+
+def test_message_accepts_attachment_only_input():
+    msg = CopilotMessage(
+        message_id="msg-1",
+        session_id="session-1",
+        role="architect",
+        content="",
+        attachments=("asset-1",),
+    )
+    assert msg.attachments == ("asset-1",)
