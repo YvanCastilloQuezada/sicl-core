@@ -54,7 +54,7 @@ _CATALOG = {
     "conversation.respond": CapabilitySpec(
         "conversation.respond", "1", "Conversación", "Responder y mantener diálogo contextual.",
         (CopilotIntent.CONVERSE, CopilotIntent.CONTINUE), CapabilityRisk.R0,
-        available=True, adapter_id="conversation_model", requires_confirmation=False,
+        available=False, adapter_id="conversation_model", requires_confirmation=False,
         permission="copilot.converse", input_schema_id="chat.v1"),
     "research.search": CapabilitySpec(
         "research.search", "1", "Investigación", "Buscar fuentes externas y sintetizar evidencia.",
@@ -64,7 +64,7 @@ _CATALOG = {
     "analysis.explore": CapabilitySpec(
         "analysis.explore", "1", "Exploración", "Explorar problemas, escenarios e hipótesis.",
         (CopilotIntent.EXPLORE,), CapabilityRisk.R0,
-        available=True, adapter_id="reasoning_model", requires_confirmation=False,
+        available=False, adapter_id="reasoning_model", requires_confirmation=False,
         permission="copilot.converse", input_schema_id="exploration.v1"),
     "architecture.design": CapabilitySpec(
         "architecture.design", "1", "Diseño arquitectónico", "Desarrollar intención, programa y alternativas sin mutar el proyecto.",
@@ -74,7 +74,7 @@ _CATALOG = {
     "action.prepare": CapabilitySpec(
         "action.prepare", "1", "Preparación de acción", "Preparar plan, entradas y efectos esperados para una acción futura.",
         (CopilotIntent.PREPARE_ACTION,), CapabilityRisk.R2,
-        available=True, adapter_id="action_planner", requires_confirmation=False,
+        available=False, adapter_id="action_planner", requires_confirmation=False,
         permission="copilot.prepare", input_schema_id="action_plan.v1"),
     "review.inspect": CapabilitySpec(
         "review.inspect", "1", "Auditoría y revisión", "Revisar resultados, archivos, evidencia y posibles inconsistencias.",
