@@ -59,3 +59,8 @@ def test_mutation_capabilities_cannot_skip_confirmation():
         from sicl.copilot_capabilities import CapabilitySpec
         CapabilitySpec("unsafe", "1", "Unsafe", "test", (CopilotIntent.EXECUTE,),
                        CapabilityRisk.R3, available=True, requires_confirmation=False)
+
+
+def test_no_capability_claims_runtime_availability_before_adapter_integration():
+    assert all(spec.available is False for spec in CAPABILITY_REGISTRY.values())
+    assert all(spec.adapter_id is None or spec.available is False for spec in CAPABILITY_REGISTRY.values())
