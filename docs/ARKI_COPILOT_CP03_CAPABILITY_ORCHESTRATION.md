@@ -104,3 +104,8 @@ Initial families (names are taxonomy, not implemented integrations):
 8. Invocation is traced and outcome recorded.
 9. Idempotency/retry policy is explicit per capability.
 10. Output validation failure prevents canonical acceptance.
+
+
+## CP-03 implementation checkpoint — 2026-11-26
+
+Implemented a code-owned static catalog in `src/sicl/copilot_capabilities.py` with immutable runtime registry metadata, capability IDs/version, intent support, risk, availability, adapter ID, permission label, schema identifiers, timeout and idempotency flags. Routing returns candidate IDs only and always states `execution_authorized: false`. The execute operation is R4 and unavailable without an adapter. Tests were authored; they have not been run. This is not the full orchestrator: health checks, real schema validators, authorization binding, approval workflow, adapters, invocation, output validation and audit outcomes remain unimplemented.
