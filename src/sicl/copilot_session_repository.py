@@ -145,8 +145,11 @@ class CopilotSessionRepository:
             if existing:
                 self.conn.commit()
                 if existing["fingerprint"] == fingerprint:
-                    return {**dict(existing), "attachments": json.loads(existing["attachments_json"]),
-                            "metadata": json.loads(existing["metadata_json"]), "code": "DUPLICATE"}
+                    duplicate = dict(existing)
+                    duplicate["attachments"] = json.loads(duplicate.pop("attachments_json"))
+                    duplicate["metadata"] = json.loads(duplicate.pop("metadata_json"))
+                    duplicate["code"] = "DUPLICATE"
+                    return duplicate
                 raise ValueError("COPILOT_IDEMPOTENCY_CONFLICT")
             sequence = int(self.conn.execute(
                 "SELECT COALESCE(MAX(sequence),0)+1 AS next FROM copilot_messages WHERE session_id=?",
