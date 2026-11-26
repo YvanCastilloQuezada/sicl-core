@@ -127,3 +127,31 @@ All endpoints require verified actor authentication and project/session authoriz
 ## Decision gate before coding persistence
 
 Complete audit of authentication/actor identity in SICL-Web and SICL-Core, attachment handling/storage, database backup/migration behavior, and endpoint access pattern. If a dedicated Copilot DB is safer than additive tables, evaluate it against the same access-control and backup requirements; do not split databases merely for aesthetic modularity.
+
+
+## CP-02 implementation checkpoint — 2026-11-26
+
+Implemented on branch `feat/arki-copilot-foundation-cp00-06`:
+- Separate SQLite tables `copilot_sessions` and `copilot_messages`; no reuse of the continuity ledger or canonical project event tables.
+- Session records identify project, caller-declared actor, and surface channel (`FIELD`, `OFFICE`, `OTHER`). Channel is metadata, not authorization.
+- Messages are ordered per session, append-only via SQLite triggers, and retrievable with sequence cursors.
+- Message write retries are idempotent using message ID or session-scoped idempotency key plus payload fingerprint; changed payload conflicts.
+- Attachment IDs are references only. Binary attachment upload/storage is NOT implemented in this checkpoint.
+- API routes: create session, list actor/project sessions, append message, read message history. Service-token authentication is fail-closed.
+- Unit/API tests were authored, but not executed in this environment.
+
+
+## Security limitation — not production exposure ready
+
+The current API uses `SICL_CORE_SERVICE_TOKEN` and caller-supplied `actor_id`. It does not yet bind that actor ID to a verified user identity, project membership, or user-level authorization. Therefore, these endpoints must remain behind a trusted server boundary (backend-to-backend) and must not be called directly from browser/mobile clients. Before production exposure, implement verified identity, project membership/authorization, per-user session ownership, rate limits, and audit policy. A service token alone is not user authorization.
+
+
+## CP-02 acceptance gaps remaining
+
+- Run tests on the Ubuntu server or a trusted local checkout; no GitHub Actions dependency.
+- Add session-create idempotency and lifecycle/close API.
+- Implement project/user authorization binding.
+- Define attachment upload staging, storage backend, size/type allowlist, scanning, retention, and cleanup.
+- Add conversation export/retention and delete/forget policy appropriate to privacy law and project requirements.
+- Verify transaction behavior under concurrent requests and restart recovery.
+- Do not claim end-to-end Field/Office session continuity until both frontend surfaces use these endpoints.
