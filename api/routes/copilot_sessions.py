@@ -7,6 +7,7 @@ exposed directly to browsers or unauthenticated clients.
 from __future__ import annotations
 
 import os
+import sqlite3
 from typing import Any
 from uuid import uuid4
 
@@ -57,13 +58,10 @@ def create_session(body: SessionCreate, project_repo: SQLiteRepository = Depends
     try:
         return sessions.create_session(session_id=body.session_id, project_id=body.project_id,
                                      actor_id=body.actor_id, channel=body.channel, title=body.title)
-    except sqlite_error():
-        raise HTTPException(status_code=409, detail={"code": "COPILOT_SESSION_CONFLICT"})
-
-
-def sqlite_error():
-    import sqlite3
-    return sqlite3.IntegrityError
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(status_code=409, detail={"code": "COPILOT_SESSION_CONFLICT"}) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_SESSION", "message": str(exc)}) from exc
 
 
 @router.get("/sessions", dependencies=[Depends(_copilot_service_auth)])
