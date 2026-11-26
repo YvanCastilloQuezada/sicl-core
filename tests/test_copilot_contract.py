@@ -5,6 +5,7 @@ from sicl.copilot_contract import (
     CopilotIntent,
     CopilotFact,
     FactStatus,
+    IntentAssessment,
     evaluate_action_gate,
 )
 
@@ -47,6 +48,21 @@ def test_execution_gate_fails_closed_when_any_gate_is_missing(field, reason):
     decision = evaluate_action_gate(ActionGateInput(**values))
     assert not decision.allowed
     assert reason in decision.reasons
+
+
+def test_ambiguous_execute_intent_is_blocked_even_when_other_gates_pass():
+    decision = evaluate_action_gate(ActionGateInput(
+        intent=CopilotIntent.EXECUTE,
+        explicit_execution_request=True,
+        capability_available=True,
+        inputs_validated=True,
+        permission_granted=True,
+        risk_policy_satisfied=True,
+        confirmation_required=False,
+        intent_ambiguous=True,
+    ))
+    assert not decision.allowed
+    assert decision.reasons == ("intent_is_ambiguous",)
 
 
 def test_execution_requires_confirmation_when_policy_says_so():
@@ -93,3 +109,23 @@ def test_proposed_fact_can_carry_value_but_is_not_confirmed():
 def test_confidence_is_bounded():
     with pytest.raises(ValueError, match="between 0 and 1"):
         CopilotFact(key="typology", value="hospital", status=FactStatus.PROPOSED, confidence=1.5)
+
+
+def test_intent_confidence_is_bounded():
+    with pytest.raises(ValueError, match="intent confidence"):
+        IntentAssessment(intent=CopilotIntent.EXECUTE, confidence=1.2)
+
+
+def test_ambiguous_intent_requires_a_clarification_question():
+    with pytest.raises(ValueError, match="clarification question"):
+        IntentAssessment(intent=CopilotIntent.EXECUTE, confidence=0.5, ambiguous=True)
+
+
+def test_clear_intent_may_not_have_clarification_question():
+    with pytest.raises(ValueError, match="paired with ambiguous"):
+        IntentAssessment(
+            intent=CopilotIntent.CONVERSE,
+            confidence=0.95,
+            ambiguous=False,
+            clarification_question="¿Quieres que ejecute?",
+        )
