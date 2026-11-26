@@ -29,8 +29,18 @@ def classify_intent(text: str) -> IntentAssessment:
             rationale="empty_input_defaults_to_conversation",
         )
 
+    # Explicit continuation should resume the current task rather than be
+    # confused by descriptive words such as "audit" or "review" in its scope.
+    continue_patterns = _RULES[0][1]
+    if any(re.search(pattern, normalized) for pattern in continue_patterns):
+        return IntentAssessment(
+            intent=CopilotIntent.CONTINUE,
+            confidence=0.90,
+            rationale="explicit_continue_command",
+        )
+
     matched: list[CopilotIntent] = []
-    for intent, patterns in _RULES:
+    for intent, patterns in _RULES[1:]:
         if any(re.search(pattern, normalized) for pattern in patterns):
             matched.append(intent)
 
