@@ -1,0 +1,172 @@
+import pytest
+
+from sicl.copilot_contract import (
+    ActionGateInput,
+    CopilotIntent,
+    CopilotFact,
+    CopilotMessage,
+    FactStatus,
+    IntentAssessment,
+    evaluate_action_gate,
+)
+
+
+@pytest.mark.parametrize(
+    "intent",
+    [
+        CopilotIntent.CONVERSE,
+        CopilotIntent.RESEARCH,
+        CopilotIntent.EXPLORE,
+        CopilotIntent.DESIGN_INTENT,
+        CopilotIntent.PREPARE_ACTION,
+        CopilotIntent.REVIEW,
+        CopilotIntent.CONTINUE,
+    ],
+)
+def test_every_non_execute_intent_is_blocked_from_execution(intent):
+    decision = evaluate_action_gate(ActionGateInput(
+        intent=intent,
+        explicit_execution_request=True,
+        capability_available=True,
+        inputs_validated=True,
+        permission_granted=True,
+        risk_policy_satisfied=True,
+        confirmation_required=False,
+    ))
+    assert not decision.allowed
+    assert "intent_is_not_execute" in decision.reasons
+
+
+@pytest.mark.parametrize(
+    "field,reason",
+    [
+        ("explicit_execution_request", "explicit_execution_request_missing"),
+        ("capability_available", "capability_unavailable"),
+        ("inputs_validated", "inputs_not_validated"),
+        ("permission_granted", "permission_not_granted"),
+        ("risk_policy_satisfied", "risk_policy_not_satisfied"),
+    ],
+)
+def test_execution_gate_fails_closed_when_any_gate_is_missing(field, reason):
+    values = dict(
+        intent=CopilotIntent.EXECUTE,
+        explicit_execution_request=True,
+        capability_available=True,
+        inputs_validated=True,
+        permission_granted=True,
+        risk_policy_satisfied=True,
+        confirmation_required=False,
+    )
+    values[field] = False
+    decision = evaluate_action_gate(ActionGateInput(**values))
+    assert not decision.allowed
+    assert reason in decision.reasons
+
+
+def test_ambiguous_execute_intent_is_blocked_even_when_other_gates_pass():
+    decision = evaluate_action_gate(ActionGateInput(
+        intent=CopilotIntent.EXECUTE,
+        explicit_execution_request=True,
+        capability_available=True,
+        inputs_validated=True,
+        permission_granted=True,
+        risk_policy_satisfied=True,
+        confirmation_required=False,
+        intent_ambiguous=True,
+    ))
+    assert not decision.allowed
+    assert decision.reasons == ("intent_is_ambiguous",)
+
+
+def test_execution_requires_confirmation_when_policy_says_so():
+    decision = evaluate_action_gate(ActionGateInput(
+        intent=CopilotIntent.EXECUTE,
+        explicit_execution_request=True,
+        capability_available=True,
+        inputs_validated=True,
+        permission_granted=True,
+        risk_policy_satisfied=True,
+        confirmation_required=True,
+        user_confirmed=False,
+    ))
+    assert not decision.allowed
+    assert decision.reasons == ("user_confirmation_missing",)
+
+
+def test_execution_allowed_only_when_all_gates_are_satisfied():
+    decision = evaluate_action_gate(ActionGateInput(
+        intent=CopilotIntent.EXECUTE,
+        explicit_execution_request=True,
+        capability_available=True,
+        inputs_validated=True,
+        permission_granted=True,
+        risk_policy_satisfied=True,
+        confirmation_required=True,
+        user_confirmed=True,
+    ))
+    assert decision.allowed
+    assert decision.reasons == ()
+
+
+def test_missing_fact_cannot_smuggle_in_a_default_value():
+    with pytest.raises(ValueError, match="must not carry a value"):
+        CopilotFact(key="area_m2", value=20000, status=FactStatus.MISSING)
+
+
+def test_proposed_fact_can_carry_value_but_is_not_confirmed():
+    fact = CopilotFact(key="area_m2", value=20000, status=FactStatus.PROPOSED, source="copilot")
+    assert fact.value == 20000
+    assert fact.status is FactStatus.PROPOSED
+
+
+def test_confidence_is_bounded():
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        CopilotFact(key="typology", value="hospital", status=FactStatus.PROPOSED, confidence=1.5)
+
+
+def test_intent_confidence_is_bounded():
+    with pytest.raises(ValueError, match="intent confidence"):
+        IntentAssessment(intent=CopilotIntent.EXECUTE, confidence=1.2)
+
+
+def test_ambiguous_intent_requires_a_clarification_question():
+    with pytest.raises(ValueError, match="clarification question"):
+        IntentAssessment(intent=CopilotIntent.EXECUTE, confidence=0.5, ambiguous=True)
+
+
+def test_clear_intent_may_not_have_clarification_question():
+    with pytest.raises(ValueError, match="paired with ambiguous"):
+        IntentAssessment(
+            intent=CopilotIntent.CONVERSE,
+            confidence=0.95,
+            ambiguous=False,
+            clarification_question="¿Quieres que ejecute?",
+        )
+
+
+def test_message_rejects_empty_identity_fields():
+    with pytest.raises(ValueError, match="message_id"):
+        CopilotMessage(message_id=" ", session_id="session-1", role="architect", content="Hola")
+    with pytest.raises(ValueError, match="session_id"):
+        CopilotMessage(message_id="msg-1", session_id=" ", role="architect", content="Hola")
+
+
+def test_message_rejects_unknown_role():
+    with pytest.raises(ValueError, match="role"):
+        CopilotMessage(message_id="msg-1", session_id="session-1", role="assistant", content="Hola")
+
+
+def test_message_rejects_empty_body_without_attachments():
+    with pytest.raises(ValueError, match="content or attachments"):
+        CopilotMessage(message_id="msg-1", session_id="session-1", role="architect", content=" ")
+
+
+def test_message_accepts_attachment_only_input():
+    msg = CopilotMessage(
+        message_id="msg-1",
+        session_id="session-1",
+        role="architect",
+        content="",
+        attachments=("asset-1",),
+    )
+    assert msg.attachments == ("asset-1",)

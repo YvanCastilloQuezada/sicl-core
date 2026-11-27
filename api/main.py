@@ -15,7 +15,7 @@ from api.routes.commands import router as commands_router
 from api.routes.projects import router as projects_router
 from api.routes.v1 import router as v1_router
 from api.routes.continuity import router as continuity_router
-from api.routes.gis_copilot import router as gis_copilot_router
+from api.routes.gis_copilot import router as gis_copilot_router\nfrom api.routes.copilot_sessions import router as copilot_sessions_router
 from .routes import bim, specialties
 
 
@@ -33,7 +33,7 @@ def create_app() -> FastAPI:
     app.include_router(commands_router)
     app.include_router(v1_router)
     app.include_router(continuity_router)
-    app.include_router(gis_copilot_router)
+    app.include_router(gis_copilot_router)\n    app.include_router(copilot_sessions_router)
 
     @app.get("/health")
     def health() -> dict[str, str]:

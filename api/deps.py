@@ -30,3 +30,11 @@ def get_repository() -> Generator[SQLiteRepository, None, None]:
 
 def get_interpreter(repository: SQLiteRepository = None, actor: str = "api") -> CLI:
     return CLI(repository or _repository, actor=actor)
+
+
+from sicl.copilot_session_repository import CopilotSessionRepository
+
+_copilot_repository = CopilotSessionRepository(_database_path)
+
+def get_copilot_session_repository():
+    yield _copilot_repository
