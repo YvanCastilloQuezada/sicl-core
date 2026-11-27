@@ -1,0 +1,156 @@
+{
+  "contract": "ARKI-UCG-RESOLVER-R03",
+  "version": "1.0.0",
+  "identity_levels": [
+    "L1_domain",
+    "L2_family",
+    "L3_intent",
+    "L4_operation",
+    "L5_entity",
+    "L6_type",
+    "L7_mode",
+    "L8_output"
+  ],
+  "cases": [
+    {
+      "id": "RT-R01",
+      "scenario": "identical_identity",
+      "expected": "REUSE_ID"
+    },
+    {
+      "id": "RT-R02",
+      "scenario": "case_variation",
+      "expected": "REUSE_ID"
+    },
+    {
+      "id": "RT-R03",
+      "scenario": "whitespace_variation",
+      "expected": "REUSE_ID"
+    },
+    {
+      "id": "RT-R04",
+      "scenario": "n_tilde_vs_n",
+      "expected": "NO_REUSE"
+    },
+    {
+      "id": "RT-R05",
+      "scenario": "different_L1",
+      "expected": "NO_REUSE"
+    },
+    {
+      "id": "RT-R06",
+      "scenario": "different_L2",
+      "expected": "NO_REUSE"
+    },
+    {
+      "id": "RT-R07",
+      "scenario": "different_L3",
+      "expected": "NO_REUSE"
+    },
+    {
+      "id": "RT-R08",
+      "scenario": "different_L4",
+      "expected": "NO_REUSE"
+    },
+    {
+      "id": "RT-R09",
+      "scenario": "different_L5",
+      "expected": "NO_REUSE"
+    },
+    {
+      "id": "RT-R10",
+      "scenario": "different_L6",
+      "expected": "NO_REUSE"
+    },
+    {
+      "id": "RT-R11",
+      "scenario": "different_L7",
+      "expected": "NO_REUSE"
+    },
+    {
+      "id": "RT-R12",
+      "scenario": "different_L8",
+      "expected": "NO_REUSE"
+    },
+    {
+      "id": "RT-R13",
+      "scenario": "parameter_variation",
+      "expected": "SAME_IDENTITY"
+    },
+    {
+      "id": "RT-R14",
+      "scenario": "context_variation",
+      "expected": "SAME_IDENTITY"
+    },
+    {
+      "id": "RT-R15",
+      "scenario": "duplicate_registry_claim",
+      "expected": "CONFLICT"
+    },
+    {
+      "id": "RT-R16",
+      "scenario": "multiple_plausible_candidates",
+      "expected": "REVIEW_REQUIRED"
+    },
+    {
+      "id": "RT-R17",
+      "scenario": "composite_operation",
+      "expected": "DECOMPOSITION_REQUIRED"
+    },
+    {
+      "id": "RT-R18",
+      "scenario": "missing_identity_level",
+      "expected": "REJECTED"
+    },
+    {
+      "id": "RT-R19",
+      "scenario": "tampered_fingerprint",
+      "expected": "REJECTED"
+    },
+    {
+      "id": "RT-R20",
+      "scenario": "forged_identity_object",
+      "expected": "REJECTED"
+    },
+    {
+      "id": "RT-R21",
+      "scenario": "forbidden_unicode",
+      "expected": "REJECTED"
+    },
+    {
+      "id": "RT-R22",
+      "scenario": "normalization_collision",
+      "expected": "SAME_CANONICAL_IDENTITY"
+    },
+    {
+      "id": "RT-R23",
+      "scenario": "incomplete_registry_record",
+      "expected": "INVALID_RECORD"
+    },
+    {
+      "id": "RT-R24",
+      "scenario": "corrupt_registry",
+      "expected": "FAIL_CLOSED"
+    },
+    {
+      "id": "RT-R25",
+      "scenario": "candidate_order_permutation",
+      "expected": "DETERMINISTIC"
+    },
+    {
+      "id": "RT-R26",
+      "scenario": "high_text_similarity_different_operation",
+      "expected": "NO_REUSE"
+    },
+    {
+      "id": "RT-R27",
+      "scenario": "hostile_python_subclass",
+      "expected": "REJECTED"
+    },
+    {
+      "id": "RT-R28",
+      "scenario": "normalizer_version_mismatch",
+      "expected": "REVIEW_REQUIRED"
+    }
+  ]
+}
